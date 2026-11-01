@@ -1,9 +1,9 @@
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.Globalization;
 using System.IO;
-using System.Text;
+using System.Runtime.InteropServices;
 using ImageMagick;
+using LibHeifSharp;
 
 namespace Donut;
 
@@ -29,8 +29,11 @@ public sealed class FileConverter
             return destination;
         }
 
-        if (format is OutputFormat.Webp or OutputFormat.Heic)
+        if (format is OutputFormat.Webp or OutputFormat.Pdf)
             return ConvertWithMagick(sourcePath, format, destination);
+
+        if (format == OutputFormat.Heic)
+            return ConvertWithHeic(sourcePath, destination);
 
         using var source = new Bitmap(sourcePath);
         using var output = new Bitmap(source.Width, source.Height, PixelFormat.Format32bppArgb);
@@ -38,12 +41,6 @@ public sealed class FileConverter
         {
             graphics.Clear(Color.White);
             graphics.DrawImage(source, 0, 0, source.Width, source.Height);
-        }
-
-        if (format == OutputFormat.Pdf)
-        {
-            WritePdf(output, source.HorizontalResolution, destination);
-            return destination;
         }
 
         ImageCodecInfo codec = format switch
@@ -110,75 +107,57 @@ public sealed class FileConverter
         {
             BackgroundColor = MagickColors.White
         };
-        if (format == OutputFormat.Heic)
-            image.Settings.SetDefine(MagickFormat.Heic, "heic:speed", "6");
-        image.Format = format == OutputFormat.Webp ? MagickFormat.WebP : MagickFormat.Heic;
+        image.Format = format switch
+        {
+            OutputFormat.Webp => MagickFormat.WebP,
+            OutputFormat.Pdf => MagickFormat.Pdf,
+            _ => throw new ArgumentOutOfRangeException(nameof(format))
+        };
         image.Write(destination);
         return destination;
     }
 
-    // Windows has no PDF encoder, so write a minimal single-page PDF directly:
-    // the image is embedded as a JPEG (DCTDecode) on a page sized to the image.
-    private static void WritePdf(Bitmap image, float dpi, string destination)
+    private static string ConvertWithHeic(string sourcePath, string destination)
     {
-        byte[] jpeg;
-        using (var buffer = new MemoryStream())
+        using var image = new MagickImage(sourcePath)
         {
-            using var parameters = new EncoderParameters(1);
-            parameters.Param[0] = new EncoderParameter(
-                System.Drawing.Imaging.Encoder.Quality,
-                95L);
-            image.Save(buffer, GetCodec(ImageFormat.Jpeg), parameters);
-            jpeg = buffer.ToArray();
+            BackgroundColor = MagickColors.White
+        };
+        image.Format = MagickFormat.Rgb;
+        byte[] pixels = image.ToByteArray();
+        int width = checked((int)image.Width);
+        int height = checked((int)image.Height);
+
+        if (!LibHeifInfo.HaveEncoder(HeifCompressionFormat.Hevc))
+            throw new NotSupportedException("HEIC encoding is unavailable because no HEVC encoder is installed.");
+
+        using var context = new HeifContext();
+        var descriptors = context.GetEncoderDescriptors(HeifCompressionFormat.Hevc);
+        if (descriptors.Count == 0)
+            throw new NotSupportedException("HEIC encoding is unavailable because no HEVC encoder is installed.");
+
+        using var heifImage = new HeifImage(
+            width,
+            height,
+            HeifColorspace.Rgb,
+            HeifChroma.InterleavedRgb24);
+        heifImage.AddPlane(HeifChannel.Interleaved, width, height, 8);
+        HeifPlaneData plane = heifImage.GetPlane(HeifChannel.Interleaved);
+        int rowBytes = width * 3;
+        for (int row = 0; row < height; row++)
+        {
+            Marshal.Copy(
+                pixels,
+                row * rowBytes,
+                IntPtr.Add(plane.Scan0, row * plane.Stride),
+                rowBytes);
         }
 
-        if (dpi < 1)
-            dpi = 96f;
-        string width = (image.Width * 72.0 / dpi).ToString("0.##", CultureInfo.InvariantCulture);
-        string height = (image.Height * 72.0 / dpi).ToString("0.##", CultureInfo.InvariantCulture);
-        string content = $"q {width} 0 0 {height} 0 0 cm /Im0 Do Q";
-
-        using var file = new FileStream(destination, FileMode.CreateNew, FileAccess.Write);
-        var offsets = new List<long>();
-
-        void Write(string text)
-        {
-            byte[] bytes = Encoding.ASCII.GetBytes(text);
-            file.Write(bytes, 0, bytes.Length);
-        }
-
-        void BeginObject()
-        {
-            offsets.Add(file.Position);
-            Write($"{offsets.Count} 0 obj\n");
-        }
-
-        Write("%PDF-1.4\n");
-
-        BeginObject();
-        Write("<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
-
-        BeginObject();
-        Write("<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n");
-
-        BeginObject();
-        Write($"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {width} {height}] " +
-              "/Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n");
-
-        BeginObject();
-        Write($"<< /Type /XObject /Subtype /Image /Width {image.Width} /Height {image.Height} " +
-              $"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {jpeg.Length} >>\nstream\n");
-        file.Write(jpeg, 0, jpeg.Length);
-        Write("\nendstream\nendobj\n");
-
-        BeginObject();
-        Write($"<< /Length {content.Length} >>\nstream\n{content}\nendstream\nendobj\n");
-
-        long xref = file.Position;
-        Write($"xref\n0 {offsets.Count + 1}\n0000000000 65535 f \n");
-        foreach (long offset in offsets)
-            Write($"{offset:D10} 00000 n \n");
-        Write($"trailer\n<< /Size {offsets.Count + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n");
+        using var encoder = context.GetEncoder(descriptors[0]);
+        encoder.SetLossyQuality(90);
+        context.EncodeImage(heifImage, encoder, new HeifEncodingOptions());
+        context.WriteToFile(destination);
+        return destination;
     }
 
     private static ImageCodecInfo GetCodec(ImageFormat format) =>

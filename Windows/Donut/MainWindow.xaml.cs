@@ -174,7 +174,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         OutputFormat format = selectedFormat.Value;
         PdfMode pdfMode = PdfMode.Separate;
-        if (format == OutputFormat.Pdf && files.Length > 1)
+        if (format == OutputFormat.Pdf)
         {
             var options = new PdfOptionsWindow { Owner = this };
             if (options.ShowDialog() != true)

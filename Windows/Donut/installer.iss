@@ -1,4 +1,4 @@
-#define MyAppName "DonutConvert"
+#define MyAppName "Donut Convert"
 #define MyAppVersion "1.3.0"
 #define MyAppPublisher "Donut Convert"
 #define MyAppExeName "Donut.exe"
@@ -21,9 +21,16 @@ DefaultGroupName=Donut Convert
 DisableProgramGroupPage=yes
 OutputDir=installer
 OutputBaseFilename=Install Donut Convert
-Compression=lzma2
-SolidCompression=yes
+; ZIP is intentionally used instead of solid LZMA: installation is much faster
+; on Windows, while the self-contained runtime remains unchanged.
+Compression=zip
+SolidCompression=no
 WizardStyle=modern
+DisableWelcomePage=no
+DisableDirPage=no
+DisableReadyPage=no
+DisableFinishedPage=no
+Uninstallable=yes
 CloseApplications=yes
 RestartApplications=no
 PrivilegesRequired=admin

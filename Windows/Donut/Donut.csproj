@@ -23,6 +23,8 @@
     <ApplicationIcon>publish\win-x64\Donut.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="LibHeif.Native.win-x64" Version="1.15.1" />
+    <PackageReference Include="LibHeifSharp" Version="3.2.0" />
     <PackageReference Include="Magick.NET-Q8-AnyCPU" Version="15.0.0" />
     <Content Include="publish\win-x64\Donut.ico">
       <Link>Donut.ico</Link>
