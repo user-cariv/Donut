@@ -32,6 +32,14 @@ jobs:
           bash -x ./package-macos.sh
           mv "build/Install Donut.dmg" "build/Install-Donut-macOS.dmg"
 
+      - name: Build Donut Island app
+        working-directory: Donut Island
+        run: |
+          set -euxo pipefail
+          chmod +x build.sh
+          ./build.sh
+          hdiutil create -volname "Donut Island" -srcfolder "Donut Island.app" -ov -format UDZO "Donut-Island-macOS.dmg"
+
       - name: Create or update release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -41,3 +49,4 @@ jobs:
             gh release create "$tag" --title "Donut $tag" --generate-notes
           fi
           gh release upload "$tag" "Mac OS/Donut/build/Install-Donut-macOS.dmg" --clobber
+          gh release upload "$tag" "Donut Island/Donut-Island-macOS.dmg" --clobber
