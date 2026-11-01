@@ -21,17 +21,17 @@ public sealed class TrayApplicationContext : IDisposable
             Icon = new System.Drawing.Icon(
                 Path.Combine(AppContext.BaseDirectory, "Donut.ico")),
             Visible = true,
-            Text = "Donut"
+            Text = "Donut Convert"
         };
         var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add("Open Donut", null, (_, _) => ShowHud());
+        menu.Items.Add("Open Donut Convert", null, (_, _) => ShowHud());
         menu.Items.Add(
             "Change shortcut",
             null,
             (_, _) => ConfigureShortcut());
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(
-            "Quit Donut",
+            "Quit Donut Convert",
             null,
             (_, _) => System.Windows.Application.Current.Shutdown());
         notifyIcon.ContextMenuStrip = menu;
@@ -52,8 +52,8 @@ public sealed class TrayApplicationContext : IDisposable
         ShortcutBinding binding = ShortcutSettings.Load();
         if (!RegisterHotKey(hotKeySource.Handle, HotKeyId, binding.Modifiers, binding.Key))
             System.Windows.MessageBox.Show(
-                $"The shortcut {binding.DisplayName} is already in use. Open Donut from the tray to choose another shortcut.",
-                "Donut shortcut unavailable",
+                $"The shortcut {binding.DisplayName} is already in use. Open Donut Convert from the tray to choose another shortcut.",
+                "Donut Convert shortcut unavailable",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
     }

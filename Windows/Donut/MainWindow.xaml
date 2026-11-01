@@ -1,7 +1,7 @@
 <Window x:Class="Donut.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Donut"
+        Title="Donut Convert"
         Width="520"
         Height="650"
         WindowStartupLocation="CenterScreen"

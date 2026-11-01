@@ -11,9 +11,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Donut</AssemblyName>
     <RootNamespace>Donut</RootNamespace>
-    <Product>Donut</Product>
-    <Company>Donut</Company>
-    <Authors>Donut</Authors>
+    <Product>Donut Convert</Product>
+    <Company>Donut Convert</Company>
+    <Authors>Donut Convert</Authors>
     <Description>Donut file conversion utility</Description>
     <Version>1.3.0</Version>
     <AssemblyVersion>1.3.0.0</AssemblyVersion>

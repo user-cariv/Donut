@@ -1,6 +1,6 @@
 #define MyAppName "DonutConvert"
 #define MyAppVersion "1.3.0"
-#define MyAppPublisher "Donut"
+#define MyAppPublisher "Donut Convert"
 #define MyAppExeName "Donut.exe"
 #ifndef Runtime
   #define Runtime "win-x64"
@@ -16,11 +16,11 @@ VersionInfoDescription=Donut file conversion utility
 VersionInfoProductName={#MyAppName}
 VersionInfoTextVersion={#MyAppVersion}
 SetupIconFile=publish\{#Runtime}\Donut.ico
-DefaultDirName={autopf}\DonutConvert
-DefaultGroupName=DonutConvert
+DefaultDirName={autopf}\Donut Convert
+DefaultGroupName=Donut Convert
 DisableProgramGroupPage=yes
 OutputDir=installer
-OutputBaseFilename=Install DonutConvert
+OutputBaseFilename=Install Donut Convert
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -36,11 +36,11 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 Source: "publish\{#Runtime}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\DonutConvert"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autodesktop}\DonutConvert"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{autoprograms}\Donut Convert"; Filename: "{app}\{#MyAppExeName}"
+Name: "{autodesktop}\Donut Convert"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch Donut"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch Donut Convert"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall"; Flags: runhidden waituntilterminated
