@@ -1,5 +1,3 @@
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
 using ImageMagick;
@@ -29,42 +27,17 @@ public sealed class FileConverter
             return destination;
         }
 
-        if (format is OutputFormat.Webp or OutputFormat.Pdf)
+        if (format is OutputFormat.Jpeg
+            or OutputFormat.Png
+            or OutputFormat.Webp
+            or OutputFormat.Tiff
+            or OutputFormat.Pdf)
             return ConvertWithMagick(sourcePath, format, destination);
 
         if (format == OutputFormat.Heic)
             return ConvertWithHeic(sourcePath, destination);
 
-        using var source = new Bitmap(sourcePath);
-        using var output = new Bitmap(source.Width, source.Height, PixelFormat.Format32bppArgb);
-        using (Graphics graphics = Graphics.FromImage(output))
-        {
-            graphics.Clear(Color.White);
-            graphics.DrawImage(source, 0, 0, source.Width, source.Height);
-        }
-
-        ImageCodecInfo codec = format switch
-        {
-            OutputFormat.Jpeg => GetCodec(ImageFormat.Jpeg),
-            OutputFormat.Png => GetCodec(ImageFormat.Png),
-            OutputFormat.Tiff => GetCodec(ImageFormat.Tiff),
-            _ => throw new NotSupportedException()
-        };
-
-        if (format == OutputFormat.Jpeg)
-        {
-            using var parameters = new EncoderParameters(1);
-            parameters.Param[0] = new EncoderParameter(
-                System.Drawing.Imaging.Encoder.Quality,
-                100L);
-            output.Save(destination, codec, parameters);
-        }
-        else
-        {
-            output.Save(destination, codec, null);
-        }
-
-        return destination;
+        throw new NotSupportedException($"The {format} output format is not supported.");
     }
 
     public string ConvertPdf(IReadOnlyList<string> sourcePaths, PdfMode mode)
@@ -107,9 +80,15 @@ public sealed class FileConverter
         {
             BackgroundColor = MagickColors.White
         };
+        if (format == OutputFormat.Jpeg)
+            image.Alpha(AlphaAction.Remove);
+
         image.Format = format switch
         {
+            OutputFormat.Jpeg => MagickFormat.Jpeg,
+            OutputFormat.Png => MagickFormat.Png,
             OutputFormat.Webp => MagickFormat.WebP,
+            OutputFormat.Tiff => MagickFormat.Tiff,
             OutputFormat.Pdf => MagickFormat.Pdf,
             _ => throw new ArgumentOutOfRangeException(nameof(format))
         };
@@ -159,10 +138,6 @@ public sealed class FileConverter
         context.WriteToFile(destination);
         return destination;
     }
-
-    private static ImageCodecInfo GetCodec(ImageFormat format) =>
-        ImageCodecInfo.GetImageEncoders()
-            .First(codec => codec.FormatID == format.Guid);
 
     private static string CreateDestinationPath(
         string sourcePath,
