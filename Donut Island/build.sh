@@ -17,7 +17,7 @@ echo "▸ Compiling (release)…"
 swift build -c release
 BIN="$(swift build -c release --show-bin-path)/DonutIsland"
 
-echo "▸ Assembling $APP…"
+echo "▸ Assembling ${APP}…"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/DonutIsland"
@@ -49,7 +49,7 @@ PLIST
 echo "▸ Signing (ad-hoc)…"
 codesign --force --deep --sign - --identifier com.ariv.donutisland "$APP"
 
-echo "✓ Built $(pwd)/$APP"
+echo "✓ Built $(pwd)/${APP}"
 
 if [[ "${1:-}" == "--install" ]]; then
   echo "▸ Installing to /Applications…"
