@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Download DonutConvert.apk</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #1c1917;
+      color: #f5f5f4;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .card {
+      background: #292524;
+      border: 1px solid #78350f;
+      border-radius: 24px;
+      padding: 32px 24px;
+      max-width: 440px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    .icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 16px;
+      border-radius: 50%;
+      background: #1c1917;
+      border: 3px solid #f59e0b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 22px;
+      font-weight: 800;
+      color: #fff;
+    }
+    p {
+      margin: 0 0 24px;
+      font-size: 13px;
+      color: #a8a29e;
+      line-height: 1.5;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 14px 20px;
+      background: #f59e0b;
+      color: #0c0a09;
+      font-weight: 700;
+      font-size: 15px;
+      text-decoration: none;
+      border-radius: 14px;
+      transition: background 0.2s, transform 0.1s;
+      cursor: pointer;
+      border: none;
+    }
+    .btn:hover {
+      background: #fbbf24;
+    }
+    .btn:active {
+      transform: scale(0.98);
+    }
+    .note {
+      margin-top: 16px;
+      font-size: 11px;
+      color: #78716c;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">🍩</div>
+    <h1>Donut Convert</h1>
+    <p>Android release APK • API 36 build configured<br>Install from Google Play for the strongest verification.</p>
+    
+    <a id="downloadBtn" href="/Donut_Convert.apk" download="Donut_Convert.apk" class="btn">
+      ⬇️ Download Donut_Convert.apk
+    </a>
+
+    <div class="note">
+      For safety, Android may require allowing this browser to install unknown apps.
+      Google Play distribution is recommended for automatic verification and updates.
+    </div>
+  </div>
+
+  <script>
+    // Automatically trigger the download
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        const link = document.getElementById('downloadBtn');
+        if (link) {
+          link.click();
+        }
+      }, 300);
+    });
+  </script>
+</body>
+</html>

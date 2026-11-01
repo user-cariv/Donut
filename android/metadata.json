@@ -1,0 +1,6 @@
+{
+  "name": "Donut Convert",
+  "description": "Fast, privacy-first photo & document converter with radial donut picker, multi-page PDF engine, and batch export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
