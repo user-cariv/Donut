@@ -3,12 +3,19 @@ using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using ImageMagick;
 
 namespace Donut;
 
+public enum PdfMode
+{
+    Separate,
+    Merge
+}
+
 public sealed class FileConverter
 {
-    public string Convert(string sourcePath, OutputFormat format)
+    public string Convert(string sourcePath, OutputFormat format, PdfMode pdfMode = PdfMode.Separate)
     {
         if (!File.Exists(sourcePath))
             throw new FileNotFoundException("The source file could not be read.", sourcePath);
@@ -23,8 +30,7 @@ public sealed class FileConverter
         }
 
         if (format is OutputFormat.Webp or OutputFormat.Heic)
-            throw new NotSupportedException(
-                $"{format.DisplayName()} encoding is not available in the Windows built-in codec set.");
+            return ConvertWithMagick(sourcePath, format, destination);
 
         using var source = new Bitmap(sourcePath);
         using var output = new Bitmap(source.Width, source.Height, PixelFormat.Format32bppArgb);
@@ -61,6 +67,53 @@ public sealed class FileConverter
             output.Save(destination, codec, null);
         }
 
+        return destination;
+    }
+
+    public string ConvertPdf(IReadOnlyList<string> sourcePaths, PdfMode mode)
+    {
+        if (sourcePaths.Count == 0)
+            throw new ArgumentException("At least one source image is required.", nameof(sourcePaths));
+
+        if (mode == PdfMode.Separate)
+            throw new ArgumentException("Separate PDF conversion must be performed one file at a time.", nameof(mode));
+
+        string destination = CreateDestinationPath(sourcePaths[0], OutputFormat.Pdf, "_merged");
+        var images = new MagickImageCollection();
+        try
+        {
+            foreach (string sourcePath in sourcePaths)
+            {
+                if (!File.Exists(sourcePath))
+                    throw new FileNotFoundException("The source file could not be read.", sourcePath);
+
+                var image = new MagickImage(sourcePath)
+                {
+                    BackgroundColor = MagickColors.White,
+                    Density = new Density(96)
+                };
+                images.Add(image);
+            }
+
+            images.Write(destination, MagickFormat.Pdf);
+            return destination;
+        }
+        finally
+        {
+            images.Dispose();
+        }
+    }
+
+    private static string ConvertWithMagick(string sourcePath, OutputFormat format, string destination)
+    {
+        using var image = new MagickImage(sourcePath)
+        {
+            BackgroundColor = MagickColors.White
+        };
+        if (format == OutputFormat.Heic)
+            image.Settings.SetDefine(MagickFormat.Heic, "heic:speed", "6");
+        image.Format = format == OutputFormat.Webp ? MagickFormat.WebP : MagickFormat.Heic;
+        image.Write(destination);
         return destination;
     }
 
@@ -132,11 +185,14 @@ public sealed class FileConverter
         ImageCodecInfo.GetImageEncoders()
             .First(codec => codec.FormatID == format.Guid);
 
-    private static string CreateDestinationPath(string sourcePath, OutputFormat format)
+    private static string CreateDestinationPath(
+        string sourcePath,
+        OutputFormat format,
+        string baseNameSuffix = "")
     {
         string directory = Path.GetDirectoryName(sourcePath)
             ?? throw new IOException("The source directory could not be resolved.");
-        string baseName = Path.GetFileNameWithoutExtension(sourcePath);
+        string baseName = Path.GetFileNameWithoutExtension(sourcePath) + baseNameSuffix;
         string sourceExtension = Path.GetExtension(sourcePath)
             .TrimStart('.')
             .ToLowerInvariant();

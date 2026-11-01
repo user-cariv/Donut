@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="donutGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="50%" stop-color="#ea580c" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+    <radialGradient id="frostingGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#fbbf24" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <!-- Background circle -->
+  <rect width="512" height="512" rx="128" fill="#1c1917" />
+  <!-- Donut outer ring -->
+  <circle cx="256" cy="256" r="180" fill="url(#donutGrad)" filter="drop-shadow(0 16px 32px rgba(234, 88, 12, 0.4))" />
+  <!-- Donut inner hole -->
+  <circle cx="256" cy="256" r="76" fill="#1c1917" />
+  <!-- Inner accent ring -->
+  <circle cx="256" cy="256" r="76" fill="none" stroke="#f59e0b" stroke-width="4" stroke-opacity="0.5" />
+  <!-- Donut center dot -->
+  <circle cx="256" cy="256" r="18" fill="#f59e0b" />
+</svg>

@@ -327,7 +327,7 @@ export const ApkDownloadModal: React.FC<ApkDownloadModalProps> = ({ isOpen, onCl
                 </div>
                 <div className="p-2.5 bg-stone-950/60 border border-stone-800/80 rounded-xl">
                   <div className="text-[10px] text-stone-400">Android Version</div>
-                  <div className="font-bold text-emerald-400 mt-0.5">Android 5.0+ to 14+</div>
+                  <div className="font-bold text-emerald-400 mt-0.5">Android 16+</div>
                 </div>
                 <div className="p-2.5 bg-stone-950/60 border border-stone-800/80 rounded-xl">
                   <div className="text-[10px] text-stone-400">Signatures</div>

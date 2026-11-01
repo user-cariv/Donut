@@ -267,7 +267,7 @@ class FloatingBubbleService : Service() {
     path: 'app/build.gradle.kts',
     name: 'app/build.gradle.kts',
     language: 'kotlin',
-    description: 'App module build configuration for Jetpack Compose, Min SDK 29, Target SDK 36',
+    description: 'App module build configuration for Jetpack Compose, Min SDK 36, Target SDK 36',
     content: `plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")

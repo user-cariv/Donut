@@ -173,6 +173,19 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         OutputFormat format = selectedFormat.Value;
+        PdfMode pdfMode = PdfMode.Separate;
+        if (format == OutputFormat.Pdf && files.Length > 1)
+        {
+            var options = new PdfOptionsWindow { Owner = this };
+            if (options.ShowDialog() != true)
+            {
+                Status = "PDF export cancelled";
+                return;
+            }
+
+            pdfMode = options.SelectedMode;
+        }
+
         IsBusy = true;
         Status = $"Converting {files.Length} file{(files.Length == 1 ? "" : "s")}…";
         int converted = 0;
@@ -182,11 +195,28 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         await Task.Run(() =>
         {
+            if (format == OutputFormat.Pdf && pdfMode == PdfMode.Merge)
+            {
+                try
+                {
+                    string saved = converter.ConvertPdf(files, PdfMode.Merge);
+                    lastFolder = Path.GetDirectoryName(saved);
+                    converted = 1;
+                }
+                catch (Exception error)
+                {
+                    failed = files.Length;
+                    firstError = error.Message;
+                }
+
+                return;
+            }
+
             foreach (string file in files)
             {
                 try
                 {
-                    string saved = converter.Convert(file, format);
+                    string saved = converter.Convert(file, format, pdfMode);
                     lastFolder = Path.GetDirectoryName(saved);
                     converted++;
                 }
