@@ -39,6 +39,9 @@ jobs:
           chmod +x build.sh
           ./build.sh
           hdiutil create -volname "Donut Island" -srcfolder "Donut Island.app" -ov -format UDZO "Donut-Island-macOS.dmg"
+          mkdir -p pkg-root/Applications
+          cp -R "Donut Island.app" pkg-root/Applications/
+          pkgbuild --root pkg-root --identifier com.ariv.donutisland --version 1.0.0 --install-location / "Donut-Island-macOS.pkg"
 
       - name: Create or update release
         env:
@@ -50,3 +53,4 @@ jobs:
           fi
           gh release upload "$tag" "Mac OS/Donut/build/Install-Donut-macOS.dmg" --clobber
           gh release upload "$tag" "Donut Island/Donut-Island-macOS.dmg" --clobber
+          gh release upload "$tag" "Donut Island/Donut-Island-macOS.pkg" --clobber
