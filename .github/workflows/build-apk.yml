@@ -20,7 +20,7 @@ jobs:
 
     - name: Install dependencies
       working-directory: android
-      run: npm install
+      run: npm install --legacy-peer-deps
 
     - name: Type-check Android app
       working-directory: android
