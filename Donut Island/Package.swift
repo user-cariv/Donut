@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "DonutIsland",
-    platforms: [.macOS(.v13)],
+    platforms: [.macOS(.v27)],
     targets: [
         .executableTarget(
             name: "DonutIsland",

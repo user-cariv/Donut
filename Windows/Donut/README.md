@@ -9,7 +9,7 @@ artwork so it stays clear in Explorer, setup pages, shortcuts, and the tray.
 
 ## Requirements
 
-- Windows 10 or later
+- Windows 11 (build 22000) or later
 - .NET 8 SDK
 - Visual Studio 2022 or VS Code with the C# Dev Kit
 

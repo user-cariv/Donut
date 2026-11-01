@@ -1,6 +1,6 @@
 # Donut Convert — Android
 
-Kotlin + Jetpack Compose. Min SDK 29 (Android 10), target 36 (Android 16).
+Kotlin + Jetpack Compose. Min SDK 29 (Android 10), target 36 (Android 16+).
 
 ## Open it
 1. Android Studio (Meerkat or newer) → **Open** → select this `DonutConvert` folder.

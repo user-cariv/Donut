@@ -1,6 +1,6 @@
 # Donut
 
-A small macOS 13+ background utility that shows a radial conversion HUD while
+A small macOS 27+ background utility that shows a radial conversion HUD while
 dragging a file with Shift held.
 
 The menu-bar item uses the Donut artwork, and the packaging script creates a
@@ -56,5 +56,5 @@ light and dark menu bars.
 
 ## Current platform
 
-The implemented target is macOS 13 and later. The `Windows` folder is reserved
+The implemented target is macOS 27 and later. The `Windows` folder is reserved
 for a future native implementation.

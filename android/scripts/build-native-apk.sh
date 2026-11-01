@@ -62,7 +62,7 @@ cat << 'EOF' > "$WORK_DIR/AndroidManifest.xml"
     android:versionCode="3"
     android:versionName="1.3.0">
 
-    <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="36" />
+    <uses-sdk android:minSdkVersion="36" android:targetSdkVersion="36" />
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />

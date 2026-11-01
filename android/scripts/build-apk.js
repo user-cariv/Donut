@@ -14,9 +14,9 @@ async function generateApk() {
   const manifest = `<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.donut.convert"
-    android:versionCode="2"
-    android:versionName="1.2.0">
-    <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="34" />
+    android:versionCode="3"
+    android:versionName="1.3.0">
+    <uses-sdk android:minSdkVersion="36" android:targetSdkVersion="36" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
@@ -47,9 +47,9 @@ async function generateApk() {
   // META-INF
   zip.file(
     'META-INF/MANIFEST.MF',
-    `Manifest-Version: 1.0\nCreated-By: Donut Convert APK Studio Builder 1.2.0\nBuilt-By: user-cariv\nAuthor: arivchoudhary16112007@gmail.com\n\nName: AndroidManifest.xml\nSHA-256-Digest: d4e5f6g7h8i9j0a1b2c3\n\nName: classes.dex\nSHA-256-Digest: e5f6g7h8i9j0a1b2c3d4\n`
+    `Manifest-Version: 1.0\nCreated-By: Donut Convert APK Studio Builder 1.3.0\nBuilt-By: user-cariv\nAuthor: arivchoudhary16112007@gmail.com\n\nName: AndroidManifest.xml\nSHA-256-Digest: d4e5f6g7h8i9j0a1b2c3\n\nName: classes.dex\nSHA-256-Digest: e5f6g7h8i9j0a1b2c3d4\n`
   );
-  zip.file('META-INF/CERT.SF', `Signature-Version: 1.0\nCreated-By: 1.2.0 (Android Studio / Donut Convert)\nSHA-256-Digest-Manifest: f6g7h8i9j0a1b2c3d4e5\n`);
+  zip.file('META-INF/CERT.SF', `Signature-Version: 1.0\nCreated-By: 1.3.0 (Android Studio / Donut Convert)\nSHA-256-Digest-Manifest: f6g7h8i9j0a1b2c3d4e5\n`);
   zip.file('META-INF/CERT.RSA', Buffer.from([0x30, 0x82, 0x01, 0x0a, 0x02, 0x82, 0x01, 0x01]));
 
   // DEX Bytecode stub
@@ -66,8 +66,8 @@ async function generateApk() {
     JSON.stringify(
       {
         appName: 'donut convert',
-        version: '1.2.0',
-        versionCode: 2,
+        version: '1.3.0',
+        versionCode: 3,
         author: 'arivchoudhary16112007@gmail.com',
         website: 'https://user-cariv.github.io/Donut-Convert/',
         features: [

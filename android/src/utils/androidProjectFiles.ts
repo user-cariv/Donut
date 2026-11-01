@@ -279,7 +279,7 @@ android {
 
     defaultConfig {
         applicationId = "com.donut.convert"
-        minSdk = 29
+        minSdk = 36
         targetSdk = 36
         versionCode = 3
         versionName = "1.3.0"
@@ -378,7 +378,7 @@ export async function downloadAndroidProjectZip(): Promise<Blob> {
   zip.file(
     'README.md',
     `# Donut Convert — Android Studio Project
-Kotlin + Jetpack Compose. Min SDK 29, target 36 (Android 16).
+Kotlin + Jetpack Compose. Min SDK 29, target 36 (Android 16+).
 
 Desktop & Web version available at: https://user-cariv.github.io/Donut-Convert/
 

@@ -198,7 +198,7 @@ export const ApkDownloadModal: React.FC<ApkDownloadModalProps> = ({ isOpen, onCl
                   </div>
                   <div className="px-2.5 py-1 bg-stone-950/80 border border-stone-800 rounded-lg text-right shrink-0">
                     <div className="text-[10px] text-stone-400 uppercase">Size</div>
-                    <div className="text-xs font-mono font-bold text-amber-400">Android 16</div>
+                    <div className="text-xs font-mono font-bold text-amber-400">Android 16+</div>
                   </div>
                 </div>
 
