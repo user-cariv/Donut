@@ -152,7 +152,7 @@ footer{padding:36px 0 44px;color:var(--muted);font-size:14px}
   <div class="tools">
     <select class="cur" id="ccy" aria-label="Currency"><option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="INR">₹ INR</option></select>
     <button class="tg" id="theme" aria-label="Switch theme">◐</button>
-    <a id="acct" class="btn sm" href="mailto:arivcwork@gmail.com?subject=Donut%20Island%20lifetime%20access">Buy lifetime</a>
+    <a id="acct" class="btn sm" href="#contact" data-open="auth">Email to buy</a>
   </div>
 </header>
 
@@ -162,7 +162,7 @@ footer{padding:36px 0 44px;color:var(--muted);font-size:14px}
     <span class="eyebrow"><i></i>For MacBooks with a notch</span>
     <h1>Give your notch <span class="grad">a purpose.</span></h1>
     <p>Donut Island turns the notch on every MacBook Pro and MacBook Air into a Dynamic Island for your calendar, messages, email and calls.</p>
-    <div class="cta"><a class="btn" href="mailto:arivcwork@gmail.com?subject=Donut%20Island%20lifetime%20access&body=Hi%2C%20I%20would%20like%20to%20buy%20Donut%20Island%20lifetime%20access%20for%20%245.">Get Donut Island</a><a class="btn ghost" href="#features">See what it shows</a></div>
+    <div class="cta"><a class="btn" href="#contact" data-open="auth">Email to buy Donut Island</a><a class="btn ghost" href="#features">See what it shows</a></div>
     <p class="small">Requires a MacBook with a notch on macOS 13 or later.</p>
   </div>
   <div class="macbook">
@@ -198,7 +198,7 @@ footer{padding:36px 0 44px;color:var(--muted);font-size:14px}
       <h3>Lifetime</h3>
       <div class="amt"><span data-price="lifetime">$5</span> <small>once</small></div>
       <ul><li>Every source and every feature</li><li>Yours forever, no subscription</li><li>All 1.x updates included</li></ul>
-      <a class="btn" href="mailto:arivcwork@gmail.com?subject=Donut%20Island%20lifetime%20access&body=Hi%2C%20I%20would%20like%20to%20buy%20Donut%20Island%20lifetime%20access%20for%20%245.">Email to buy lifetime</a>
+      <a class="btn" href="#contact" data-open="auth">Email to buy lifetime</a>
     </div>
   </div>
   <p class="fine">Requires a MacBook with a notch (MacBook Pro or MacBook Air) on macOS 13 or later. Donut Island doesn’t run on Macs without a notch.</p>
@@ -208,7 +208,7 @@ footer{padding:36px 0 44px;color:var(--muted);font-size:14px}
   <div class="head"><h2>Good to know.</h2></div>
   <div class="faq">
     <details><summary>Which Macs does it work on?</summary><p>Only MacBooks with a notch: MacBook Pro 14-inch and 16-inch (2021 and later), and MacBook Air 13-inch and 15-inch with M2 or later. It requires macOS 13 or later.</p></details>
-    <details><summary>Why create an account?</summary><p>Your account holds your license, so you can restore it after a reinstall or a new Mac.</p></details>
+    <details><summary>How do I get the download?</summary><p>Send your details using the email form. I will reply with payment instructions and the Donut Island download file.</p></details>
     <details><summary>Why does it need Accessibility access?</summary><p>Donut Island reads the notification banners macOS already shows for messages, email and calls. Calendar uses its own permission.</p></details>
     <details><summary>Will macOS still show its own banner?</summary><p>Yes. Apple doesn’t let apps hide the system banner.</p></details>
     <details><summary>Is it on the Mac App Store?</summary><p>No. Reading notifications needs Accessibility access, which the App Store doesn’t allow. You download it directly.</p></details>
@@ -223,38 +223,18 @@ footer{padding:36px 0 44px;color:var(--muted);font-size:14px}
   <div class="sheet">
     <button class="x" id="close" aria-label="Close">✕</button>
     <div id="s1">
-      <h3 id="st">Create your account</h3>
-      <p>Sign in with your email first. Then you’ll choose a plan and pay.</p>
+      <h3 id="st">Request lifetime access</h3>
+      <p>Fill in your details and your email app will open with a ready-to-send request.</p>
       <input id="nm" type="text" placeholder="Full name" autocomplete="name">
       <input id="em" type="email" placeholder="Email address" autocomplete="email">
+      <input id="ph" type="tel" placeholder="Contact number" autocomplete="tel">
       <p class="err" id="err"></p>
-      <button class="btn" id="go">Continue</button>
-    </div>
-    <div id="s2" hidden>
-      <h3>Checkout</h3>
-      <p id="who"></p>
-      <div class="sum"><span id="pn"></span><b id="pp"></b></div>
-      <button class="btn" id="pay"></button>
-      <p class="err" id="perr" style="margin-top:12px"></p>
-      <button class="link" id="swap"></button>
+      <button class="btn" id="go">Open email</button>
     </div>
   </div>
 </div>
 
 <script>
-/* ===== Connect these ===== */
-var CONFIG = {
-  checkout: {
-    USD: { lifetime: "" },
-    EUR: { lifetime: "" },
-    INR: { lifetime: "" }
-  },   // one checkout link per currency and plan (Lemon Squeezy / Stripe / Paddle / Razorpay)
-  signupUrl: ""   // optional: your backend endpoint that receives {name, email}
-};
-/* ========================= */
-var plan="lifetime", user=null;
-try{ user=JSON.parse(localStorage.getItem("di_user")||"null"); }catch(e){}
-
 /* theme */
 var root=document.documentElement, tg=document.getElementById("theme");
 try{ var st=localStorage.getItem("di_theme"); if(st) root.setAttribute("data-theme",st); }catch(e){}
@@ -288,7 +268,7 @@ function renderPrices(){
   var note=document.getElementById("ccnote"); if(note) note.textContent=ccy==="USD"?"":" Prices in "+ccy+" are converted from USD at an approximate rate.";
   document.querySelectorAll("[data-price]").forEach(function(el){ el.textContent=price(el.dataset.price); });
 }
-curSel.onchange=function(){ ccy=curSel.value; try{ localStorage.setItem("di_ccy",ccy); }catch(e){} renderPrices(); if(!document.getElementById("s2").hidden) setPlan(plan); };
+curSel.onchange=function(){ ccy=curSel.value; try{ localStorage.setItem("di_ccy",ccy); }catch(e){} renderPrices(); };
 renderPrices();
 
 /* island demo */
@@ -310,19 +290,13 @@ tabs.forEach(function(b){ b.addEventListener("click",function(){ clearTimeout(au
 window.addEventListener("resize",function(){ if(cur) show(cur); });
 if(!matchMedia("(prefers-reduced-motion:reduce)").matches) auto=setTimeout(cycle,900); else show("message");
 
-/* account + checkout */
+/* email request */
 var $=function(i){ return document.getElementById(i); }, scrim=$("scrim");
-function label(){ $("acct").textContent=user?user.email:"Sign in"; }
-function step(n){ $("s1").hidden=n!==1; $("s2").hidden=n!==2; }
-function setPlan(p){
-  plan="lifetime"; $("pn").textContent="Donut Island Lifetime"; $("pp").textContent=price("lifetime");
-  $("pay").textContent="Pay "+price("lifetime"); $("swap").hidden=true;
-}
+function label(){ $("acct").textContent="Email to buy"; }
+function step(n){ $("s1").hidden=n!==1; }
 function openSheet(p){
-  if(p) plan=p;
-  scrim.classList.add("on"); $("err").textContent=""; $("perr").textContent="";
-  if(user){ $("who").textContent="Signed in as "+user.email; setPlan(plan); step(2); }
-  else{ step(1); setTimeout(function(){ $("nm").focus(); },50); }
+  scrim.classList.add("on"); $("err").textContent="";
+  step(1); setTimeout(function(){ $("nm").focus(); },50);
 }
 function closeSheet(){ scrim.classList.remove("on"); }
 document.querySelectorAll("[data-open]").forEach(function(el){ el.addEventListener("click",function(e){ e.preventDefault(); openSheet(el.dataset.plan); }); });
@@ -330,19 +304,13 @@ $("close").onclick=closeSheet;
 scrim.addEventListener("click",function(e){ if(e.target===scrim) closeSheet(); });
 document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeSheet(); });
 $("go").onclick=function(){
-  var name=$("nm").value.trim(), email=$("em").value.trim();
+  var name=$("nm").value.trim(), email=$("em").value.trim(), phone=$("ph").value.trim();
   if(!name){ $("err").textContent="Enter your name."; return; }
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ $("err").textContent="Enter a valid email address."; return; }
-  user={name:name,email:email};
-  try{ localStorage.setItem("di_user",JSON.stringify(user)); }catch(e){}
-  if(CONFIG.signupUrl){ fetch(CONFIG.signupUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(user)}).catch(function(){}); }
-  label(); $("who").textContent="Welcome, "+name+". Pick your plan below."; setPlan(plan); step(2);
-};
-$("pay").onclick=function(){
-  var url=(CONFIG.checkout[ccy]||{})[plan];
-  if(!url){ $("perr").textContent="Checkout isn’t connected yet. The owner needs to add the payment link."; return; }
-  var sep=url.indexOf("?")>-1?"&":"?";
-  location.href=url+sep+"checkout[email]="+encodeURIComponent(user.email)+"&checkout[name]="+encodeURIComponent(user.name);
+  if(!phone){ $("err").textContent="Enter your contact number."; return; }
+  var subject=encodeURIComponent("Donut Island lifetime access request");
+  var body=encodeURIComponent("Full name: "+name+"\nEmail: "+email+"\nContact number: "+phone+"\n\nI would like to buy Donut Island lifetime access for $5.");
+  window.location.href="mailto:arivcwork@gmail.com?subject="+subject+"&body="+body;
 };
 label();
 </script>
