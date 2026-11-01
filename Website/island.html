@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Donut Island – Give your notch a purpose</title>
-<meta name="description" content="Donut Island turns the notch on every MacBook Pro and MacBook Air into a Dynamic Island. $5 for life, or $1 for a week.">
+<meta name="description" content="Donut Island turns the notch on every MacBook Pro and MacBook Air into a Dynamic Island. Get lifetime access for $5.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -154,7 +154,7 @@ footer{padding:36px 0 44px;color:var(--muted);font-size:14px}
   <div class="tools">
     <select class="cur" id="ccy" aria-label="Currency"><option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="INR">₹ INR</option></select>
     <button class="tg" id="theme" aria-label="Switch theme">◐</button>
-    <a id="acct" class="btn sm" href="#pricing" data-open="auth">Sign in</a>
+    <a id="acct" class="btn sm" href="mailto:arivcwork@gmail.com?subject=Donut%20Island%20lifetime%20access">Buy lifetime</a>
   </div>
 </header>
 
@@ -164,7 +164,7 @@ footer{padding:36px 0 44px;color:var(--muted);font-size:14px}
     <span class="eyebrow"><i></i>For MacBooks with a notch</span>
     <h1>Give your notch <span class="grad">a purpose.</span></h1>
     <p>Donut Island turns the notch on every MacBook Pro and MacBook Air into a Dynamic Island for your calendar, messages, email and calls.</p>
-    <div class="cta"><button class="btn" data-open="auth">Get Donut Island</button><a class="btn ghost" href="#features">See what it shows</a></div>
+    <div class="cta"><a class="btn" href="mailto:arivcwork@gmail.com?subject=Donut%20Island%20lifetime%20access&body=Hi%2C%20I%20would%20like%20to%20buy%20Donut%20Island%20lifetime%20access%20for%20%245.">Get Donut Island</a><a class="btn ghost" href="#features">See what it shows</a></div>
     <p class="small">Requires a MacBook with a notch on macOS 13 or later.</p>
   </div>
   <div class="macbook">
@@ -194,23 +194,16 @@ footer{padding:36px 0 44px;color:var(--muted);font-size:14px}
 </div></section>
 
 <section id="pricing" style="padding-top:20px"><div class="wrap">
-  <div class="head"><h2>Choose how long you stay.</h2><p>Create a free account first, then check out. Your license is tied to your account.</p></div>
+  <div class="head"><h2>Own it for life.</h2><p>Send an email to request Donut Island lifetime access for $5. I will reply with payment and download instructions.</p></div>
   <div class="plans">
-    <div class="plan">
-      <h3>Week Pass</h3>
-      <div class="amt"><span data-price="week">$1</span> <small>/ 7 days</small></div>
-      <ul><li>Every source and every feature</li><li>Full access for 7 days</li><li>No auto-renewal</li></ul>
-      <button class="btn ghost" data-plan="week" data-open="auth">Get 1 week</button>
-    </div>
     <div class="plan best">
-      <span class="tag">Best value</span>
       <h3>Lifetime</h3>
       <div class="amt"><span data-price="lifetime">$5</span> <small>once</small></div>
       <ul><li>Every source and every feature</li><li>Yours forever, no subscription</li><li>All 1.x updates included</li></ul>
-      <button class="btn" data-plan="lifetime" data-open="auth">Get lifetime</button>
+      <a class="btn" href="mailto:arivcwork@gmail.com?subject=Donut%20Island%20lifetime%20access&body=Hi%2C%20I%20would%20like%20to%20buy%20Donut%20Island%20lifetime%20access%20for%20%245.">Email to buy lifetime</a>
     </div>
   </div>
-  <p class="fine">Requires a MacBook with a notch (MacBook Pro or MacBook Air) on macOS 13 or later. Donut Island doesn’t run on Macs without a notch.<span id="ccnote"></span></p>
+  <p class="fine">Requires a MacBook with a notch (MacBook Pro or MacBook Air) on macOS 13 or later. Donut Island doesn’t run on Macs without a notch.</p>
 </div></section>
 
 <section id="faq" style="padding-top:20px"><div class="wrap">
@@ -254,9 +247,9 @@ footer{padding:36px 0 44px;color:var(--muted);font-size:14px}
 /* ===== Connect these ===== */
 var CONFIG = {
   checkout: {
-    USD: { lifetime: "", week: "" },
-    EUR: { lifetime: "", week: "" },
-    INR: { lifetime: "", week: "" }
+    USD: { lifetime: "" },
+    EUR: { lifetime: "" },
+    INR: { lifetime: "" }
   },   // one checkout link per currency and plan (Lemon Squeezy / Stripe / Paddle / Razorpay)
   signupUrl: ""   // optional: your backend endpoint that receives {name, email}
 };
@@ -273,7 +266,7 @@ tg.onclick=function(){ var n=isDark()?"light":"dark"; root.setAttribute("data-th
 paint();
 
 /* currency (approximate rates, units per 1 USD: update periodically) */
-var BASE={lifetime:5,week:1};
+var BASE={lifetime:5};
 var RATES={USD:1,EUR:0.85,INR:94};
 var SYM={USD:"$",EUR:"€",INR:"₹"};
 function fmt(c,v){ if(c==="INR") return "₹"+Math.round(v); return SYM[c]+(Math.round(v*100)/100).toFixed(2).replace(/\.00$/,""); }
@@ -294,7 +287,7 @@ function price(p){ return PRICES[ccy][p]; }
 var curSel=document.getElementById("ccy");
 function renderPrices(){
   curSel.value=ccy;
-  document.getElementById("ccnote").textContent=ccy==="USD"?"":" Prices in "+ccy+" are converted from USD at an approximate rate. The final amount is confirmed at checkout.";
+  var note=document.getElementById("ccnote"); if(note) note.textContent=ccy==="USD"?"":" Prices in "+ccy+" are converted from USD at an approximate rate.";
   document.querySelectorAll("[data-price]").forEach(function(el){ el.textContent=price(el.dataset.price); });
 }
 curSel.onchange=function(){ ccy=curSel.value; try{ localStorage.setItem("di_ccy",ccy); }catch(e){} renderPrices(); if(!document.getElementById("s2").hidden) setPlan(plan); };
@@ -324,11 +317,8 @@ var $=function(i){ return document.getElementById(i); }, scrim=$("scrim");
 function label(){ $("acct").textContent=user?user.email:"Sign in"; }
 function step(n){ $("s1").hidden=n!==1; $("s2").hidden=n!==2; }
 function setPlan(p){
-  plan=p; $("pn").textContent={lifetime:"Donut Island Lifetime",week:"Donut Island Week Pass"}[p]; $("pp").textContent=price(p);
-  $("pay").textContent="Pay "+price(p);
-  var o=p==="lifetime"?"week":"lifetime";
-  $("swap").textContent="Switch to "+(o==="week"?"the week pass for ":"lifetime for ")+price(o);
-  $("swap").onclick=function(){ setPlan(o); };
+  plan="lifetime"; $("pn").textContent="Donut Island Lifetime"; $("pp").textContent=price("lifetime");
+  $("pay").textContent="Pay "+price("lifetime"); $("swap").hidden=true;
 }
 function openSheet(p){
   if(p) plan=p;
