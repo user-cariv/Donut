@@ -37,6 +37,7 @@ public sealed class TrayApplicationContext : IDisposable
         notifyIcon.ContextMenuStrip = menu;
         notifyIcon.DoubleClick += (_, _) => ShowHud();
 
+
         var parameters = new HwndSourceParameters("DonutHotKey")
         {
             Width = 0,
