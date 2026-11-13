@@ -55,8 +55,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleName</key><string>Donut Island</string>
   <key>CFBundleDisplayName</key><string>Donut Island</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0.1</string>
-  <key>CFBundleVersion</key><string>2</string>
+  <key>CFBundleShortVersionString</key><string>1.0.13</string>
+  <key>CFBundleVersion</key><string>13</string>
   <key>CFBundleIconFile</key><string>DonutIslandIcon</string>
   <key>LSMinimumSystemVersion</key><string>27.0</string>
   <key>LSUIElement</key><true/>
