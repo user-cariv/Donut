@@ -215,7 +215,7 @@ struct ExpandedView: View {
                     Text("Liquid Glass")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.white)
-                    Text("Glass rim, sheen and Apple's glass material on macOS 26")
+                    Text("Apple Liquid Glass, styled to echo the iPhone look on macOS 27")
                         .font(.system(size: 11))
                         .foregroundColor(Color.white.opacity(0.6))
                 }

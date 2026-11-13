@@ -10,9 +10,15 @@ A Dynamic Island for notched MacBook Pros (M1 Pro/Max through M5). It lives over
 
 On Macs without a notch, it draws a virtual pill in the menu bar.
 
-## Build and run
+## Install and run
 
-1. Unzip the folder.
+Donut Island requires macOS 27 or later on Intel or Apple silicon Macs. The notch animation works on MacBooks with or without a notch.
+
+For a ready-to-use download, install the app bundle provided by the publisher. On first launch, macOS asks each Mac user to approve Calendar access. To show message, email, WhatsApp and call banners, each user must also enable Donut Island under **System Settings > Privacy & Security > Accessibility**. These approvals belong to the macOS user account and cannot be granted by the installer or by the app. If macOS blocks an unsigned download, use the publisher's signed and notarized release, when available.
+
+### Build from source
+
+1. Unzip the folder, keeping `Donut Island Sunset Oasis.png` beside `build.sh`.
 2. Open Terminal in the folder and run:
 
 ```bash
@@ -26,14 +32,14 @@ You can also open `Package.swift` in Xcode and press Run.
 
 Look for the 🍩 in the menu bar. **Preview** in that menu lets you test every kind of notification without waiting for a real one.
 
-## Permissions (one-time)
+## Permissions (per Mac user)
 
 | Permission | Why | Where |
 |---|---|---|
 | **Accessibility** | Reads the banners macOS shows for messages, emails and calls | System Settings > Privacy & Security > Accessibility > enable Donut Island |
 | **Calendars** | Shows your events | Prompted on first launch; or menu > Connect Calendar… |
 
-The app is ad-hoc signed, so macOS may ask you to re-grant Accessibility after you rebuild it. Remove Donut Island from the list with the minus button and add it again if it stops working.
+macOS requires the logged-in user to grant these permissions. An administrator or installer cannot pre-approve them for every user. The source build is ad-hoc signed, so macOS may ask you to grant Accessibility again after rebuilding; remove the old Donut Island entry and add the rebuilt app if access stops working. For straightforward public downloads, distribute a Developer ID signed and notarized build.
 
 ## Getting each source to show up
 
@@ -61,5 +67,5 @@ The app is ad-hoc signed, so macOS may ask you to re-grant Accessibility after y
 
 - Tap the slider icon in the expanded island to get a **Liquid Glass** switch and a **Translucency** slider. You see the change live. The menu bar 🍩 menu has the same options, with presets (Solid, Light, Medium, Clear).
 - **Translucency** goes from solid black (0%) to mostly see-through (100%). The collapsed island is always solid black so it matches the physical notch.
-- **Liquid Glass on** adds a glass rim, a light sheen and, on macOS 26 or later, Apple's own glass material. Off gives plain frosted translucency.
-- Real Apple glass is only compiled in when you build with Xcode 26 or newer (`xcode-select --install` after updating macOS gets you that). On older versions you still get the blur, rim and sheen.
+- **Liquid Glass on** adds a glass rim, a light sheen and Apple's native glass material, styled to echo the translucent Liquid Glass look on iPhone. Off gives plain frosted translucency.
+- Build with Xcode 26 or newer (`xcode-select --install`) to include Apple's native glass material. The app requires macOS 27 or later.

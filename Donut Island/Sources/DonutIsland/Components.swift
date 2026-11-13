@@ -137,7 +137,7 @@ struct VisualEffectBlur: NSViewRepresentable {
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 
-/// Apple's own Liquid Glass on macOS 26+. It is only compiled when building with the
+/// Apple's own Liquid Glass on macOS 27+. It is only compiled when building with the
 /// Xcode 26 toolchain, and falls back to nothing on older systems.
 struct GlassLayer: View {
     let shape: NotchShape
@@ -145,7 +145,7 @@ struct GlassLayer: View {
     @ViewBuilder
     var body: some View {
         #if compiler(>=6.2)
-        if #available(macOS 26.0, *) {
+        if #available(macOS 27.0, *) {
             Color.clear.glassEffect(.regular, in: shape)
         } else {
             Color.clear
