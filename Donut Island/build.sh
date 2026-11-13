@@ -24,7 +24,7 @@ echo "▸ Compiling (release)…"
 swift build -c release
 BIN="$(swift build -c release --show-bin-path)/DonutIsland"
 
-echo "▸ Assembling $APP…"
+echo "▸ Assembling ${APP}…"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/DonutIsland"
@@ -55,8 +55,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleName</key><string>Donut Island</string>
   <key>CFBundleDisplayName</key><string>Donut Island</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0.14</string>
-  <key>CFBundleVersion</key><string>14</string>
+  <key>CFBundleShortVersionString</key><string>1.0.15</string>
+  <key>CFBundleVersion</key><string>15</string>
   <key>CFBundleIconFile</key><string>DonutIslandIcon</string>
   <key>LSMinimumSystemVersion</key><string>27.0</string>
   <key>LSUIElement</key><true/>
