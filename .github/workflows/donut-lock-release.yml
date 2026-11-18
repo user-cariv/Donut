@@ -5,13 +5,6 @@ on:
     branches: [main]
     paths:
       - 'Donut Lock/**'
-      - 'Website/index.html'
-      - 'Website/hub.css'
-      - 'Website/lock.html'
-      - 'Website/lock.css'
-      - 'Website/donut-lock-card.png'
-      - 'Website/donut-lock-icon.jpeg'
-      - '.github/workflows/donut-lock-release.yml'
   workflow_dispatch:
 
 permissions:
