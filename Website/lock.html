@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Donut Lock keeps files and folders in an encrypted vault, with password and biometric unlock for Windows and macOS.">
+  <title>Donut Lock — A private place for your files</title>
+  <link rel="icon" type="image/svg+xml" href="donut-mark.svg?v=3">
+  <link rel="stylesheet" href="hub.css">
+  <link rel="stylesheet" href="lock.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="hub-ambient hub-ambient-one" aria-hidden="true"></div>
+  <div class="hub-ambient hub-ambient-two" aria-hidden="true"></div>
+  <header class="hub-nav">
+    <a class="hub-brand" href="index.html" aria-label="Donut home"><span class="hub-mark"><img src="donut-mark.svg" alt=""></span><span>DONUT</span></a>
+    <nav aria-label="Main navigation"><a href="index.html#apps">Apps</a><a href="convert.html">Donut Convert</a><a href="island.html">Donut Island</a><a href="lock.html" aria-current="page">Donut Lock</a></nav>
+    <button class="hub-theme-toggle" type="button" aria-label="Toggle appearance">◐</button>
+  </header>
+
+  <main class="lock-page">
+    <section class="lock-hero">
+      <div class="lock-hero-copy">
+        <p class="hub-eyebrow"><span class="hub-status-dot"></span> A private vault for Windows &amp; macOS</p>
+        <h1>Your files.<br><em>Only yours.</em></h1>
+        <p>Add copies of files or folders to an encrypted vault, then unlock them with a password or your device’s biometric sign-in when available.</p>
+        <div class="lock-platforms"><span>Windows Hello</span><span>Touch ID</span><span>4+ character password</span></div>
+      </div>
+      <div class="lock-hero-art"><img src="donut-lock-card.png" alt="Donut Lock preview showing a private passcode vault and protected items"></div>
+    </section>
+
+    <section class="lock-section" id="features">
+      <div class="lock-section-heading">
+        <p class="hub-eyebrow">Private by design</p>
+        <h2>One calm place<br><em>for what’s personal.</em></h2>
+        <p>Donut Lock is built around a simple vault workflow: choose the items you want to keep private, protect them, and unlock them when you need them.</p>
+      </div>
+      <div class="lock-feature-grid">
+        <article class="lock-feature"><span class="lock-feature-mark">▣</span><h3>Files and folders</h3><p>Keep documents, photos, executables, and other file types in encrypted vault copies. Folders are packaged and restored when opened.</p></article>
+        <article class="lock-feature"><span class="lock-feature-mark">◉</span><h3>Use your device</h3><p>Choose Touch ID on supported Macs or Windows Hello on supported PCs. If biometrics aren’t configured, Donut Lock suggests where to set them up.</p></article>
+        <article class="lock-feature"><span class="lock-feature-mark">✦</span><h3>Your password still works</h3><p>Set a password with at least 4 characters. Use letters, numbers, or symbols, and keep password unlock available as your fallback.</p></article>
+      </div>
+    </section>
+
+    <section class="lock-download" id="download">
+      <p class="hub-eyebrow">Choose your platform</p>
+      <h2>Download Donut Lock.</h2>
+      <p>Get the native app for your computer. Windows downloads as a ZIP; macOS downloads as an app bundle ZIP.</p>
+      <div class="lock-download-options">
+        <a class="hub-button" href="https://github.com/user-cariv/Donut/releases/download/donut-lock-latest/Donut-Lock-Windows-x64.zip">Download for Windows <span>↓</span></a>
+        <a class="hub-button" href="https://github.com/user-cariv/Donut/releases/download/donut-lock-latest/Donut-Lock-macOS.zip">Download for macOS <span>↓</span></a>
+      </div>
+      <p class="lock-download-note">Windows 10 22H2 or newer · macOS 13 or newer · First downloads may take a few minutes to appear after a release update.</p>
+      <p class="lock-download-note">Windows: extract the ZIP and open DonutLock.exe. macOS: extract Donut Lock.app and move it to Applications. This early Mac build is not signed or notarized, so Gatekeeper may ask you to approve it in Privacy &amp; Security.</p>
+    </section>
+
+    <section class="lock-faq" id="faq">
+      <div class="lock-section-heading"><p class="hub-eyebrow">Good to know</p><h2>Clear about<br><em>what’s protected.</em></h2></div>
+      <details><summary>Does Donut Lock intercept every Finder or File Explorer click?</summary><p>No. The current app protects copies opened through its vault. It does not intercept other apps’ open actions, and the original item stays where it is. Move sensitive originals yourself after confirming the vault copy works.</p></details>
+      <details><summary>What happens when I unlock an item?</summary><p>Donut Lock creates a temporary decrypted copy and opens it with the default app. Remove that temporary copy after you finish.</p></details>
+      <details><summary>Can I use it without a fingerprint?</summary><p>Yes. Password unlock is available on both platforms. If fingerprint sign-in isn’t configured, the app points you to the platform’s setup settings.</p></details>
+    </section>
+  </main>
+
+  <footer class="hub-footer"><a class="hub-brand" href="index.html"><span class="hub-mark"><img src="donut-mark.svg" alt=""></span><span>DONUT</span></a><span>Small apps. Big relief.</span><span>Donut Lock is a product of <a href="index.html">Donut</a>.</span></footer>
+  <script src="hub.js"></script>
+</body>
+</html>
