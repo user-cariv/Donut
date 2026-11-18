@@ -15,15 +15,20 @@
 .lock-feature .lock-feature-mark { width: 45px; height: 45px; margin-bottom: 18px; display: grid; place-items: center; border-radius: 15px; color: #fff; background: linear-gradient(135deg, var(--hub-orange), var(--hub-coral)); font-size: 22px; }
 .lock-feature h3 { margin: 0 0 10px; font-size: 21px; }
 .lock-feature p { margin: 0; color: var(--hub-muted); font-size: 13px; line-height: 1.65; }
-.lock-download { margin: 0 0 80px; padding: 38px; border: 1px solid #fff; border-radius: 28px; background: linear-gradient(130deg, #fff9, #ffebe1); box-shadow: var(--hub-shadow); }
-.lock-download h2 { margin: 0 0 12px; font-size: clamp(32px, 4vw, 48px); }
-.lock-download p { margin: 0; color: var(--hub-muted); line-height: 1.7; }
-.lock-download-options { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 23px; }.lock-download-options .hub-button { color: #fff; background: var(--hub-ink); }.lock-download-options .hub-button span { color: #ff9a62; }.lock-download .lock-download-note { margin-top: 18px; font-size: 12px; }
+.lock-download { margin: 0 0 90px; padding: 0; }
+.lock-download-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 26px; }.lock-download-heading .hub-eyebrow { margin-bottom: 12px; }.lock-download-heading h2 { margin: 0; font-size: clamp(36px, 4.6vw, 54px); }.lock-download-heading > p { max-width: 280px; margin: 0 0 5px; color: var(--hub-muted); font-size: 14px; line-height: 1.6; }
+.lock-download-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.lock-download-card { min-width: 0; padding: 25px; border: 1px solid #fff; border-radius: 22px; background: #fff9; box-shadow: 0 18px 45px rgba(87,42,22,.08); }
+.lock-platform-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; color: #fff; background: #191311; }.lock-platform-icon svg { width: 21px; height: 21px; fill: currentColor; }.lock-apple-icon { color: #191311; background: #f1e9e3; }
+.lock-platform-label { margin: 18px 0 7px; color: var(--hub-orange); font-size: 10px; font-weight: 700; letter-spacing: .13em; }.lock-download-card h3 { margin: 0; font-size: clamp(20px, 2.2vw, 25px); letter-spacing: -.05em; }.lock-download-card .lock-platform-requirement { margin: 7px 0 20px; color: var(--hub-muted); font-size: 13px; }
+.lock-download-button { min-height: 48px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-radius: 13px; color: #fff; background: var(--hub-ink); font-size: 13px; font-weight: 700; transition: transform .2s ease, background .2s ease; }.lock-download-button:hover { transform: translateY(-2px); background: #34221d; }.lock-download-button span { color: #ff9a62; font-size: 18px; }
+.lock-download-card .lock-platform-note { margin: 13px 0 0; color: var(--hub-muted); font-size: 11px; line-height: 1.55; }.lock-download-security-note { margin: 16px 0 0; color: var(--hub-muted); font-size: 11px; line-height: 1.6; }
 .lock-faq { max-width: 760px; margin: 0 auto 100px; }
 .lock-faq details { padding: 19px 0; border-bottom: 1px solid #c9b4aa66; }
 .lock-faq summary { cursor: pointer; font-weight: 700; }
 .lock-faq details p { margin: 10px 0 0; color: var(--hub-muted); line-height: 1.7; font-size: 14px; }
 body.dark-mode .lock-feature, body.dark-mode .lock-platforms span { background: #241c19; border-color: #3c2e29; }
-body.dark-mode .lock-download { background: linear-gradient(130deg, #261d19, #34221d); border-color: #3c2e29; }
+body.dark-mode .lock-download-card { background: #211a17; border-color: #3c2e29; }.lock-download-card, .lock-download-button { text-decoration: none; }
+body.dark-mode .lock-download-button { color: #21140d; background: #ff9a62; }
 @media (max-width: 960px) { .hub-app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.lock-hero { min-height: 0; gap: 30px; padding: 75px 0 55px; } }
-@media (max-width: 760px) { .hub-app-grid, .lock-feature-grid { grid-template-columns: 1fr; }.lock-page { width: min(100% - 32px, 560px); }.lock-hero { grid-template-columns: 1fr; padding-top: 65px; }.lock-hero-art { max-width: 560px; }.lock-section { padding: 45px 0 60px; }.lock-download { padding: 27px 22px; margin-bottom: 60px; }.lock-faq { margin-bottom: 70px; } }
+@media (max-width: 760px) { .hub-app-grid, .lock-feature-grid, .lock-download-options { grid-template-columns: 1fr; }.lock-page { width: min(100% - 32px, 560px); }.lock-hero { grid-template-columns: 1fr; padding-top: 65px; }.lock-hero-art { max-width: 560px; }.lock-section { padding: 45px 0 60px; }.lock-download { margin-bottom: 60px; }.lock-download-heading { display: block; }.lock-download-heading > p { margin-top: 12px; }.lock-download-card { padding: 22px; }.lock-faq { margin-bottom: 70px; } }
