@@ -15,6 +15,8 @@
 .boost-steps h3 { margin: 20px 0 9px; font-size: 24px; }
 .boost-steps p, .boost-note { color: var(--hub-muted); font-size: 13px; line-height: 1.65; }
 .boost-note a { color: var(--hub-orange); text-decoration: underline; text-underline-offset: 3px; }
+.boost-game-card { margin-top: 30px; padding: 26px; display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; border: 1px solid #fff; border-radius: 24px; background: linear-gradient(135deg, #fff9, #fff5); box-shadow: var(--hub-shadow); }
+.boost-game-card .hub-eyebrow { margin-bottom: 11px; }.boost-game-card h3 { margin: 0; font-size: clamp(25px, 3vw, 34px); }.boost-game-card p:not(.hub-eyebrow) { max-width: 700px; color: var(--hub-muted); font-size: 13px; line-height: 1.65; }.boost-game-badge { padding: 10px 14px; border: 1px solid #8b5cf655; border-radius: 100px; color: #7045ba; background: #eee8ff; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .boost-note { max-width: 780px; margin: 20px 0 0; }
 .boost-download { padding: 10px 0 100px; }
 .boost-download-heading { margin-bottom: 24px; }.boost-download-heading .hub-eyebrow { margin-bottom: 10px; }.boost-download-heading h2 { margin: 0; font-size: clamp(36px, 4.6vw, 54px); }
@@ -28,6 +30,6 @@
 .boost-download-copy .hub-button { margin-top: 5px; }
 .boost-runtime-note { font-size: 12px !important; }.boost-runtime-note a { color: var(--hub-orange); text-decoration: underline; text-underline-offset: 3px; }
 .boost-macos-card { align-content: start; }.boost-macos-icon { display: grid; place-items: center; color: #fff; background: #17110f; font: 700 32px Manrope, sans-serif; }.boost-coming-soon { display: inline-flex; margin-top: 7px; padding: 8px 12px; border-radius: 100px; color: #80502e; background: #ffe4c9; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
-body.dark-mode .boost-steps article, body.dark-mode .boost-download-card { border-color: #3c2e29; background: #211a17; }body.dark-mode .boost-coming-soon { color: #ffcc9b; background: #453022; }
+body.dark-mode .boost-steps article, body.dark-mode .boost-download-card, body.dark-mode .boost-game-card { border-color: #3c2e29; background: #211a17; }body.dark-mode .boost-coming-soon { color: #ffcc9b; background: #453022; }body.dark-mode .boost-game-badge { color: #ddc8ff; border-color: #8b5cf666; background: #302344; }
 @media (max-width: 900px) { .boost-hero { gap: 28px; }.boost-hero h1 { font-size: clamp(46px, 6.4vw, 68px); } }
-@media (max-width: 760px) { .boost-page { width: min(100% - 32px, 560px); }.boost-hero { min-height: 0; grid-template-columns: 1fr; padding: 65px 0 45px; }.boost-hero-art { max-width: 560px; }.boost-how { padding: 45px 0 65px; }.boost-steps, .boost-download-options { grid-template-columns: 1fr; }.boost-download { padding-bottom: 70px; }.boost-download-card { grid-template-columns: auto 1fr; padding: 25px; gap: 18px; } }
+@media (max-width: 760px) { .boost-page { width: min(100% - 32px, 560px); }.boost-hero { min-height: 0; grid-template-columns: 1fr; padding: 65px 0 45px; }.boost-hero-art { max-width: 560px; }.boost-how { padding: 45px 0 65px; }.boost-steps, .boost-download-options { grid-template-columns: 1fr; }.boost-game-card { grid-template-columns: 1fr; align-items: start; }.boost-game-badge { justify-self: start; }.boost-download { padding-bottom: 70px; }.boost-download-card { grid-template-columns: auto 1fr; padding: 25px; gap: 18px; } }
