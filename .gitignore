@@ -2,10 +2,6 @@
 Windows/Donut/bin/
 Windows/Donut/obj/
 Mac OS/Donut/build/
-Donut Lock/windows/bin/
-Donut Lock/windows/obj/
-Donut Lock/macOS/.build/
-Donut Lock/macOS/build/
 
 # Local tooling and editor files
 .vs/
