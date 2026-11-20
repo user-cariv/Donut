@@ -1,0 +1,32 @@
+.boost-page { width: min(1120px, calc(100% - 48px)); margin: 0 auto; }
+.boost-hero { min-height: 620px; padding: 85px 0 65px; display: grid; grid-template-columns: .9fr 1.1fr; align-items: center; gap: 48px; }
+.boost-hero h1 { margin: 0; font-size: clamp(48px, 6.2vw, 78px); }
+.boost-hero .hub-lead { max-width: 470px; margin: 25px 0; }
+.boost-platform-note { margin: 15px 0 0; color: var(--hub-muted); font-size: 12px; }
+.boost-hero-art { overflow: hidden; border: 1px solid #ffffff33; border-radius: 30px; background: #111638; box-shadow: var(--hub-shadow); }
+.boost-hero-art img { display: block; width: 100%; height: auto; }
+.boost-how { padding: 55px 0 90px; }
+.boost-section-heading { max-width: 720px; }
+.boost-section-heading h2 { margin: 0; font-size: clamp(40px, 5vw, 62px); }
+.boost-section-heading > p:last-child { max-width: 660px; color: var(--hub-muted); line-height: 1.7; }
+.boost-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 38px; }
+.boost-steps article { padding: 24px; border: 1px solid #fff; border-radius: 22px; background: #fff8; box-shadow: var(--hub-shadow); }
+.boost-steps article > span { color: var(--hub-orange); font-size: 11px; font-weight: 700; letter-spacing: .12em; }
+.boost-steps h3 { margin: 20px 0 9px; font-size: 24px; }
+.boost-steps p, .boost-note { color: var(--hub-muted); font-size: 13px; line-height: 1.65; }
+.boost-note { max-width: 780px; margin: 20px 0 0; }
+.boost-download { padding: 10px 0 100px; }
+.boost-download-heading { margin-bottom: 24px; }.boost-download-heading .hub-eyebrow { margin-bottom: 10px; }.boost-download-heading h2 { margin: 0; font-size: clamp(36px, 4.6vw, 54px); }
+.boost-download-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.boost-download-card { min-width: 0; display: grid; grid-template-columns: auto 1fr; gap: 23px; align-items: start; padding: 28px; border: 1px solid #fff; border-radius: 28px; background: #fff9; box-shadow: var(--hub-shadow); }
+.boost-download-icon { width: 72px; height: 72px; overflow: hidden; border-radius: 20px; box-shadow: 0 10px 25px #201b3b22; }
+.boost-download-icon img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.boost-download-copy .hub-eyebrow { margin: 0 0 10px; }
+.boost-download-copy h3 { margin: 0; font-size: clamp(23px, 2.4vw, 30px); letter-spacing: -.06em; }
+.boost-download-copy > p:not(.hub-eyebrow) { max-width: 650px; color: var(--hub-muted); line-height: 1.65; font-size: 14px; }
+.boost-download-copy .hub-button { margin-top: 5px; }
+.boost-runtime-note { font-size: 12px !important; }.boost-runtime-note a { color: var(--hub-orange); text-decoration: underline; text-underline-offset: 3px; }
+.boost-macos-card { align-content: start; }.boost-macos-icon { display: grid; place-items: center; color: #fff; background: #17110f; font: 700 32px Manrope, sans-serif; }.boost-coming-soon { display: inline-flex; margin-top: 7px; padding: 8px 12px; border-radius: 100px; color: #80502e; background: #ffe4c9; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
+body.dark-mode .boost-steps article, body.dark-mode .boost-download-card { border-color: #3c2e29; background: #211a17; }body.dark-mode .boost-coming-soon { color: #ffcc9b; background: #453022; }
+@media (max-width: 900px) { .boost-hero { gap: 28px; }.boost-hero h1 { font-size: clamp(46px, 6.4vw, 68px); } }
+@media (max-width: 760px) { .boost-page { width: min(100% - 32px, 560px); }.boost-hero { min-height: 0; grid-template-columns: 1fr; padding: 65px 0 45px; }.boost-hero-art { max-width: 560px; }.boost-how { padding: 45px 0 65px; }.boost-steps, .boost-download-options { grid-template-columns: 1fr; }.boost-download { padding-bottom: 70px; }.boost-download-card { grid-template-columns: auto 1fr; padding: 25px; gap: 18px; } }
