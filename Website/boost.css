@@ -14,6 +14,7 @@
 .boost-steps article > span { color: var(--hub-orange); font-size: 11px; font-weight: 700; letter-spacing: .12em; }
 .boost-steps h3 { margin: 20px 0 9px; font-size: 24px; }
 .boost-steps p, .boost-note { color: var(--hub-muted); font-size: 13px; line-height: 1.65; }
+.boost-note a { color: var(--hub-orange); text-decoration: underline; text-underline-offset: 3px; }
 .boost-note { max-width: 780px; margin: 20px 0 0; }
 .boost-download { padding: 10px 0 100px; }
 .boost-download-heading { margin-bottom: 24px; }.boost-download-heading .hub-eyebrow { margin-bottom: 10px; }.boost-download-heading h2 { margin: 0; font-size: clamp(36px, 4.6vw, 54px); }
