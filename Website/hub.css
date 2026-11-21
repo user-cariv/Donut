@@ -10,7 +10,7 @@
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { margin: 0; color: var(--hub-ink); background: var(--hub-cream); font-family: "DM Sans", sans-serif; overflow-x: hidden; background-image: linear-gradient(rgba(79,43,29,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(79,43,29,.025) 1px, transparent 1px); background-size: 72px 72px; }
-body.dark-mode { --hub-ink: #f7f2ed; --hub-muted: #c5b9b2; --hub-cream: #171312; --hub-shadow: 0 30px 80px rgba(0,0,0,.35); background-color: #171312; background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); }
+body.dark-mode { color-scheme: dark; --hub-ink: #f7f2ed; --hub-muted: #c5b9b2; --hub-cream: #171312; --hub-shadow: 0 30px 80px rgba(0,0,0,.35); background-color: #171312; background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); }
 a { color: inherit; text-decoration: none; }
 .hub-ambient { position: fixed; width: 620px; height: 620px; border-radius: 50%; filter: blur(80px); opacity: .3; pointer-events: none; z-index: -1; }
 .hub-ambient-one { background: #ffc58e; top: -270px; right: -140px; }

@@ -22,7 +22,7 @@ body {
   background-size: 72px 72px;
 }
 body.modal-open { overflow: hidden; }
-body.dark-mode { --ink: #f7f2ed; --muted: #b5a9a2; --cream: #171312; --line: rgba(255,255,255,.12); background-color: #171312; background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); }
+body.dark-mode { color-scheme: dark; --ink: #f7f2ed; --muted: #c5b9b2; --cream: #171312; --line: rgba(255,255,255,.12); background-color: #171312; background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); }
 body.dark-mode .nav, body.dark-mode .proof, body.dark-mode .glass-card { background: #2a211f99; border-color: #ffffff1c; }
 body.dark-mode .brand-mark span { background: var(--cream); }
 body.dark-mode .button-primary { background: #fff; color: #171312; }
@@ -189,3 +189,7 @@ body.dark-mode .format-pill { color: #fff3ea; border-color: #ffffff35; backgroun
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 @media (max-width: 380px) { .nav { padding: 0 9px; }.brand { font-size: 17px; }.brand-mark { width: 24px; height: 24px; }.nav-actions { gap: 5px; }.nav-download { padding: 8px 9px; font-size: 10px; }.theme-toggle { width: 28px; height: 28px; }.hero-meta i { display: none; }.hero-meta { gap: 10px; }.format-grid { grid-template-columns: 1fr; }.format-tile { min-height: 100px; }.download-panel { padding: 28px 16px; }.platform-option { align-items: flex-start; }.platform-option small { max-width: 180px; }.download-status { max-width: 64px; line-height: 1.25; }.download-choice { align-items: flex-start; }.choice-status { max-width: 64px; line-height: 1.25; text-align: right; } }
+body.dark-mode .compatibility, body.dark-mode .hero-meta, body.dark-mode .download-note, body.dark-mode .footer { color: #c5b9b2; }
+body.dark-mode .hero-meta b, body.dark-mode .footer .brand { color: var(--ink); }
+body.dark-mode .demo-steps, body.dark-mode .demo-empty small { color: #c5b9b2; }
+body.dark-mode :is(button, a, input, select, textarea):focus-visible { outline: 3px solid #ffad78; outline-offset: 3px; }
