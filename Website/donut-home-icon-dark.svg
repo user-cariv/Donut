@@ -20,7 +20,9 @@
     <mask id="donutHoleMask">
       <rect width="1024" height="1024" fill="#fff"/>
       <circle cx="512" cy="512" r="154" fill="#000"/>
+      <circle cx="795" cy="254" r="133" fill="#000"/>
     </mask>
+    <clipPath id="donutOuterClip"><circle cx="512" cy="512" r="394"/></clipPath>
     <style>:root{--icon-background:#080808}</style>
   </defs>
   <rect width="1024" height="1024" fill="var(--icon-background)"/>
@@ -31,8 +33,7 @@
     <circle cx="512" cy="512" r="168" fill="none" stroke="#f3c17b" stroke-width="28"/>
     <circle cx="512" cy="512" r="153" fill="var(--icon-background)"/>
     <circle cx="512" cy="512" r="137" fill="none" stroke="#fff" stroke-opacity=".2" stroke-width="3"/>
-    <circle cx="795" cy="254" r="133" fill="var(--icon-background)" stroke="#f6d99f" stroke-width="20"/>
-    <circle cx="795" cy="254" r="121" fill="none" stroke="#fff" stroke-opacity=".2" stroke-width="3"/>
+    <circle cx="795" cy="254" r="133" fill="none" stroke="#f6d99f" stroke-width="20" clip-path="url(#donutOuterClip)" mask="url(#donutHoleMask)"/>
   </g>
   <g fill="none" stroke-linecap="round" stroke-width="24">
     <path d="m456 240 31 22" stroke="#30231d"/>
