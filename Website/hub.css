@@ -41,11 +41,12 @@ body.dark-mode .hub-button span { color: #bd542b; }
 .hub-orbit { position: absolute; border: 1px solid #ec8d6b33; border-radius: 50%; transform: rotate(-18deg); }
 .hub-orbit-one { width: 450px; height: 250px; }
 .hub-orbit-two { width: 340px; height: 490px; transform: rotate(55deg); }
-.hub-donut { width: 300px; height: 300px; padding: 36px; border-radius: 50%; background: linear-gradient(145deg, #fff8, #ffffff22); box-shadow: 0 35px 65px #a84f2a33, 0 0 0 22px #fff3, 0 0 0 23px #fff7; transform: rotate(-7deg); }
-.hub-donut img { width: 100%; height: 100%; }
+.hub-donut { width: 320px; height: 320px; padding: 24px; border-radius: 50%; background: linear-gradient(145deg, #fff8, #ffffff22); box-shadow: 0 35px 65px #a84f2a33, 0 0 0 22px #fff3, 0 0 0 23px #fff7; transform: rotate(-7deg); display: flex; align-items: center; justify-content: center; }
+.hub-donut img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 15px 30px rgba(220, 80, 50, 0.22)); }
 .hub-float { position: absolute; padding: 10px 15px; border: 1px solid #fff; border-radius: 100px; color: #6e5e59; background: #fff8; box-shadow: 0 10px 24px #8c4c2b18; backdrop-filter: blur(15px); font-size: 11px; font-weight: 600; }
 .hub-float-one { top: 50px; right: 3%; }.hub-float-two { bottom: 45px; left: 3%; }
 body.dark-mode .hub-donut { background: linear-gradient(145deg,#382b24,#211a17); box-shadow: 0 35px 65px #0007,0 0 0 22px #ffffff0b,0 0 0 23px #ffffff20; }
+body.dark-mode .hub-donut img { filter: drop-shadow(0 15px 35px rgba(0, 0, 0, 0.6)); }
 body.dark-mode .hub-float { border-color: #ffffff26; color: #f1e6dd; background: #2b211be8; box-shadow: 0 10px 24px #0005; }
 .hub-apps { width: min(1120px, calc(100% - 48px)); margin: 40px auto 0; padding: 100px 0 70px; }
 .hub-section-heading { display: grid; grid-template-columns: 1fr 1fr; align-items: end; gap: 25px; }
