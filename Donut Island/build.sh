@@ -71,7 +71,11 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 PLIST
 
 echo "▸ Signing (ad-hoc)…"
-codesign --force --deep --sign - --identifier com.ariv.donutisland "$APP"
+if [[ -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then
+  codesign --force --deep --sign "$APPLE_SIGNING_IDENTITY" --identifier com.ariv.donutisland "$APP"
+else
+  codesign --force --deep --sign - --identifier com.ariv.donutisland "$APP"
+fi
 
 echo "✓ Built $(pwd)/$APP"
 

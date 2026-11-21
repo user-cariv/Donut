@@ -1,9 +1,12 @@
-name: Validate Android web bundle
+name: Build and sign Donut Convert APK
 
 on:
   push:
-    branches: [ "main", "master" ]
+    tags:
+      - "android-v*"
   workflow_dispatch:
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -26,20 +29,37 @@ jobs:
       working-directory: android
       run: npm run lint
 
-    - name: Build web bundle
+    - name: Build web bundle and release APK
       working-directory: android
-      run: npm run build:web
+      env:
+        RELEASE_KEYSTORE: ${{ runner.temp }}/release.keystore
+        RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+        RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+        RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y android-sdk android-sdk-build-tools apksigner zipalign aapt
+        if [ -z "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ]; then
+          echo "::error::RELEASE_KEYSTORE_BASE64 secret is not configured"
+          exit 1
+        fi
+        echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 --decode > "$RELEASE_KEYSTORE"
+        npm run build
 
-    - name: Upload web bundle
-      uses: actions/upload-artifact@v4
-      with:
-        name: DonutConvert-web
-        path: android/dist
+    - name: Verify APK signature
+      working-directory: android
+      run: apksigner verify --verbose "public/Donut Convert.apk"
 
-    - name: Upload published APK
+    - name: Upload signed APK
       uses: actions/upload-artifact@v4
       with:
         name: DonutConvert-APK
         path: |
           android/public/DonutConvert.apk
           android/public/Donut Convert.apk
+
+    - name: Create Android GitHub Release
+      if: startsWith(github.ref, 'refs/tags/android-v')
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: gh release create "${{ github.ref_name }}" "android/public/Donut Convert.apk" --title "Donut Convert ${{ github.ref_name }}" --generate-notes

@@ -1,0 +1,99 @@
+name: Build and sign Donut Convert for Windows
+
+on:
+  push:
+    tags:
+      - "windows-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build-sign-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Publish self-contained app
+        working-directory: Windows/Donut
+        run: dotnet publish Donut.csproj -c Release -r win-x64 --self-contained true -o publish/win-x64
+
+      - name: Package unsigned app for SignPath
+        shell: pwsh
+        run: Compress-Archive -Path "Windows/Donut/publish/win-x64/*" -DestinationPath "Donut-Convert-Windows-unsigned.zip"
+
+      - name: Upload unsigned app
+        id: sign-app-upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Donut-Convert-Windows-unsigned
+          path: Donut-Convert-Windows-unsigned.zip
+
+      - name: Submit app signing request
+        id: sign-app
+        uses: signpath/github-action-submit-signing-request@v0.3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: donut-convert-windows
+          signing-policy-slug: release-signing
+          github-artifact-id: ${{ steps.sign-app-upload.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed-app
+
+      - name: Replace publish folder with signed app
+        shell: pwsh
+        run: |
+          Remove-Item "Windows/Donut/publish/win-x64" -Recurse -Force
+          Expand-Archive "signed-app/Donut-Convert-Windows-unsigned.zip" -DestinationPath "Windows/Donut/publish/win-x64"
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress
+
+      - name: Build signed-file installer
+        working-directory: Windows/Donut
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.Replace('windows-v', '')
+          (Get-Content installer.iss) -replace '(#define MyAppVersion ")[^"]*(")', "`$1$version`$2" |
+            Set-Content installer.iss -Encoding UTF8
+          & "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe" installer.iss "/DRuntime=win-x64"
+
+      - name: Upload unsigned installer to SignPath
+        id: unsigned-installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Donut-Convert-Installer-unsigned
+          path: Windows/Donut/installer/Install Donut Convert.exe
+
+      - name: Submit installer signing request
+        uses: signpath/github-action-submit-signing-request@v0.3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: donut-convert-windows
+          signing-policy-slug: release-signing
+          github-artifact-id: ${{ steps.unsigned-installer.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed-installer
+
+      - name: Create signed installer output
+        shell: pwsh
+        run: |
+          Copy-Item "signed-installer/Install Donut Convert.exe" "Windows/Donut/installer/Install-Donut-Convert-win-x64.exe" -Force
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            "Windows/Donut/installer/Install-Donut-Convert-win-x64.exe" \
+            --title "Donut Convert ${{ github.ref_name }}" \
+            --generate-notes

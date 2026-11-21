@@ -21,6 +21,52 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Validate Apple release signing configuration
+        env:
+          APPLE_DEVELOPER_ID_P12: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
+          APPLE_DEVELOPER_ID_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_INSTALLER_SIGNING_IDENTITY: ${{ secrets.APPLE_INSTALLER_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          for name in APPLE_DEVELOPER_ID_P12 APPLE_DEVELOPER_ID_PASSWORD \
+            APPLE_SIGNING_IDENTITY APPLE_INSTALLER_SIGNING_IDENTITY \
+            APPLE_ID APPLE_APP_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is required to create a signed and notarized macOS release"
+              exit 1
+            fi
+          done
+
+      - name: Import Apple Developer ID certificate
+        env:
+          APPLE_DEVELOPER_ID_P12: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
+          APPLE_DEVELOPER_ID_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_PASSWORD }}
+        run: |
+          set -euo pipefail
+          echo "$APPLE_DEVELOPER_ID_P12" | base64 --decode > /tmp/developer-id.p12
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security import /tmp/developer-id.p12 -k build.keychain -P "$APPLE_DEVELOPER_ID_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productsign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" build.keychain
+          rm -f /tmp/developer-id.p12
+
+      - name: Configure Apple signing
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_INSTALLER_SIGNING_IDENTITY: ${{ secrets.APPLE_INSTALLER_SIGNING_IDENTITY }}
+        run: |
+          if [ -n "$APPLE_SIGNING_IDENTITY" ]; then
+            echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY" >> "$GITHUB_ENV"
+            echo "APPLE_SIGNING_REQUIRED=YES" >> "$GITHUB_ENV"
+            echo "APPLE_SIGNING_ALLOWED=YES" >> "$GITHUB_ENV"
+            echo "APPLE_INSTALLER_SIGNING_IDENTITY=$APPLE_INSTALLER_SIGNING_IDENTITY" >> "$GITHUB_ENV"
+          fi
+
       - name: Build macOS DMG
         working-directory: Mac OS/Donut
         run: |
@@ -42,6 +88,35 @@ jobs:
           mkdir -p pkg-root/Applications
           cp -R "Donut Island.app" pkg-root/Applications/
           pkgbuild --root pkg-root --identifier com.ariv.donutisland --version 1.0.16 --install-location / "Donut-Island-macOS.pkg"
+
+      - name: Sign macOS artifacts
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_INSTALLER_SIGNING_IDENTITY: ${{ secrets.APPLE_INSTALLER_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          codesign --verify --deep --strict "Mac OS/Donut/build/Donut.app"
+          codesign --verify --deep --strict "Donut Island/Donut Island.app"
+          codesign --force --sign "$APPLE_SIGNING_IDENTITY" --timestamp "Mac OS/Donut/build/Install-Donut-macOS.dmg"
+          codesign --force --sign "$APPLE_SIGNING_IDENTITY" --timestamp "Donut Island/Donut-Island-macOS.dmg"
+          productsign --timestamp --sign "$APPLE_INSTALLER_SIGNING_IDENTITY" "Donut Island/Donut-Island-macOS.pkg" "Donut Island/Donut-Island-macOS-signed.pkg"
+          mv "Donut Island/Donut-Island-macOS-signed.pkg" "Donut Island/Donut-Island-macOS.pkg"
+
+      - name: Notarize macOS artifacts
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          xcrun notarytool submit "Mac OS/Donut/build/Install-Donut-macOS.dmg" --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+          xcrun stapler staple "Mac OS/Donut/build/Install-Donut-macOS.dmg"
+          xcrun notarytool submit "Donut Island/Donut-Island-macOS.dmg" --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+          xcrun stapler staple "Donut Island/Donut-Island-macOS.dmg"
+          if [ -f "Donut Island/Donut-Island-macOS.pkg" ]; then
+            xcrun notarytool submit "Donut Island/Donut-Island-macOS.pkg" --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+            xcrun stapler staple "Donut Island/Donut-Island-macOS.pkg"
+          fi
 
       - name: Create or update release
         env:

@@ -1,0 +1,6 @@
+<!-- NEEDS CHECKING: SignPath artifact configuration schema must be verified against the organization project. -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <pe-file>
+    <authenticode-sign/>
+  </pe-file>
+</artifact-configuration>

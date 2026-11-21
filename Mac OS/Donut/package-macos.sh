@@ -42,15 +42,20 @@ xcodebuild \
     -target Donut \
     -configuration Release \
     CONFIGURATION_BUILD_DIR="$BUILD_DIR" \
-    CODE_SIGN_IDENTITY="-" \
-    CODE_SIGNING_REQUIRED=NO \
-    CODE_SIGNING_ALLOWED=NO \
+    CODE_SIGN_IDENTITY="${APPLE_SIGNING_IDENTITY:--}" \
+    CODE_SIGNING_REQUIRED="${APPLE_SIGNING_REQUIRED:-NO}" \
+    CODE_SIGNING_ALLOWED="${APPLE_SIGNING_ALLOWED:-NO}" \
     build
 
 cp "$BUILD_DIR/Donut.icns" "$APP_PATH/Contents/Resources/Donut.icns"
 /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile Donut.icns" \
     "$APP_PATH/Contents/Info.plist"
 touch "$APP_PATH"
+
+if [ -n "${APPLE_SIGNING_IDENTITY:-}" ]; then
+    codesign --force --deep --sign "$APPLE_SIGNING_IDENTITY" --timestamp --options runtime "$APP_PATH"
+    codesign --verify --deep --strict "$APP_PATH"
+fi
 
 rm -f "$DMG_PATH"
 hdiutil create \
