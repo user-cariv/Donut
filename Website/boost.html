@@ -5,9 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Donut Boost uses your Windows PC's Wi-Fi and USB-tethered phone connections together for supported large downloads.">
   <title>Donut Boost — More connections. Faster downloads.</title>
-  <link rel="icon" type="image/svg+xml" href="donut-mark.svg?v=3">
-  <link rel="stylesheet" href="hub.css?v=donut-boost-1">
-  <link rel="stylesheet" href="boost.css?v=1">
+  <link rel="stylesheet" href="hub.css?v=donut-boost-3">
+  <link rel="stylesheet" href="boost.css?v=2">
+  <link rel="stylesheet" href="account.css?v=auth-1">
+    <link rel="icon" type="image/png" sizes="512x512" href="donut-home-icon-light-512.png?v=2" data-theme-light="donut-home-icon-light-512.png?v=2" data-theme-dark="donut-home-icon-dark-512.png?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="donut-home-icon-light-180.png?v=2" data-theme-light="donut-home-icon-light-180.png?v=2" data-theme-dark="donut-home-icon-dark-180.png?v=2">
+  <link rel="manifest" href="site-light.webmanifest?v=2" data-theme-light="site-light.webmanifest?v=2" data-theme-dark="site-dark.webmanifest?v=2">
+  <meta name="theme-color" content="#ffffff" data-theme-light="#ffffff" data-theme-dark="#080808">
+  <meta name="apple-mobile-web-app-title" content="Donut">
+  <script src="home-screen-icon.js?v=2"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
@@ -16,8 +22,8 @@
   <div class="hub-ambient hub-ambient-one" aria-hidden="true"></div>
   <div class="hub-ambient hub-ambient-two" aria-hidden="true"></div>
   <header class="hub-nav">
-    <a class="hub-brand" href="index.html" aria-label="Donut home"><span class="hub-mark"><img src="donut-mark.svg" alt=""></span><span>DONUT</span></a>
-    <nav aria-label="Main navigation"><a href="index.html#apps">Apps</a><a href="#how-it-works">How it works</a><a href="#download">Download</a></nav>
+    <a class="hub-brand" href="index.html" aria-label="Donut Boost home"><span class="hub-mark"><img src="donut-mark.svg" alt=""></span><span>Donut Boost</span></a>
+    <nav aria-label="Main navigation"><a href="index.html">Home</a><a href="index.html#apps">Other Apps</a><a href="index.html#support">Support</a><a href="#download">Download</a><a href="#how-it-works">How it works</a></nav>
     <button class="hub-theme-toggle" type="button" aria-label="Toggle appearance">◐</button>
   </header>
 
@@ -44,16 +50,38 @@
         <article><span>02</span><h3>Paste a link</h3><p>Enter a direct file download URL in Donut Boost and choose where to save the file.</p></article>
         <article><span>03</span><h3>Download together</h3><p>Watch per-connection activity and combined download progress in one window.</p></article>
       </div>
-      <p class="boost-note"><strong>In the app:</strong> choose Combine Both, Home Wi-Fi Only, or Mobile Data Only; toggle individual connections; pause, resume, or cancel a download; and choose its save folder.</p>
+      <p class="boost-note"><strong>In the app:</strong> choose Combine Both, Home Wi-Fi Only, or Mobile Data Only; set custom download speed limits (or uncapped); toggle individual connections; pause, resume, or cancel a download; and choose its save folder.</p>
+      <p class="boost-note">Adapters refresh automatically while the app is open. Donut Boost can recover active download chunks if a phone disconnects, and periodically checks tethered mobile connections to help keep them available.</p>
       <p class="boost-note">Setup help: <a href="https://support.google.com/android/answer/9059108" target="_blank" rel="noopener">Android USB tethering</a> · <a href="https://support.apple.com/en-gb/111785" target="_blank" rel="noopener">iPhone Personal Hotspot on Windows</a>. Multi-connection speed depends on the server supporting byte-range downloads. Links without that support may not benefit from combined connections and can fail.</p>
       <article class="boost-game-card">
-        <div>
-          <p class="hub-eyebrow">New · Included in the Windows app</p>
-          <h3>Game Launcher Accelerator</h3>
-          <p>No link paste needed: the accelerator distributes supported launcher connections across active adapters, with each connection using one adapter. The app lists Steam, Epic Games, EA App, Rockstar, and Battle.net, and shows live connection activity.</p>
-          <p>It uses Windows system proxy settings. Other apps honoring that setting can also route through it; launchers that bypass the system proxy will not. It starts enabled and can be switched off in Donut Boost.</p>
+        <div class="boost-game-copy">
+          <p class="hub-eyebrow"><span class="boost-kicker-dot"></span> Included in Donut Boost for Windows</p>
+          <div class="boost-game-heading">
+            <h3>Game downloads,<br><em>on another level.</em></h3>
+            <span class="boost-live-status"><i></i> Auto-on</span>
+          </div>
+          <p class="boost-game-intro">Skip the link paste. Donut Boost spots activity in supported launchers, shows what is downloading, and routes supported connections across your active adapters.</p>
+          <div class="boost-launcher-list" aria-label="Supported game launchers">
+            <span>Steam</span><span>Epic Games</span><span>EA App</span><span>Rockstar</span><span>Battle.net</span><span>Ubisoft Connect</span><span>Riot Games</span><span>Xbox</span><span>GOG Galaxy</span>
+          </div>
+          <p class="boost-game-footnote"><strong>Universal Acceleration.</strong> Multi-path hardware bonding across all 9 game launchers without proxy dependencies. Auto size detection for Steam &amp; Epic, plus 1-click size targets (10–100 GB) for all launchers.</p>
         </div>
-        <span class="boost-game-badge">Wi-Fi + mobile adapters</span>
+        <div class="boost-game-visual" aria-hidden="true">
+          <svg viewBox="0 0 260 220" fill="none">
+            <path class="boost-connection-path path-one" d="M42 62C82 62 80 104 122 108"/>
+            <path class="boost-connection-path path-two" d="M45 166C83 166 88 126 122 112"/>
+            <path class="boost-connection-path path-three" d="M139 110C174 110 175 65 218 65"/>
+            <path class="boost-connection-path path-four" d="M139 114C176 114 178 163 218 163"/>
+            <circle class="boost-connection-node" cx="42" cy="62" r="5"/><circle class="boost-connection-node" cx="45" cy="166" r="5"/>
+            <circle class="boost-connection-node" cx="218" cy="65" r="5"/><circle class="boost-connection-node" cx="218" cy="163" r="5"/>
+            <circle class="boost-orbit" cx="130" cy="111" r="77"/><circle class="boost-orbit orbit-two" cx="130" cy="111" r="61"/>
+          </svg>
+          <div class="boost-visual-node node-wifi"><span>Wi-Fi</span><small>Home</small></div>
+          <div class="boost-visual-node node-phone"><span>USB</span><small>Phone</small></div>
+          <div class="boost-visual-core"><span>⚡</span><small>BOOST</small></div>
+          <div class="boost-visual-node node-steam"><span>9 launchers</span><small>Detected</small></div>
+          <div class="boost-visual-node node-speed"><span>LIVE</span><small>Activity</small></div>
+        </div>
       </article>
     </section>
 
@@ -63,10 +91,14 @@
         <article class="boost-download-card">
           <div class="boost-download-icon"><img src="donut-boost-icon.png" alt=""></div>
           <div class="boost-download-copy">
-            <p class="hub-eyebrow">Windows · x64 · Current build</p>
+            <p class="hub-eyebrow">Windows · x64 · Official Installer</p>
             <h3>Donut Boost for Windows</h3>
-            <p>Download the ZIP, extract it, and run <strong>DonutBoost.exe</strong> or <strong>Launch Donut Boost.vbs</strong>. The app requires the .NET 8 Desktop Runtime.</p>
-            <a class="hub-button" href="Donut-Boost-Windows-x64-current.zip?v=20261120-2249" download>Download current build for Windows <span>↓</span></a>
+            <p>Download the official Windows Setup installer for full installation, desktop shortcuts, Wi-Fi priority optimization, and clean uninstallation in Windows Settings. Requires .NET 8 Desktop Runtime.</p>
+            <p class="boost-license-note">Speed bonding and Game Launcher Accelerator require an active pass. A 24-hour free pass is available once per device; redeem codes cover 1 day, 7 days, 1 month, or lifetime access.</p>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin:16px 0 8px;">
+              <a class="hub-button" href="Install Donut Boost.exe" download style="display:inline-flex;align-items:center;gap:8px;">Download Windows Installer (Setup.exe) <span>↓</span></a>
+              <a class="hub-button" href="Donut-Boost-Windows-x64-current.zip" download style="background:transparent;border:1px solid rgba(255,255,255,0.2);color:#E2E8F0;display:inline-flex;align-items:center;gap:8px;">Portable ZIP <span>↓</span></a>
+            </div>
             <p class="boost-runtime-note">Need the runtime? <a href="https://dotnet.microsoft.com/en-us/download/dotnet/8.0" target="_blank" rel="noopener">Get .NET 8 Desktop Runtime from Microsoft</a>.</p>
           </div>
         </article>
@@ -85,5 +117,8 @@
 
   <footer class="hub-footer"><a class="hub-brand" href="index.html"><span class="hub-mark"><img src="donut-mark.svg" alt=""></span><span>DONUT</span></a><span>Small apps. Big relief.</span><span>Donut Boost is a product of <a href="index.html">Donut</a>.</span></footer>
   <script src="hub.js"></script>
+  <script src="supabase-config.js?v=auth-1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="account.js?v=auth-1"></script>
 </body>
 </html>

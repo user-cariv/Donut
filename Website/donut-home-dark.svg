@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <clipPath id="donut-body"><circle cx="512" cy="512" r="387"/></clipPath>
+    <linearGradient id="crust" x1="190" y1="150" x2="820" y2="890" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F4C17D"/><stop offset=".58" stop-color="#E5A153"/><stop offset="1" stop-color="#D88A43"/>
+    </linearGradient>
+    <linearGradient id="icing" x1="252" y1="168" x2="804" y2="822" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFD0BD"/><stop offset=".48" stop-color="#F79782"/><stop offset="1" stop-color="#ED604C"/>
+    </linearGradient>
+    <filter id="shadow" x="70" y="90" width="900" height="900" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" fill="#080808"/>
+  <ellipse cx="515" cy="893" rx="335" ry="28" fill="#000" opacity=".42" filter="url(#shadow)"/>
+  <circle cx="512" cy="512" r="387" fill="url(#crust)"/>
+  <ellipse cx="505" cy="493" rx="341" ry="357" fill="url(#icing)"/>
+  <circle cx="800" cy="252" r="143" fill="url(#crust)" clip-path="url(#donut-body)"/>
+  <circle cx="800" cy="252" r="126" fill="#080808"/>
+  <circle cx="512" cy="512" r="174" fill="url(#crust)"/>
+  <circle cx="512" cy="512" r="142" fill="#080808"/>
+  <g fill="#FFF9EF">
+    <rect x="439" y="232" width="57" height="21" rx="10.5" transform="rotate(35 439 232)"/>
+    <rect x="558" y="250" width="57" height="21" rx="10.5" transform="rotate(-12 558 250)"/>
+    <rect x="286" y="347" width="57" height="21" rx="10.5" transform="rotate(-29 286 347)"/>
+    <rect x="737" y="452" width="57" height="21" rx="10.5" transform="rotate(61 737 452)"/>
+    <rect x="336" y="696" width="57" height="21" rx="10.5" transform="rotate(-56 336 696)"/>
+    <rect x="527" y="744" width="57" height="21" rx="10.5" transform="rotate(20 527 744)"/>
+  </g>
+  <g fill="#29211B">
+    <rect x="222" y="526" width="57" height="21" rx="10.5" transform="rotate(15 222 526)"/>
+    <rect x="693" y="652" width="57" height="21" rx="10.5" transform="rotate(-35 693 652)"/>
+  </g>
+</svg>
