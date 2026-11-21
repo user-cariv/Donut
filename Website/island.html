@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Donut Island – Give your notch a purpose</title>
 <meta name="description" content="Donut Island turns the notch on every MacBook Pro and MacBook Air into a Dynamic Island. Download it free from Donut.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; frame-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://qigzqfntaokxnsfcejiy.supabase.co https://open.er-api.com; upgrade-insecure-requests">
+<meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+<meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()">
     <link rel="icon" type="image/png" sizes="512x512" href="donut-home-icon-light-512.png?v=2" data-theme-light="donut-home-icon-light-512.png?v=2" data-theme-dark="donut-home-icon-dark-512.png?v=2">
   <link rel="apple-touch-icon" sizes="180x180" href="donut-home-icon-light-180.png?v=2" data-theme-light="donut-home-icon-light-180.png?v=2" data-theme-dark="donut-home-icon-dark-180.png?v=2">
   <link rel="manifest" href="site-light.webmanifest?v=2" data-theme-light="site-light.webmanifest?v=2" data-theme-dark="site-dark.webmanifest?v=2">
@@ -81,6 +84,7 @@ h1,h2,h3{margin:0;font-family:Manrope,"DM Sans",sans-serif}
 .island.open .inner{opacity:1;transition-delay:.22s}
 .row{display:flex;gap:14px;align-items:center}
 .ico{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;font-size:22px;flex:none}
+.scene-calendar{background:#ff6a4a}.scene-message,.scene-accept{background:#30d158}.scene-call{background:#3a3a3c}.scene-decline{background:#ff453a}
 .sub{color:#a7a09a;font-size:13px}
 .acts{display:flex;gap:10px;margin-top:16px}
 .acts span{flex:1;text-align:center;padding:9px;border-radius:999px;font-weight:700;font-size:14px}
@@ -224,37 +228,9 @@ footer{padding:36px 0 44px;color:var(--muted);font-size:14px}
 
 <footer><div class="wrap">Donut Island is a product of <a href="index.html">Donut</a>. <a href="index.html">Explore all Donut apps</a>.</div></footer>
 
-<script>
-/* theme */
-var root=document.documentElement, tg=document.getElementById("theme");
-try{ var st=localStorage.getItem("di_theme"); if(st) root.setAttribute("data-theme",st); }catch(e){}
-function isDark(){ return root.getAttribute("data-theme")==="dark"; }
-function paint(){ tg.setAttribute("aria-label",isDark()?"Switch to light mode":"Switch to dark mode"); }
-tg.onclick=function(){ var n=isDark()?"light":"dark"; root.setAttribute("data-theme",n); try{ localStorage.setItem("di_theme",n); }catch(e){} paint(); };
-paint();
-
-/* island demo */
-var isl=document.getElementById("island"), inner=document.getElementById("inner"), tabs=document.querySelectorAll(".chips button");
-var scenes={
-  calendar:{w:360,h:128,html:'<div class="row"><div class="ico" style="background:#ff6a4a">📅</div><div><b>Design review</b><div class="sub">In 10 minutes · 3:30 PM</div></div></div>'},
-  message:{w:360,h:128,html:'<div class="row"><div class="ico" style="background:#30d158">💬</div><div><b>Maya</b><div class="sub">Still on for dinner tonight?</div></div></div>'},
-  call:{w:360,h:152,html:'<div class="row"><div class="ico" style="background:#3a3a3c">📞</div><div><b>Dad</b><div class="sub">iPhone call</div></div></div><div class="acts"><span style="background:#ff453a">Decline</span><span style="background:#30d158">Accept</span></div>'}
-};
-var order=["message","calendar","call"], idx=0, auto=null, cur=null;
-function show(k){
-  tabs.forEach(function(b){ b.setAttribute("aria-pressed",String(b.dataset.s===k)); });
-  var s=scenes[k]; cur=k; inner.innerHTML=s.html;
-  isl.classList.add("open"); isl.style.width=Math.min(s.w,isl.parentElement.clientWidth-24)+"px"; isl.style.height=s.h+"px";
-}
-function rest(){ cur=null; isl.classList.remove("open"); isl.style.width="150px"; isl.style.height="30px"; tabs.forEach(function(b){ b.setAttribute("aria-pressed","false"); }); }
-function cycle(){ show(order[idx%3]); idx++; auto=setTimeout(function(){ rest(); auto=setTimeout(cycle,900); },3200); }
-tabs.forEach(function(b){ b.addEventListener("click",function(){ clearTimeout(auto); cur===b.dataset.s?rest():show(b.dataset.s); }); });
-window.addEventListener("resize",function(){ if(cur) show(cur); });
-if(!matchMedia("(prefers-reduced-motion:reduce)").matches) auto=setTimeout(cycle,900); else show("message");
-
-</script>
+<script src="island-app.js?v=1"></script>
 <script src="supabase-config.js?v=auth-1"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="vendor/supabase-js-2.119.2.js"></script>
 <script src="account.js?v=auth-1"></script>
 </body>
 </html>

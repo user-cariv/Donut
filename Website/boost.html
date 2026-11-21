@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; frame-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://qigzqfntaokxnsfcejiy.supabase.co https://open.er-api.com; upgrade-insecure-requests">
+  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()">
   <meta name="description" content="Donut Boost uses your Windows PC's Wi-Fi and USB-tethered phone connections together for supported large downloads.">
   <title>Donut Boost — More connections. Faster downloads.</title>
   <link rel="stylesheet" href="hub.css?v=donut-boost-3">
@@ -208,7 +211,7 @@
   <footer class="hub-footer"><a class="hub-brand" href="index.html"><span class="hub-mark"><img src="donut-mark.svg" alt=""></span><span>DONUT</span></a><span>Small apps. Big relief.</span><span>Donut Boost is a product of <a href="index.html">Donut</a>.</span></footer>
   <script src="hub.js"></script>
   <script src="supabase-config.js?v=auth-1"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="vendor/supabase-js-2.119.2.js"></script>
   <script src="account.js?v=auth-1"></script>
   <script src="boost-pricing.js?v=1"></script>
 </body>

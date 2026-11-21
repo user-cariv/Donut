@@ -19,7 +19,9 @@ jobs:
     runs-on: xcode-27
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Validate Apple release signing configuration
         env:
@@ -121,8 +123,13 @@ jobs:
       - name: Create or update release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
         run: |
-          tag="${{ inputs.release_tag || github.ref_name }}"
+          tag="$RELEASE_TAG"
+          if [[ ! "$tag" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]; then
+            echo "::error::Invalid release tag"
+            exit 1
+          fi
           if ! gh release view "$tag" >/dev/null 2>&1; then
             gh release create "$tag" --title "Donut $tag" --generate-notes
           fi

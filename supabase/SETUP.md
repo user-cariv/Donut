@@ -2,8 +2,8 @@
 
 The site is static, so support requests need a hosted form endpoint. This setup
 stores tickets and attachments in a private Supabase project and can send email
-through Resend. The website config now points to the Donut Support project;
-the backend still needs its migration and function deployed.
+through Resend. The website config contains only the public URL and publishable
+key. The support backend uses server-side secrets.
 
 ## 1. Create a Supabase project
 
@@ -23,10 +23,13 @@ supabase db push
 supabase functions deploy submit-support --no-verify-jwt
 ```
 
-The migration creates a private ticket table and a private attachment bucket.
-Only the Edge Function uses the service-role key to write or read those records.
-The function enforces allowed file types, up to 5 files, 8 MB per file, 20 MB
-total, a per-email submission limit, and an origin allow-list.
+The migrations create a private ticket table, a private attachment bucket, and
+an internal rate-limit table. Only the Edge Function uses the service-role key
+to write or read those records. The function bounds request bodies, checks file
+signatures and allowed types, limits uploads to 5 files (8 MB each, 20 MB total),
+limits submissions to 3 per email and 5 per IP per hour, and checks an origin
+allow-list. The browser's public key and CORS origin check are not treated as
+authentication.
 
 ## 3. Configure function secrets
 

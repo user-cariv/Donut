@@ -23,11 +23,12 @@ document.querySelectorAll('a[href^="#"]:not([data-open-download])').forEach((lin
 });
 
 const themeToggle = document.querySelector(".theme-toggle");
-const storedTheme = localStorage.getItem("donut-theme");
+let storedTheme = null;
+try { storedTheme = localStorage.getItem("donut-theme"); } catch (_) {}
 if (storedTheme === "dark") document.body.classList.add("dark-mode");
-themeToggle.addEventListener("click", () => {
+themeToggle?.addEventListener("click", () => {
   document.body.classList.toggle("dark-mode");
-  localStorage.setItem("donut-theme", document.body.classList.contains("dark-mode") ? "dark" : "light");
+  try { localStorage.setItem("donut-theme", document.body.classList.contains("dark-mode") ? "dark" : "light"); } catch (_) {}
 });
 
 const downloadModal = document.querySelector("#download-modal");

@@ -1,4 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2.119.2";
 
 const MAX_FILES = 5;
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
@@ -91,6 +91,35 @@ function hasValidSignature(type: string, bytes: Uint8Array): boolean {
   return false;
 }
 
+async function readBoundedFormData(request: Request, maxBytes: number): Promise<FormData | null> {
+  if (!request.body) return null;
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    totalBytes += value.byteLength;
+    if (totalBytes > maxBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const body = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  const boundedRequest = new Request(request.url, {
+    method: "POST",
+    headers: { "Content-Type": request.headers.get("content-type") ?? "" },
+    body,
+  });
+  return await boundedRequest.formData();
+}
+
 async function sendEmail(
   apiKey: string,
   from: string,
@@ -139,7 +168,10 @@ Deno.serve(async (request) => {
     if (!request.headers.get("content-type")?.includes("multipart/form-data")) {
       return jsonResponse({ error: "Please submit the support form." }, 415, cors);
     }
-    const form = await request.formData();
+    const form = await readBoundedFormData(request, MAX_REQUEST_BYTES);
+    if (!form) {
+      return jsonResponse({ error: "The request is too large. Please reduce the attachment sizes." }, 413, cors);
+    }
     // Quietly accept bot submissions to a honeypot without creating tickets.
     if (String(form.get("company") ?? "").trim()) {
       return jsonResponse({ ticketId: crypto.randomUUID(), received: true }, 201, cors);
@@ -170,14 +202,14 @@ Deno.serve(async (request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const cutoff = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count, error: rateError } = await admin
-      .from("support_tickets")
-      .select("id", { count: "exact", head: true })
-      .eq("email", email)
-      .gte("created_at", cutoff);
+    const forwardedFor = request.headers.get("x-forwarded-for")?.split(",", 1)[0]?.trim();
+    if (!forwardedFor || forwardedFor.length > 64) {
+      return jsonResponse({ error: "We couldn’t verify this request. Please try again later." }, 503, cors);
+    }
+    const { data: withinRateLimit, error: rateError } = await admin
+      .rpc("consume_support_submission_rate_limit", { p_email: email, p_ip: forwardedFor });
     if (rateError) throw rateError;
-    if ((count ?? 0) >= 3) {
+    if (withinRateLimit !== true) {
       return jsonResponse({ error: "For safety, please wait before sending another request." }, 429, cors);
     }
 
