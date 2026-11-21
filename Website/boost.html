@@ -3,9 +3,6 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; frame-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://qigzqfntaokxnsfcejiy.supabase.co https://open.er-api.com; upgrade-insecure-requests">
-  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
-  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()">
   <meta name="description" content="Donut Boost uses your Windows PC's Wi-Fi and USB-tethered phone connections together for supported large downloads.">
   <title>Donut Boost — More connections. Faster downloads.</title>
   <link rel="stylesheet" href="hub.css?v=donut-boost-3">
@@ -88,99 +85,6 @@
       </article>
     </section>
 
-    <section class="boost-pricing" id="pricing" aria-labelledby="boost-pricing-title">
-      <div class="boost-pricing-heading">
-        <div>
-          <p class="hub-eyebrow">Straightforward passes</p>
-          <h2 id="boost-pricing-title">More speed.<br><em>One simple price.</em></h2>
-          <p>Choose a pass that fits your next download. No recurring subscription.</p>
-        </div>
-        <div class="boost-currency-control">
-          <label for="boost-currency">Display currency</label>
-          <select id="boost-currency" name="currency">
-            <option value="INR" selected>INR · Indian rupee</option>
-            <option value="USD">USD · US dollar</option>
-            <option value="EUR">EUR · Euro</option>
-            <option value="GBP">GBP · British pound</option>
-            <option value="CAD">CAD · Canadian dollar</option>
-            <option value="AUD">AUD · Australian dollar</option>
-            <option value="SGD">SGD · Singapore dollar</option>
-            <option value="AED">AED · UAE dirham</option>
-            <option value="SAR">SAR · Saudi riyal</option>
-            <option value="JPY">JPY · Japanese yen</option>
-            <option value="CNY">CNY · Chinese yuan</option>
-            <option value="HKD">HKD · Hong Kong dollar</option>
-            <option value="CHF">CHF · Swiss franc</option>
-            <option value="NZD">NZD · New Zealand dollar</option>
-            <option value="BRL">BRL · Brazilian real</option>
-            <option value="MXN">MXN · Mexican peso</option>
-            <option value="ZAR">ZAR · South African rand</option>
-            <option value="IDR">IDR · Indonesian rupiah</option>
-            <option value="PHP">PHP · Philippine peso</option>
-            <option value="THB">THB · Thai baht</option>
-            <option value="PKR">PKR · Pakistani rupee</option>
-            <option value="BDT">BDT · Bangladeshi taka</option>
-            <option value="LKR">LKR · Sri Lankan rupee</option>
-            <option value="NPR">NPR · Nepalese rupee</option>
-          </select>
-          <p class="boost-fx-status" id="boost-fx-status" aria-live="polite">Prices are set in INR. Loading daily reference rates…</p>
-        </div>
-      </div>
-
-      <div class="boost-price-grid">
-        <article class="boost-price-card">
-          <p class="boost-price-duration">1 day</p>
-          <h3>Quick boost</h3>
-          <p class="boost-price-description">A full day to try multi-connection downloads.</p>
-          <p class="boost-price-amount" data-inr="10">₹10</p>
-          <p class="boost-price-caption">one-time pass</p>
-          <a href="#download" class="boost-price-link">Get the app <span>→</span></a>
-        </article>
-        <article class="boost-price-card boost-price-featured">
-          <span class="boost-price-tag">Popular</span>
-          <p class="boost-price-duration">7 days</p>
-          <h3>Week pass</h3>
-          <p class="boost-price-description">A little more room for bigger downloads.</p>
-          <p class="boost-price-amount" data-inr="50">₹50</p>
-          <p class="boost-price-caption">one-time pass</p>
-          <a href="#download" class="boost-price-link">Get the app <span>→</span></a>
-        </article>
-        <article class="boost-price-card">
-          <p class="boost-price-duration">1 month</p>
-          <h3>Monthly pass</h3>
-          <p class="boost-price-description">Keep Boost ready for your everyday downloads.</p>
-          <p class="boost-price-amount" data-inr="100">₹100</p>
-          <p class="boost-price-caption">one-time pass</p>
-          <a href="#download" class="boost-price-link">Get the app <span>→</span></a>
-        </article>
-        <article class="boost-price-card boost-price-lifetime">
-          <p class="boost-price-duration">Lifetime</p>
-          <h3>One and done</h3>
-          <p class="boost-price-description">Unlock Donut Boost for the long run.</p>
-          <p class="boost-price-amount" data-inr="300">₹300</p>
-          <p class="boost-price-caption">one-time payment</p>
-          <a href="#download" class="boost-price-link">Get the app <span>→</span></a>
-        </article>
-      </div>
-      <div class="boost-activation-flow" aria-label="How to buy and activate a pass">
-        <div class="boost-activation-intro">
-          <p class="hub-eyebrow">How to activate a pass</p>
-          <h3>An activation code unlocks your chosen duration.</h3>
-          <p>First time using Donut Boost? Your first 24 hours are free.</p>
-        </div>
-        <ol>
-          <li><span>01</span><div><strong>Contact Donut Support</strong><p>Tell us which pass you want: 1 day, 7 days, 1 month, or lifetime.</p></div></li>
-          <li><span>02</span><div><strong>Get payment details</strong><p>Donut will reply with payment instructions for your selected pass.</p></div></li>
-          <li><span>03</span><div><strong>Receive your code by email</strong><p>After payment is received and confirmed, we’ll email you the activation code for that duration.</p></div></li>
-        </ol>
-        <a class="hub-button" href="index.html#support">Go to Support <span>→</span></a>
-      </div>
-      <div class="boost-pricing-footer">
-        <p><strong>Free trial:</strong> First-time users can try Donut Boost free for 24 hours.</p>
-        <p>Converted amounts are estimates using daily reference exchange rates. Your bank or payment provider may use a different rate or add fees. <a href="https://www.exchangerate-api.com" target="_blank" rel="noopener">Rates By Exchange Rate API</a></p>
-      </div>
-    </section>
-
     <section class="boost-download" id="download">
       <div class="boost-download-heading"><div><p class="hub-eyebrow">Get Donut Boost</p><h2>Choose your platform.</h2></div></div>
       <div class="boost-download-options">
@@ -191,10 +95,8 @@
             <h3>Donut Boost for Windows</h3>
             <p>Download the official Windows Setup installer for full installation, desktop shortcuts, Wi-Fi priority optimization, and clean uninstallation in Windows Settings. Requires .NET 8 Desktop Runtime.</p>
             <p class="boost-license-note">Speed bonding and Game Launcher Accelerator require an active pass. A 24-hour free pass is available once per device; redeem codes cover 1 day, 7 days, 1 month, or lifetime access.</p>
-            <div style="display:flex;gap:12px;flex-wrap:wrap;margin:16px 0 8px;">
-              <a class="hub-button" href="Install Donut Boost.exe" download style="display:inline-flex;align-items:center;gap:8px;">Download Windows Installer (Setup.exe) <span>↓</span></a>
-              <a class="hub-button" href="Donut-Boost-Windows-x64-current.zip" download style="background:transparent;border:1px solid rgba(255,255,255,0.2);color:#E2E8F0;display:inline-flex;align-items:center;gap:8px;">Portable ZIP <span>↓</span></a>
-            </div>
+            <a class="hub-button" href="Install Donut Boost.exe" download style="margin-top:16px;">Download Windows Installer (Setup.exe) <span>↓</span></a>
+            <p style="margin-top:10px;font-size:12px;opacity:0.8;"><a href="Donut-Boost-Windows-x64-current.zip" download>Download portable ZIP version</a></p>
             <p class="boost-runtime-note">Need the runtime? <a href="https://dotnet.microsoft.com/en-us/download/dotnet/8.0" target="_blank" rel="noopener">Get .NET 8 Desktop Runtime from Microsoft</a>.</p>
           </div>
         </article>
