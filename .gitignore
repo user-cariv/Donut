@@ -8,6 +8,10 @@ Mac OS/Donut/build/
 .vscode/
 *.user
 *.suo
+supabase/.temp/
+supabase/.env*
+!supabase/.env.example
+.tools/
 
 # macOS metadata
 .DS_Store

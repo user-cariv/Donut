@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="hub.css?v=donut-boost-3">
-  <link rel="stylesheet" href="account.css?v=preview-7">
+  <link rel="stylesheet" href="account.css?v=support-1">
 </head>
 <body>
   <div class="hub-ambient hub-ambient-one" aria-hidden="true"></div>
@@ -112,12 +112,13 @@
         <textarea class="account-textarea" id="support-issue" name="issue" placeholder="Tell us what you need help with." required></textarea>
         <div class="hub-support-attachments">
           <label class="hub-support-attach" for="support-files"><span aria-hidden="true">＋</span> Attach images or PDFs</label>
-          <input class="hub-support-file-input" id="support-files" name="attachments" type="file" accept="image/*,.pdf,application/pdf" multiple aria-describedby="support-file-help">
-          <p class="hub-support-file-help" id="support-file-help">Optional · Add screenshots or documents to explain the issue.</p>
+          <input class="hub-support-file-input" id="support-files" name="attachments" type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" multiple aria-describedby="support-file-help">
+          <p class="hub-support-file-help" id="support-file-help">Optional · Up to 5 JPG, PNG, WebP, GIF, or PDF files; 8 MB each.</p>
           <ul class="hub-support-file-list" aria-live="polite" hidden></ul>
+          <div class="hub-support-trap" aria-hidden="true"><label for="support-company">Company</label><input id="support-company" name="company" tabindex="-1" autocomplete="off"></div>
         </div>
         <button class="hub-support-submit" type="submit">Send a support request <span>→</span></button>
-        <p class="hub-support-message" aria-live="polite">Support form preview: submissions are not sent yet.</p>
+        <p class="hub-support-message" aria-live="polite">Support isn’t connected yet. Requests and attachments won’t be sent.</p>
       </form>
     </section>
   </main>
@@ -128,6 +129,7 @@
     <span>© 2026 Donut</span>
   </footer>
   <script src="hub.js"></script>
-  <script src="account.js?v=preview-4"></script>
+  <script src="support-config.js?v=1"></script>
+  <script src="account.js?v=support-2"></script>
 </body>
 </html>

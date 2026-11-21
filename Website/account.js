@@ -223,19 +223,64 @@
       form.elements.name.value = account.name || "";
       form.elements.email.value = account.email || "";
     }
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
-      form.querySelector(".hub-support-message").textContent = "Thanks — the form works in preview. Support messages aren’t sent until Donut’s support service is connected.";
-    });
-    form.addEventListener("submit", () => {
-      const count = fileInput?.files.length || 0;
-      if (count) {
-        window.setTimeout(() => {
-          const message = form.querySelector(".hub-support-message");
-          message.textContent += ` ${count} attachment${count === 1 ? "" : "s"} selected; files aren’t sent in this preview.`;
-        }, 0);
+      const supportMessage = form.querySelector(".hub-support-message");
+      const supportConfig = window.DONUT_SUPPORT_CONFIG || {};
+      if (supportMessage && supportConfig.supabaseUrl && supportConfig.anonKey) {
+        supportMessage.textContent = "Support requests are ready. Email alerts will be enabled after the support inbox is set up.";
       }
-    });
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const message = supportMessage;
+        const submit = form.querySelector('button[type="submit"]');
+        const config = window.DONUT_SUPPORT_CONFIG || {};
+        if (!config.supabaseUrl || !config.anonKey) {
+          message.textContent = "Support isn’t connected yet. Your request and files were not sent.";
+          return;
+        }
+        const selectedFiles = [...(fileInput?.files || [])];
+        const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"]);
+        const totalBytes = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+        if (selectedFiles.length > 5 || totalBytes > 20 * 1024 * 1024 ||
+            selectedFiles.some((file) => file.size > 8 * 1024 * 1024 || !allowedTypes.has(file.type))) {
+          message.textContent = "Attach up to 5 JPG, PNG, WebP, GIF, or PDF files, each under 8 MB and 20 MB total.";
+          return;
+        }
+        const originalLabel = submit?.textContent || "Send a support request";
+        if (submit) {
+          submit.disabled = true;
+          submit.textContent = "Sending…";
+        }
+        message.textContent = "Sending your request securely…";
+        try {
+          const endpoint = `${config.supabaseUrl.replace(/\/$/, "")}/functions/v1/submit-support`;
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              apikey: config.anonKey,
+              Authorization: `Bearer ${config.anonKey}`,
+            },
+            body: new FormData(form),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.error || "We couldn’t send your request. Please try again.");
+          const shortId = String(result.ticketId || "").slice(0, 8).toUpperCase();
+          if (result.notificationStatus === "sent") {
+            message.textContent = `Thanks — we received your request (${shortId}) and sent a confirmation email.`;
+          } else {
+            message.textContent = `Your request (${shortId}) was saved, but email notifications aren’t configured yet.`;
+          }
+          form.elements.issue.value = "";
+          if (fileInput) fileInput.value = "";
+          renderFiles();
+        } catch (error) {
+          message.textContent = error instanceof Error ? error.message : "We couldn’t send your request. Please try again.";
+        } finally {
+          if (submit) {
+            submit.disabled = false;
+            submit.textContent = originalLabel;
+          }
+        }
+      });
   });
   const themeControls = [...document.querySelectorAll(".hub-theme-toggle, .theme-toggle, #theme")];
   const updateThemeLabels = () => {
