@@ -6,7 +6,7 @@
   <meta name="description" content="Donut Boost uses your Windows PC's Wi-Fi and USB-tethered phone connections together for supported large downloads.">
   <title>Donut Boost — More connections. Faster downloads.</title>
   <link rel="stylesheet" href="hub.css?v=donut-boost-3">
-  <link rel="stylesheet" href="boost.css?v=1">
+  <link rel="stylesheet" href="boost.css?v=2">
   <link rel="stylesheet" href="account.css?v=auth-1">
     <link rel="icon" type="image/png" sizes="512x512" href="donut-home-icon-light-512.png?v=2" data-theme-light="donut-home-icon-light-512.png?v=2" data-theme-dark="donut-home-icon-dark-512.png?v=2">
   <link rel="apple-touch-icon" sizes="180x180" href="donut-home-icon-light-180.png?v=2" data-theme-light="donut-home-icon-light-180.png?v=2" data-theme-dark="donut-home-icon-dark-180.png?v=2">
@@ -54,13 +54,34 @@
       <p class="boost-note">Adapters refresh automatically while the app is open. Donut Boost can recover active download chunks if a phone disconnects, and periodically checks tethered mobile connections to help keep them available.</p>
       <p class="boost-note">Setup help: <a href="https://support.google.com/android/answer/9059108" target="_blank" rel="noopener">Android USB tethering</a> · <a href="https://support.apple.com/en-gb/111785" target="_blank" rel="noopener">iPhone Personal Hotspot on Windows</a>. Multi-connection speed depends on the server supporting byte-range downloads. Links without that support may not benefit from combined connections and can fail.</p>
       <article class="boost-game-card">
-        <div>
-          <p class="hub-eyebrow">New · Included in the Windows app</p>
-          <h3>Game Launcher Accelerator</h3>
-          <p>No link paste needed: the accelerator detects downloads across supported launchers, including Steam, Epic Games, EA App, Rockstar Games, Battle.net, Ubisoft Connect, Riot Games, Xbox App, and GOG Galaxy. It shows which launcher is active and live connection activity. Automatic game-size estimates are available for supported Steam and Epic downloads.</p>
-          <p>It uses Windows system proxy settings. Other apps honoring that setting can also route through it; launchers that bypass the system proxy will not. It starts enabled and can be switched off in Donut Boost.</p>
+        <div class="boost-game-copy">
+          <p class="hub-eyebrow"><span class="boost-kicker-dot"></span> Included in Donut Boost for Windows</p>
+          <div class="boost-game-heading">
+            <h3>Game downloads,<br><em>on another level.</em></h3>
+            <span class="boost-live-status"><i></i> Auto-on</span>
+          </div>
+          <p class="boost-game-intro">Skip the link paste. Donut Boost spots activity in supported launchers, shows what is downloading, and routes supported connections across your active adapters.</p>
+          <div class="boost-launcher-list" aria-label="Supported game launchers">
+            <span>Steam</span><span>Epic Games</span><span>EA App</span><span>Rockstar</span><span>Battle.net</span><span>Ubisoft Connect</span><span>Riot Games</span><span>Xbox</span><span>GOG Galaxy</span>
+          </div>
+          <p class="boost-game-footnote"><strong>Live activity.</strong> Automatic size estimates are available for supported Steam and Epic downloads. Uses the Windows system proxy; some launchers may bypass it.</p>
         </div>
-        <span class="boost-game-badge">Wi-Fi + mobile adapters</span>
+        <div class="boost-game-visual" aria-hidden="true">
+          <svg viewBox="0 0 260 220" fill="none">
+            <path class="boost-connection-path path-one" d="M42 62C82 62 80 104 122 108"/>
+            <path class="boost-connection-path path-two" d="M45 166C83 166 88 126 122 112"/>
+            <path class="boost-connection-path path-three" d="M139 110C174 110 175 65 218 65"/>
+            <path class="boost-connection-path path-four" d="M139 114C176 114 178 163 218 163"/>
+            <circle class="boost-connection-node" cx="42" cy="62" r="5"/><circle class="boost-connection-node" cx="45" cy="166" r="5"/>
+            <circle class="boost-connection-node" cx="218" cy="65" r="5"/><circle class="boost-connection-node" cx="218" cy="163" r="5"/>
+            <circle class="boost-orbit" cx="130" cy="111" r="77"/><circle class="boost-orbit orbit-two" cx="130" cy="111" r="61"/>
+          </svg>
+          <div class="boost-visual-node node-wifi"><span>Wi-Fi</span><small>Home</small></div>
+          <div class="boost-visual-node node-phone"><span>USB</span><small>Phone</small></div>
+          <div class="boost-visual-core"><span>⚡</span><small>BOOST</small></div>
+          <div class="boost-visual-node node-steam"><span>9 launchers</span><small>Detected</small></div>
+          <div class="boost-visual-node node-speed"><span>LIVE</span><small>Activity</small></div>
+        </div>
       </article>
     </section>
 
