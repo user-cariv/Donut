@@ -36,6 +36,7 @@ Uninstallable=yes
 CloseApplications=yes
 RestartApplications=no
 PrivilegesRequired=admin
+ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayName=Donut Boost
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
@@ -51,7 +52,7 @@ Name: "{autodesktop}\Donut Boost"; Filename: "{app}\{#MyAppExeName}"; IconFilena
 
 [Run]
 ; Launch Donut Boost upon setup completion
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch Donut Boost"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch Donut Boost"; Flags: nowait postinstall skipifsilent runascurrentuser
 
 [UninstallRun]
 ; Cleanly reset proxy and any registry modifications
