@@ -35,7 +35,7 @@ try {
     & $cli db push --dry-run "--remote=$projectRef"
     if ($LASTEXITCODE -ne 0) { throw "Supabase migration preview failed." }
 
-    $approval = Read-Host "If that target is correct, type APPLY to create the support table and private file bucket"
+    $approval = Read-Host "If that target is correct, type APPLY to update the private support table, attachment bucket, and rate limits"
     if ($approval -cne "APPLY") {
       Write-Host "Stopped without changing the Supabase project."
       return
