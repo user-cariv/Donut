@@ -74,11 +74,22 @@ public partial class MainWindow : Window
         }
         else
         {
-            GameBoostToggle.IsChecked = true;
-            GameBoostBadgeBorder.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 45, 27));
-            GameBoostBadgeBorder.BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88));
-            GameBoostBadgeText.Text = "🟢 AUTO-ON (Active)";
-            GameBoostBadgeText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88));
+            // Auto-claim first-time 24-Hour Free Pass if eligible so new users get instant speed bonding
+            var trialResult = _licenseManager.ActivateTrial();
+            if (trialResult.Success)
+            {
+                OnLogReceived("🎁 [WELCOME] 24-Hour Free Pass automatically activated! Enjoy unlimited speed bonding.");
+                UpdateLicenseUI();
+                EnableGameBoost();
+            }
+            else
+            {
+                GameBoostToggle.IsChecked = true;
+                GameBoostBadgeBorder.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 45, 27));
+                GameBoostBadgeBorder.BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88));
+                GameBoostBadgeText.Text = "🟢 AUTO-ON (Active)";
+                GameBoostBadgeText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88));
+            }
         }
     }
 

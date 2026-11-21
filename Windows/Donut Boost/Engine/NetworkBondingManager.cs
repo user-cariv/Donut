@@ -213,14 +213,34 @@ public class NetworkBondingManager : IDisposable
                         // Wi-Fi metric 5 (lowest = primary gateway for Windows & taskbar icon)
                         // Phone tethering metric 60 (secondary = dedicated boost pipeline)
                         int targetMetric = adp.IsWifi ? 5 : 60;
-                        using var proc = Process.Start(new ProcessStartInfo
+                        
+                        // Enforce IPv4
+                        try
                         {
-                            FileName = "netsh",
-                            Arguments = $"interface ip set interface {adp.InterfaceIndex} metric={targetMetric}",
-                            CreateNoWindow = true,
-                            UseShellExecute = false
-                        });
-                        proc?.WaitForExit(500);
+                            using var proc4 = Process.Start(new ProcessStartInfo
+                            {
+                                FileName = "netsh",
+                                Arguments = $"interface ipv4 set interface {adp.InterfaceIndex} metric={targetMetric}",
+                                CreateNoWindow = true,
+                                UseShellExecute = false
+                            });
+                            proc4?.WaitForExit(300);
+                        }
+                        catch { }
+
+                        // Enforce IPv6
+                        try
+                        {
+                            using var proc6 = Process.Start(new ProcessStartInfo
+                            {
+                                FileName = "netsh",
+                                Arguments = $"interface ipv6 set interface {adp.InterfaceIndex} metric={targetMetric}",
+                                CreateNoWindow = true,
+                                UseShellExecute = false
+                            });
+                            proc6?.WaitForExit(300);
+                        }
+                        catch { }
                     }
                 }
             }
