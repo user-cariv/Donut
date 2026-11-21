@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="crust" x1="170" y1="120" x2="810" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f4bd78"/>
+      <stop offset=".55" stop-color="#e9a45b"/>
+      <stop offset="1" stop-color="#ce8241"/>
+    </linearGradient>
+    <linearGradient id="icing" x1="260" y1="175" x2="760" y2="820" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffc1ad"/>
+      <stop offset=".52" stop-color="#f58d78"/>
+      <stop offset="1" stop-color="#e86655"/>
+    </linearGradient>
+    <radialGradient id="shine" cx="0" cy="0" r="1" gradientTransform="matrix(410 340 -300 362 320 270)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="72" y="72" width="880" height="900" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="24" stdDeviation="24" flood-color="#000000" flood-opacity=".45"/>
+    </filter>
+    <mask id="donutHoleMask">
+      <rect width="1024" height="1024" fill="#fff"/>
+      <circle cx="512" cy="512" r="154" fill="#000"/>
+      <circle cx="795" cy="254" r="133" fill="#000"/>
+    </mask>
+    <clipPath id="donutOuterClip"><circle cx="512" cy="512" r="394"/></clipPath>
+    <style>:root{--icon-background:#080808}</style>
+  </defs>
+  <rect width="1024" height="1024" fill="var(--icon-background)"/>
+  <g filter="url(#shadow)">
+    <circle cx="512" cy="512" r="394" fill="url(#crust)" mask="url(#donutHoleMask)"/>
+    <ellipse cx="508" cy="493" rx="350" ry="378" fill="url(#icing)" mask="url(#donutHoleMask)"/>
+    <ellipse cx="390" cy="330" rx="260" ry="190" fill="url(#shine)" mask="url(#donutHoleMask)"/>
+    <circle cx="512" cy="512" r="168" fill="none" stroke="#f3c17b" stroke-width="28"/>
+    <circle cx="512" cy="512" r="153" fill="var(--icon-background)"/>
+    <circle cx="512" cy="512" r="137" fill="none" stroke="#fff" stroke-opacity=".2" stroke-width="3"/>
+    <circle cx="795" cy="254" r="133" fill="none" stroke="#f6d99f" stroke-width="20" clip-path="url(#donutOuterClip)" mask="url(#donutHoleMask)"/>
+  </g>
+  <g fill="none" stroke-linecap="round" stroke-width="24">
+    <path d="m456 240 31 22" stroke="#30231d"/>
+    <path d="m582 260 34-8" stroke="#fff8ef"/>
+    <path d="m286 358 35-19" stroke="#fff8ef"/>
+    <path d="m239 523 36 10" stroke="#30231d"/>
+    <path d="m365 706-23 34" stroke="#fff8ef"/>
+    <path d="m540 756 35 12" stroke="#fff8ef"/>
+    <path d="m714 650 31-22" stroke="#30231d"/>
+    <path d="m749 456 20 35" stroke="#fff8ef"/>
+  </g>
+</svg>

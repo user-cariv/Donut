@@ -66,4 +66,5 @@ public static class ShortcutSettings
 
     public static ShortcutBinding Default { get; } =
         new(0x0002 | 0x0001, (uint)KeyInterop.VirtualKeyFromKey(Key.D), "Ctrl + Alt + D");
+
 }

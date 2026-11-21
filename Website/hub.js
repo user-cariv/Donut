@@ -1,11 +1,12 @@
 const themeToggle = document.querySelector(".hub-theme-toggle");
-const storedTheme = localStorage.getItem("donut-theme");
+let storedTheme = null;
+try { storedTheme = localStorage.getItem("donut-theme"); } catch (_) {}
 if (storedTheme === "dark") document.body.classList.add("dark-mode");
 
 if (themeToggle) {
   themeToggle.addEventListener("click", () => {
     document.body.classList.toggle("dark-mode");
-    localStorage.setItem("donut-theme", document.body.classList.contains("dark-mode") ? "dark" : "light");
+    try { localStorage.setItem("donut-theme", document.body.classList.contains("dark-mode") ? "dark" : "light"); } catch (_) {}
   });
 }
 

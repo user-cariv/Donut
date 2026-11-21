@@ -173,6 +173,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         OutputFormat format = selectedFormat.Value;
+        IsBusy = true;
+        Status = $"Converting {files.Length} file{(files.Length == 1 ? "" : "s")}…";
         PdfMode pdfMode = PdfMode.Separate;
         if (format == OutputFormat.Pdf)
         {
@@ -186,8 +188,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             pdfMode = options.SelectedMode;
         }
 
-        IsBusy = true;
-        Status = $"Converting {files.Length} file{(files.Length == 1 ? "" : "s")}…";
         int converted = 0;
         int failed = 0;
         string? firstError = null;

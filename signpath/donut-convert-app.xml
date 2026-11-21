@@ -1,0 +1,13 @@
+<!-- NEEDS CHECKING: SignPath artifact configuration schema and file paths must be verified against the organization project. -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <zip-file>
+    <directory>
+      <file path="Donut.exe">
+        <authenticode-sign/>
+      </file>
+      <file path="*.dll">
+        <authenticode-sign/>
+      </file>
+    </directory>
+  </zip-file>
+</artifact-configuration>

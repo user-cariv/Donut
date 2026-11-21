@@ -222,8 +222,18 @@ public class MainActivity extends Activity {
 }
 EOF
 
-ANDROID_JAR="/usr/lib/android-sdk/platforms/android-23/android.jar"
-DX="/usr/lib/android-sdk/build-tools/debian/dx"
+ANDROID_JAR="${ANDROID_JAR:-/usr/lib/android-sdk/platforms/android-23/android.jar}"
+if [ ! -f "$ANDROID_JAR" ] && [ -n "${ANDROID_HOME:-}" ]; then
+  ANDROID_JAR="$(find "$ANDROID_HOME/platforms" -name android.jar | sort -V | tail -n 1)"
+fi
+DX="${DX:-/usr/lib/android-sdk/build-tools/debian/dx}"
+if [ ! -x "$DX" ] && [ -n "${ANDROID_HOME:-}" ]; then
+  DX="$(find "$ANDROID_HOME/build-tools" -name d8 | sort -V | tail -n 1)"
+fi
+if [ ! -x "$DX" ]; then
+  echo "Android dex tool (dx or d8) was not found. Set DX or ANDROID_HOME." >&2
+  exit 1
+fi
 
 echo "1. Generating R.java with aapt..."
 aapt package -f -m \
@@ -241,7 +251,14 @@ javac -source 1.8 -target 1.8 \
   "$WORK_DIR/src/com/donutconvert/app/MainActivity.java"
 
 echo "3. Converting bytecode to Dalvik classes.dex with dx..."
-$DX --dex --output="$WORK_DIR/classes.dex" "$WORK_DIR/obj"
+if [[ "$(basename "$DX")" == "d8" ]]; then
+  DEX_OUTPUT="$WORK_DIR/dex-output"
+  mkdir -p "$DEX_OUTPUT"
+  "$DX" --output "$DEX_OUTPUT" "$WORK_DIR/obj"
+  cp "$DEX_OUTPUT/classes.dex" "$WORK_DIR/classes.dex"
+else
+  "$DX" --dex --output="$WORK_DIR/classes.dex" "$WORK_DIR/obj"
+fi
 
 echo "4. Packaging APK with aapt..."
 cd "$WORK_DIR"
