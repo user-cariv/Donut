@@ -23,7 +23,7 @@
   <div class="hub-ambient hub-ambient-two" aria-hidden="true"></div>
   <header class="hub-nav">
     <a class="hub-brand" href="index.html" aria-label="Donut Boost home"><span class="hub-mark"><img src="donut-mark.svg" alt=""></span><span>Donut Boost</span></a>
-    <nav aria-label="Main navigation"><a href="index.html">Home</a><a href="index.html#apps">Other Apps</a><a href="index.html#support">Support</a><a href="#download">Download</a><a href="#how-it-works">How it works</a></nav>
+    <nav aria-label="Main navigation"><a href="index.html">Home</a><a href="#how-it-works">How it works</a><a href="#pricing">Pricing</a><a href="#download">Download</a><a href="index.html#support">Support</a></nav>
     <button class="hub-theme-toggle" type="button" aria-label="Toggle appearance">◐</button>
   </header>
 
@@ -85,6 +85,123 @@
       </article>
     </section>
 
+    <section class="boost-pricing" id="pricing">
+      <div class="boost-pricing-heading">
+        <div>
+          <p class="hub-eyebrow">Straightforward passes</p>
+          <h2 id="boost-pricing-title">More speed.<br><em>One simple price.</em></h2>
+          <p>Choose a pass that fits your next download. No recurring subscription or auto-renewals.</p>
+        </div>
+        <div class="boost-currency-control">
+          <label for="boost-currency">Display currency</label>
+          <div class="boost-currency-select-wrap">
+            <select id="boost-currency" name="currency" class="boost-currency-select">
+              <option value="INR" selected>INR · Indian rupee (₹)</option>
+              <option value="USD">USD · US dollar ($)</option>
+              <option value="EUR">EUR · Euro (€)</option>
+              <option value="GBP">GBP · British pound (£)</option>
+              <option value="CAD">CAD · Canadian dollar (C$)</option>
+              <option value="AUD">AUD · Australian dollar (A$)</option>
+              <option value="AED">AED · UAE dirham (AED)</option>
+              <option value="SAR">SAR · Saudi riyal (SAR)</option>
+              <option value="SGD">SGD · Singapore dollar (S$)</option>
+              <option value="JPY">JPY · Japanese yen (¥)</option>
+            </select>
+            <span class="boost-currency-arrow">▾</span>
+          </div>
+          <span id="boost-fx-status" class="boost-fx-status">Prices are set in INR. Choose another currency for live exchange rate.</span>
+        </div>
+      </div>
+
+      <div class="boost-pricing-grid">
+        <!-- 1 Day Pass -->
+        <article class="boost-pricing-card">
+          <div class="boost-plan-header">
+            <div class="boost-plan-duration">1 Day</div>
+            <h3 class="boost-plan-title">Quickboost</h3>
+            <p class="boost-plan-desc">A full day to try multi-connection speed bonding on big downloads.</p>
+          </div>
+          <div class="boost-plan-price-wrap">
+            <span class="boost-price-amount" data-inr="10">₹10</span>
+            <span class="boost-price-cycle">/ one-time pass</span>
+          </div>
+          <ul class="boost-plan-features">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> 24 hours unlimited speed bonding</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Accelerate all 9 game launchers</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Home Wi-Fi + Mobile 5G concurrent</li>
+          </ul>
+          <a class="hub-button boost-plan-action outline" href="#download">Get 1-Day Pass</a>
+        </article>
+
+        <!-- 7 Days Pass (Popular) -->
+        <article class="boost-pricing-card popular">
+          <span class="boost-plan-badge popular">Popular</span>
+          <div class="boost-plan-header">
+            <div class="boost-plan-duration">7 Days</div>
+            <h3 class="boost-plan-title">Week Pass</h3>
+            <p class="boost-plan-desc">A little more room for heavy game updates and large downloads.</p>
+          </div>
+          <div class="boost-plan-price-wrap">
+            <span class="boost-price-amount" data-inr="50">₹50</span>
+            <span class="boost-price-cycle">/ one-time pass</span>
+          </div>
+          <ul class="boost-plan-features">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> 7 days unlimited speed bonding</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Accelerate all 9 game launchers</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Multi-channel download engine</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Keep Wi-Fi locked as primary</li>
+          </ul>
+          <a class="hub-button boost-plan-action" href="#download">Get 7-Day Pass</a>
+        </article>
+
+        <!-- 1 Month Pass -->
+        <article class="boost-pricing-card">
+          <div class="boost-plan-header">
+            <div class="boost-plan-duration">1 Month</div>
+            <h3 class="boost-plan-title">Monthly Pass</h3>
+            <p class="boost-plan-desc">Keep Donut Boost ready for all your everyday downloads and patches.</p>
+          </div>
+          <div class="boost-plan-price-wrap">
+            <span class="boost-price-amount" data-inr="100">₹100</span>
+            <span class="boost-price-cycle">/ one-time pass</span>
+          </div>
+          <ul class="boost-plan-features">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> 30 days unlimited speed bonding</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Game Launcher Accelerator auto-on</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Dedicated 5G boost pipelines</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> No recurring fees or renewals</li>
+          </ul>
+          <a class="hub-button boost-plan-action outline" href="#download">Get 1-Month Pass</a>
+        </article>
+
+        <!-- Lifetime Pass (Best Value) -->
+        <article class="boost-pricing-card best-value">
+          <span class="boost-plan-badge best-value">Best Value</span>
+          <div class="boost-plan-header">
+            <div class="boost-plan-duration">Lifetime</div>
+            <h3 class="boost-plan-title">One &amp; Done</h3>
+            <p class="boost-plan-desc">Unlock Donut Boost permanently with all future updates included.</p>
+          </div>
+          <div class="boost-plan-price-wrap">
+            <span class="boost-price-amount" data-inr="300">₹300</span>
+            <span class="boost-price-cycle">/ lifetime payment</span>
+          </div>
+          <ul class="boost-plan-features">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Lifetime unlimited speed bonding</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Lifetime Game Launcher Accelerator</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> All future updates &amp; new launchers</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Single one-time payment forever</li>
+          </ul>
+          <a class="hub-button boost-plan-action" href="#download" style="background:linear-gradient(135deg, #10b981, #059669);">Get Lifetime Pass</a>
+        </article>
+      </div>
+
+      <div class="boost-pricing-footer">
+        <span>🎉 <strong>Free trial:</strong> First-time users get 24 hours free automatically upon opening the app.</span>
+        <span>Need help activating a pass? <a href="index.html#support">Contact Support</a></span>
+      </div>
+    </section>
+
     <section class="boost-download" id="download">
       <div class="boost-download-heading"><div><p class="hub-eyebrow">Get Donut Boost</p><h2>Choose your platform.</h2></div></div>
       <div class="boost-download-options">
@@ -115,6 +232,7 @@
 
   <footer class="hub-footer"><a class="hub-brand" href="index.html"><span class="hub-mark"><img src="donut-mark.svg" alt=""></span><span>DONUT</span></a><span>Small apps. Big relief.</span><span>Donut Boost is a product of <a href="index.html">Donut</a>.</span></footer>
   <script src="hub.js"></script>
+  <script src="boost-pricing.js"></script>
   <script src="supabase-config.js?v=auth-1"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="account.js?v=auth-1"></script>

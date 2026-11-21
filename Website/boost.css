@@ -62,3 +62,65 @@ body.dark-mode .boost-steps article, body.dark-mode .boost-download-card { borde
 @media (max-width: 760px) { .boost-page { width: min(100% - 32px, 560px); }.boost-hero { min-height: 0; grid-template-columns: 1fr; padding: 65px 0 45px; }.boost-hero-art { max-width: 560px; }.boost-how { padding: 45px 0 65px; }.boost-steps, .boost-download-options { grid-template-columns: 1fr; }.boost-game-card { grid-template-columns: 1fr; align-items: start; }.boost-game-visual { width: min(100%, 300px); height: 210px; margin: 8px auto 0; }.boost-download { padding-bottom: 70px; }.boost-download-card { grid-template-columns: auto 1fr; padding: 25px; gap: 18px; } }
 @keyframes boost-flow { to { stroke-dashoffset: -24; } }
 @media (prefers-reduced-motion: reduce) { .boost-connection-path { animation: none; } }
+
+/* Pricing Section */
+.boost-pricing { padding: 40px 0 80px; }
+.boost-pricing-heading { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 24px; margin-bottom: 32px; }
+.boost-pricing-heading h2 { margin: 0; font-size: clamp(38px, 4.8vw, 56px); }
+.boost-pricing-heading > div:first-child p { max-width: 580px; color: var(--hub-muted); margin: 12px 0 0; line-height: 1.6; }
+
+.boost-currency-control { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.boost-currency-control label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--hub-muted); }
+.boost-currency-select-wrap { position: relative; display: inline-flex; align-items: center; }
+.boost-currency-select { appearance: none; padding: 10px 36px 10px 14px; font-family: inherit; font-size: 13px; font-weight: 600; color: inherit; background: #fff9; border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; cursor: pointer; box-shadow: var(--hub-shadow); transition: border-color .2s; }
+.boost-currency-select:hover, .boost-currency-select:focus { border-color: var(--hub-orange, #ff6b35); outline: none; }
+.boost-currency-arrow { position: absolute; right: 12px; pointer-events: none; font-size: 10px; color: var(--hub-muted); }
+.boost-fx-status { font-size: 11px; color: var(--hub-muted); margin-top: 4px; max-width: 320px; line-height: 1.4; }
+
+.boost-pricing-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-top: 24px; }
+.boost-pricing-card { position: relative; display: flex; flex-direction: column; padding: 28px 22px; border: 1px solid #fff; border-radius: 26px; background: #fff9; box-shadow: var(--hub-shadow); transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease; }
+.boost-pricing-card:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.08); }
+.boost-pricing-card.popular { border: 1.5px solid #ff764f; background: linear-gradient(180deg, rgba(255,118,79,0.06), #fff9 35%); }
+.boost-pricing-card.best-value { border: 1.5px solid #30d158; background: linear-gradient(180deg, rgba(48,209,88,0.06), #fff9 35%); }
+
+.boost-plan-badge { position: absolute; top: -11px; right: 20px; padding: 4px 12px; border-radius: 100px; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.boost-plan-badge.popular { background: linear-gradient(135deg, #ff9a58, #ff5722); }
+.boost-plan-badge.best-value { background: linear-gradient(135deg, #34c759, #10b981); }
+
+.boost-plan-header { margin-bottom: 16px; }
+.boost-plan-duration { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--hub-orange, #ff6b35); margin-bottom: 6px; }
+.boost-plan-title { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.04em; }
+.boost-plan-desc { font-size: 12px; color: var(--hub-muted); margin: 6px 0 0; line-height: 1.5; min-height: 36px; }
+
+.boost-plan-price-wrap { display: flex; align-items: baseline; gap: 4px; margin: 14px 0 18px; }
+.boost-price-amount { font-size: 32px; font-weight: 900; letter-spacing: -0.05em; font-family: 'Manrope', sans-serif; }
+.boost-price-cycle { font-size: 12px; color: var(--hub-muted); font-weight: 500; }
+
+.boost-plan-features { list-style: none; padding: 0; margin: 0 0 22px; display: flex; flex-direction: column; gap: 10px; flex-grow: 1; border-top: 1px solid rgba(0,0,0,0.06); padding-top: 16px; }
+.boost-plan-features li { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; color: var(--hub-muted); line-height: 1.4; }
+.boost-plan-features li svg { width: 14px; height: 14px; stroke: #30d158; flex-shrink: 0; margin-top: 2px; }
+
+.boost-plan-action { width: 100%; text-align: center; justify-content: center; padding: 12px 18px; font-size: 13px; font-weight: 700; border-radius: 14px; box-sizing: border-box; }
+.boost-plan-action.outline { background: transparent; border: 1px solid rgba(0,0,0,0.15); color: inherit; }
+.boost-plan-action.outline:hover { background: rgba(0,0,0,0.04); }
+
+.boost-pricing-footer { margin-top: 24px; padding: 16px 20px; border-radius: 16px; background: rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--hub-muted); }
+.boost-pricing-footer a { color: var(--hub-orange); text-decoration: underline; text-underline-offset: 3px; }
+
+/* Dark mode pricing overrides */
+body.dark-mode .boost-pricing-card { border-color: #3c2e29; background: #211a17; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+body.dark-mode .boost-pricing-card.popular { border-color: #ff764f; background: linear-gradient(180deg, rgba(255,118,79,0.1), #211a17 40%); }
+body.dark-mode .boost-pricing-card.best-value { border-color: #30d158; background: linear-gradient(180deg, rgba(48,209,88,0.1), #211a17 40%); }
+body.dark-mode .boost-currency-select { background: #211a17; border-color: #3c2e29; color: #f7f4ff; }
+body.dark-mode .boost-plan-features { border-top-color: rgba(255,255,255,0.08); }
+body.dark-mode .boost-plan-action.outline { border-color: rgba(255,255,255,0.2); color: #f7f4ff; }
+body.dark-mode .boost-plan-action.outline:hover { background: rgba(255,255,255,0.06); }
+body.dark-mode .boost-pricing-footer { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); }
+
+@media (max-width: 960px) {
+  .boost-pricing-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 580px) {
+  .boost-pricing-grid { grid-template-columns: 1fr; }
+  .boost-pricing-heading { flex-direction: column; align-items: flex-start; }
+}
