@@ -149,7 +149,7 @@ footer{padding:36px 0 44px;color:var(--muted);font-size:14px}
 @media (max-width:480px){.wrap{padding-left:16px;padding-right:16px}.nav{width:calc(100% - 20px);padding:9px 10px}.logo{font-size:17px}.tools{gap:5px}.cur{font-size:13px;padding:7px 5px}.tg{width:32px;height:32px}.btn.sm{padding:8px 10px;font-size:12px}#acct{max-width:110px}.hero{padding-top:26px}.hero h1{font-size:clamp(44px,13vw,68px)}.hero p{font-size:16px}.cta{flex-direction:column;align-items:stretch}.cta .btn{text-align:center}.macbook{padding-bottom:28px}.screen{width:100%;border-radius:16px 16px 9px 9px}.macbook::before{left:1%;right:1%;bottom:16px}.macbook::after{bottom:10px}.macbook-label{font-size:9px}.island{font-size:12px}.inner{padding-left:14px;padding-right:14px}.chips{bottom:10px;gap:5px}.chips button{font-size:11px;padding:7px 10px}.tile{padding:22px}.tile p{font-size:14px}.plan{padding:30px 20px 24px}.amt{font-size:52px}.amt small{font-size:14px}.faq{width:100%}.faq summary{font-size:16px}.details p{font-size:14px}.sheet{padding:34px 22px 24px}.footer{padding-left:16px;padding-right:16px}}
 @media (prefers-reduced-motion:reduce){.island,.inner,.sheet,.btn{transition:none;animation:none}html{scroll-behavior:auto}}
 </style>
-<link rel="stylesheet" href="account.css?v=preview-7">
+<link rel="stylesheet" href="account.css?v=auth-1">
 </head>
 <body>
 
@@ -253,6 +253,8 @@ window.addEventListener("resize",function(){ if(cur) show(cur); });
 if(!matchMedia("(prefers-reduced-motion:reduce)").matches) auto=setTimeout(cycle,900); else show("message");
 
 </script>
-<script src="account.js?v=preview-4"></script>
+<script src="supabase-config.js?v=auth-1"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="account.js?v=auth-1"></script>
 </body>
 </html>

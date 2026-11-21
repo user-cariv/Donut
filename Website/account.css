@@ -25,7 +25,10 @@
 .account-primary,.account-google,.account-secondary{width:100%;min-height:47px;margin-top:14px;border:0;border-radius:13px;font:700 14px "DM Sans",sans-serif;cursor:pointer}
 .account-primary{background:#211915;color:#fff}
 .account-google,.account-secondary{border:1px solid #e6d9cd;background:#fff;color:#29211c}
-.account-google span{display:inline-grid;width:20px;height:20px;margin-right:8px;place-items:center;border:1px solid #e5ded7;border-radius:50%;font-weight:800;color:#4285f4;vertical-align:middle}
+.account-google{display:flex;align-items:center;justify-content:center;gap:10px}
+.account-google svg{width:22px;height:22px;flex:none;border-radius:50%}
+.account-google:disabled,.account-primary:disabled{opacity:.65;cursor:wait}
+.account-google:focus-visible,.account-primary:focus-visible,.account-secondary:focus-visible{outline:3px solid #ed955f;outline-offset:3px}
 .account-message{min-height:21px;margin:12px 0 0;color:#42704c;font-size:12px;line-height:1.5}
 .account-message[data-kind="error"]{color:#a23f32}
 .account-divider{display:flex;align-items:center;gap:10px;margin:13px 0 0;color:#988b82;font-size:11px}.account-divider::before,.account-divider::after{content:"";height:1px;flex:1;background:#e9ddd2}

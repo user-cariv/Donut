@@ -1,5 +1,16 @@
 (() => {
-  const sessionKey = "donut-preview-account";
+  const config = window.DONUT_SUPABASE_CONFIG || {};
+  const supabaseClient = window.supabase?.createClient && config.url && config.publishableKey
+    ? window.supabase.createClient(config.url, config.publishableKey, {
+      auth: {
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        persistSession: true,
+        storageKey: "donut-auth",
+      },
+    })
+    : null;
+  let authUser = null;
   const buttons = [];
   const header = document.querySelector("header");
   if (!header) return;
@@ -43,7 +54,7 @@
       <p class="account-eyebrow">Your Donut account</p>
       <h2 class="account-title" id="account-title">One account, every Donut.</h2>
       <p class="account-copy">Save your place and keep future purchases together in one Donut account.</p>
-      <p class="account-preview-note"><strong>Private preview:</strong> sign-in is simulated in this browser. No password is requested, and nothing is sent to a server.</p>
+      <p class="account-preview-note">Sign in with Google or your Donut email and password. Your account follows you across Donut pages.</p>
       <div class="account-tabs" role="tablist" aria-label="Account options">
         <button class="account-tab" id="account-tab-signin" type="button" role="tab" aria-selected="true" aria-controls="account-panel-signin">Sign in</button>
         <button class="account-tab" id="account-tab-create" type="button" role="tab" aria-selected="false" aria-controls="account-panel-create">Create account</button>
@@ -52,9 +63,14 @@
         <form data-account-form="signin">
           <label class="account-label" for="account-email-signin">Email address</label>
           <input class="account-input" id="account-email-signin" name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+          <label class="account-label" for="account-password-signin">Password</label>
+          <input class="account-input" id="account-password-signin" name="password" type="password" autocomplete="current-password" required>
           <button class="account-primary" type="submit">Continue with email</button>
           <p class="account-divider">or</p>
-          <button class="account-google" type="button" data-preview-google><span>G</span> Continue with Google</button>
+          <button class="account-google" type="button" data-google-auth>
+            <svg aria-hidden="true" viewBox="0 0 48 48"><circle cx="24" cy="24" r="23" fill="#fff"/><path fill="#4285F4" d="M43.6 24.5c0-1.4-.1-2.8-.4-4.1H24v7.8h11.1c-.5 2.5-1.9 4.7-4.1 6.2v5.1h6.6c3.9-3.6 6-8.9 6-15z"/><path fill="#34A853" d="M24 44c5.5 0 10.1-1.8 13.5-4.9l-6.6-5.1c-1.8 1.2-4.1 2-6.9 2-5.3 0-9.8-3.6-11.4-8.4H5.8v5.3C9.2 39.5 16 44 24 44z"/><path fill="#FBBC05" d="M12.6 27.6a12 12 0 0 1 0-7.2v-5.3H5.8a20 20 0 0 0 0 17.8l6.8-5.3z"/><path fill="#EA4335" d="M24 12c3 0 5.7 1 7.8 3.1l5.9-5.9C34.1 5.8 29.5 4 24 4 16 4 9.2 8.5 5.8 15.1l6.8 5.3C14.2 15.6 18.7 12 24 12z"/></svg>
+            Continue with Google
+          </button>
           <p class="account-message" aria-live="polite"></p>
         </form>
       </div>
@@ -64,13 +80,18 @@
           <input class="account-input" id="account-name-create" name="name" autocomplete="name" placeholder="Your name" required>
           <label class="account-label" for="account-email-create">Email address</label>
           <input class="account-input" id="account-email-create" name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
-          <button class="account-primary" type="submit">Create preview account</button>
+          <label class="account-label" for="account-password-create">Password</label>
+          <input class="account-input" id="account-password-create" name="password" type="password" autocomplete="new-password" minlength="8" required>
+          <button class="account-primary" type="submit">Create account</button>
           <p class="account-divider">or</p>
-          <button class="account-google" type="button" data-preview-google><span>G</span> Continue with Google</button>
+          <button class="account-google" type="button" data-google-auth>
+            <svg aria-hidden="true" viewBox="0 0 48 48"><circle cx="24" cy="24" r="23" fill="#fff"/><path fill="#4285F4" d="M43.6 24.5c0-1.4-.1-2.8-.4-4.1H24v7.8h11.1c-.5 2.5-1.9 4.7-4.1 6.2v5.1h6.6c3.9-3.6 6-8.9 6-15z"/><path fill="#34A853" d="M24 44c5.5 0 10.1-1.8 13.5-4.9l-6.6-5.1c-1.8 1.2-4.1 2-6.9 2-5.3 0-9.8-3.6-11.4-8.4H5.8v5.3C9.2 39.5 16 44 24 44z"/><path fill="#FBBC05" d="M12.6 27.6a12 12 0 0 1 0-7.2v-5.3H5.8a20 20 0 0 0 0 17.8l6.8-5.3z"/><path fill="#EA4335" d="M24 12c3 0 5.7 1 7.8 3.1l5.9-5.9C34.1 5.8 29.5 4 24 4 16 4 9.2 8.5 5.8 15.1l6.8 5.3C14.2 15.6 18.7 12 24 12z"/></svg>
+            Continue with Google
+          </button>
           <p class="account-message" aria-live="polite"></p>
         </form>
       </div>
-      <p class="account-footnote">Before launch, account security and Google authorization will be connected to Donut's private backend.</p>
+      <p class="account-footnote">Google sign-in is secure and continues across the Donut website.</p>
     </section>`;
   document.body.append(layer);
 
@@ -78,16 +99,14 @@
   const closeButton = layer.querySelector(".account-close");
   const tabs = [...layer.querySelectorAll("[role=tab]")];
   const panels = [...layer.querySelectorAll("[role=tabpanel]")];
-  const readAccount = () => {
-    try { return JSON.parse(sessionStorage.getItem(sessionKey) || "null"); }
-    catch { return null; }
-  };
+  const displayName = (user) => user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Donut member";
+  const readAccount = () => authUser ? { name: displayName(authUser), email: authUser.email || "" } : null;
   const updateTriggers = () => {
     const user = readAccount();
     buttons.forEach((button) => {
       button.textContent = user ? (user.name || user.email.split("@")[0]) : "Account";
       button.dataset.signedIn = String(Boolean(user));
-      button.setAttribute("aria-label", user ? `Preview account for ${user.email}` : "Open Donut account");
+      button.setAttribute("aria-label", user ? `Account for ${user.email}` : "Open Donut account");
     });
   };
   const setTab = (name) => {
@@ -101,7 +120,7 @@
   const open = (tab = "signin") => {
     layer.hidden = false;
     document.body.style.overflow = "hidden";
-    setTab(readAccount() ? "profile" : tab);
+    setTab(readAccount() ? "signin" : tab);
     if (readAccount()) showProfile();
     else layer.querySelector(`#account-panel-${tab} input`)?.focus();
   };
@@ -113,8 +132,8 @@
     const user = readAccount();
     if (!user) return;
     layer.querySelector(".account-title").textContent = `Welcome${user.name ? `, ${user.name.split(" ")[0]}` : " back"}.`;
-    layer.querySelector(".account-copy").textContent = "This preview account is available as you move between Donut pages in this browser session.";
-    layer.querySelector(".account-preview-note").innerHTML = `<strong>Preview account:</strong> ${escapeText(user.email)}. This is a local demo identity, not a live Donut account.`;
+    layer.querySelector(".account-copy").textContent = "Your account is ready across the Donut website.";
+    layer.querySelector(".account-preview-note").textContent = `Signed in securely as ${user.email}.`;
     layer.querySelector(".account-tabs").hidden = true;
     panels.forEach((panel) => { panel.hidden = true; });
     let card = layer.querySelector(".account-user-card");
@@ -126,29 +145,29 @@
       const signout = document.createElement("button");
       signout.type = "button";
       signout.className = "account-secondary";
-      signout.textContent = "Sign out of preview";
-      signout.addEventListener("click", () => {
-        sessionStorage.removeItem(sessionKey);
-        layer.querySelector(".account-title").textContent = "One account, every Donut.";
-        layer.querySelector(".account-copy").textContent = "Save your place and keep future purchases together in one Donut account.";
-        layer.querySelector(".account-preview-note").innerHTML = "<strong>Private preview:</strong> sign-in is simulated in this browser. No password is requested, and nothing is sent to a server.";
-        layer.querySelector(".account-tabs").hidden = false;
-        card.remove(); signout.remove(); updateTriggers(); setTab("signin");
+      signout.textContent = "Sign out";
+      signout.addEventListener("click", async () => {
+        signout.disabled = true;
+        const { error } = await supabaseClient.auth.signOut();
+        if (error) {
+          layer.querySelector(".account-preview-note").textContent = error.message;
+          signout.disabled = false;
+        }
       });
       dialog.insertBefore(signout, layer.querySelector(".account-footnote"));
     }
-    card.querySelector(".account-avatar").textContent = (user.name || user.email).slice(0, 1).toUpperCase();
+    card.querySelector(".account-avatar").textContent = user.name.slice(0, 1).toUpperCase();
     card.querySelector("strong").textContent = user.name || "Donut member";
     card.querySelector("small").textContent = user.email;
   };
-  function escapeText(value) {
-    return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
-  }
-  const finishPreviewSignIn = (name, email, form) => {
-    sessionStorage.setItem(sessionKey, JSON.stringify({ name: name.trim(), email: email.trim().toLowerCase() }));
-    form.querySelector(".account-message").textContent = "Preview sign-in complete. No account was created on a server.";
-    updateTriggers();
-    window.setTimeout(showProfile, 450);
+  const resetProfile = () => {
+    layer.querySelector(".account-user-card")?.remove();
+    layer.querySelector(".account-secondary")?.remove();
+    layer.querySelector(".account-title").textContent = "One account, every Donut.";
+    layer.querySelector(".account-copy").textContent = "Save your place and keep future purchases together in one Donut account.";
+    layer.querySelector(".account-preview-note").textContent = "Sign in with Google or your Donut email and password. Your account follows you across Donut pages.";
+    layer.querySelector(".account-tabs").hidden = false;
+    panels.forEach((panel) => { panel.hidden = panel.id !== "account-panel-signin"; });
   };
 
   trigger.addEventListener("click", () => open());
@@ -157,29 +176,102 @@
   document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !layer.hidden) close(); });
   tabs.forEach((tab) => tab.addEventListener("click", () => setTab(tab.id.replace("account-tab-", ""))));
   layer.querySelectorAll("form[data-account-form]").forEach((form) => {
-    form.addEventListener("submit", (event) => {
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const data = new FormData(form);
       const email = String(data.get("email") || "").trim();
       const name = String(data.get("name") || "").trim();
+      const password = String(data.get("password") || "");
       const message = form.querySelector(".account-message");
+      const submit = form.querySelector('button[type="submit"]');
       message.dataset.kind = "";
-      finishPreviewSignIn(name, email, form);
+      if (!supabaseClient) {
+        message.textContent = "Donut sign-in could not load. Refresh the page and try again.";
+        message.dataset.kind = "error";
+        return;
+      }
+      const originalText = submit.textContent;
+      submit.disabled = true;
+      submit.textContent = form.dataset.accountForm === "create" ? "Creating account…" : "Signing in…";
+      message.textContent = "";
+      try {
+        const redirectTo = `${window.location.origin}${window.location.pathname}`;
+        const result = form.dataset.accountForm === "create"
+          ? await supabaseClient.auth.signUp({
+            email,
+            password,
+            options: { data: { full_name: name }, emailRedirectTo: redirectTo },
+          })
+          : await supabaseClient.auth.signInWithPassword({ email, password });
+        if (result.error) throw result.error;
+        if (form.dataset.accountForm === "create" && !result.data.session) {
+          message.textContent = "Check your email for a confirmation link to finish creating your account.";
+        } else {
+          message.textContent = "You’re signed in.";
+          updateTriggers();
+          showProfile();
+        }
+      } catch (error) {
+        message.textContent = error instanceof Error ? error.message : "Sign-in failed. Please try again.";
+        message.dataset.kind = "error";
+      } finally {
+        submit.disabled = false;
+        submit.textContent = originalText;
+      }
     });
   });
-  layer.querySelectorAll("[data-preview-google]").forEach((button) => button.addEventListener("click", () => {
-    const email = layer.querySelector("#account-email-signin")?.value || layer.querySelector("#account-email-create")?.value;
+  layer.querySelectorAll("[data-google-auth]").forEach((button) => button.addEventListener("click", async () => {
     const form = button.closest("form");
     const message = form.querySelector(".account-message");
-    if (!email) {
-      message.textContent = "Preview mode: enter an email address first to demonstrate the signed-in state.";
+    if (!supabaseClient) {
+      message.textContent = "Donut sign-in could not load. Refresh the page and try again.";
       message.dataset.kind = "error";
-      layer.querySelector("#account-email-signin")?.focus();
       return;
     }
-    message.textContent = "Google authorization is not connected in this preview. Use the email button to try the account flow.";
-    message.dataset.kind = "error";
+    button.disabled = true;
+    message.dataset.kind = "";
+    message.textContent = "Connecting securely to Google…";
+    try {
+      const redirectTo = `${window.location.origin}${window.location.pathname}`;
+      const { error } = await supabaseClient.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo,
+          queryParams: { prompt: "select_account" },
+        },
+      });
+      if (error) throw error;
+    } catch (error) {
+      message.textContent = error instanceof Error ? error.message : "Google sign-in could not start. Please try again.";
+      message.dataset.kind = "error";
+      button.disabled = false;
+    }
   }));
+
+  if (supabaseClient) {
+    const callbackParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const returningFromOAuth = callbackParams.has("code");
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+      authUser = session?.user || null;
+      updateTriggers();
+      if (authUser && returningFromOAuth) {
+        open();
+        showProfile();
+      } else if (event === "SIGNED_IN" && !layer.hidden) {
+        showProfile();
+      } else if (event === "SIGNED_OUT") {
+        resetProfile();
+      }
+    });
+    const authError = callbackParams.get("error_description") || hashParams.get("error_description");
+    if (authError) {
+      open("signin");
+      const message = layer.querySelector("#account-panel-signin .account-message");
+      message.textContent = authError.replace(/\+/g, " ");
+      message.dataset.kind = "error";
+    }
+  }
 
   document.querySelectorAll("[data-support-form]").forEach((form) => {
     const account = readAccount();
@@ -224,16 +316,16 @@
       form.elements.email.value = account.email || "";
     }
       const supportMessage = form.querySelector(".hub-support-message");
-      const supportConfig = window.DONUT_SUPPORT_CONFIG || {};
-      if (supportMessage && supportConfig.supabaseUrl && supportConfig.anonKey) {
+      const supportConfig = window.DONUT_SUPABASE_CONFIG || {};
+      if (supportMessage && supportConfig.url && supportConfig.publishableKey) {
         supportMessage.textContent = "Support requests are ready. Email alerts will be enabled after the support inbox is set up.";
       }
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         const message = supportMessage;
         const submit = form.querySelector('button[type="submit"]');
-        const config = window.DONUT_SUPPORT_CONFIG || {};
-        if (!config.supabaseUrl || !config.anonKey) {
+        const config = window.DONUT_SUPABASE_CONFIG || {};
+        if (!config.url || !config.publishableKey) {
           message.textContent = "Support isn’t connected yet. Your request and files were not sent.";
           return;
         }
@@ -252,12 +344,12 @@
         }
         message.textContent = "Sending your request securely…";
         try {
-          const endpoint = `${config.supabaseUrl.replace(/\/$/, "")}/functions/v1/submit-support`;
+          const endpoint = `${config.url.replace(/\/$/, "")}/functions/v1/submit-support`;
           const response = await fetch(endpoint, {
             method: "POST",
             headers: {
-              apikey: config.anonKey,
-              Authorization: `Bearer ${config.anonKey}`,
+              apikey: config.publishableKey,
+              Authorization: `Bearer ${config.publishableKey}`,
             },
             body: new FormData(form),
           });
