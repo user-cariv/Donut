@@ -429,6 +429,8 @@ public partial class MainWindow : Window
             ModeMobileOnlyRadio.IsChecked = true;
             _bondingManager.CurrentMode = BondingMode.MobileDataOnly;
         }
+
+        NetworkBondingManager.ApplyBondingModeMetrics(adapters.Where(a => a.IsEnabled && a.IsOnline), _bondingManager.CurrentMode);
     }
 
     private void OnAdaptersChanged()
@@ -811,6 +813,9 @@ public partial class MainWindow : Window
         Size50GBBtn.Background = _selectedGameSizeTarget == (50L * 1024 * 1024 * 1024) ? activeBg : subtleBg;
         Size50GBBtn.BorderBrush = _selectedGameSizeTarget == (50L * 1024 * 1024 * 1024) ? accentBrush : borderBrush;
 
+        Size70GBBtn.Background = _selectedGameSizeTarget == (70L * 1024 * 1024 * 1024) ? activeBg : subtleBg;
+        Size70GBBtn.BorderBrush = _selectedGameSizeTarget == (70L * 1024 * 1024 * 1024) ? accentBrush : borderBrush;
+
         Size90GBBtn.Background = _selectedGameSizeTarget == (90L * 1024 * 1024 * 1024) ? activeBg : subtleBg;
         Size90GBBtn.BorderBrush = _selectedGameSizeTarget == (90L * 1024 * 1024 * 1024) ? accentBrush : borderBrush;
 
@@ -822,7 +827,7 @@ public partial class MainWindow : Window
     {
         Dispatcher.BeginInvoke(() =>
         {
-            double mbps = (instantSpeedBps * 8) / (1024 * 1024);
+            double mbps = (instantSpeedBps * 8) / 1_000_000.0;
             string speedText = mbps >= 1000 ? $"{(mbps / 1000):F2} Gbps" : $"{mbps:F1} Mbps";
 
             // Update Game Launcher Accelerator Card Subtitle

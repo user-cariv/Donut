@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using Microsoft.Win32;
 using DonutBoost.Models;
 
 namespace DonutBoost.Engine;
@@ -88,6 +89,7 @@ public class NetworkBondingManager : IDisposable
                         break;
                 }
             }
+            ApplyBondingModeMetrics(_adapters.Where(a => a.IsEnabled && a.IsOnline), CurrentMode);
         }
         AdaptersChanged?.Invoke();
     }
@@ -186,35 +188,68 @@ public class NetworkBondingManager : IDisposable
             _adapters.Clear();
             _adapters.AddRange(detected);
 
-            // Enforce Wi-Fi as lowest metric (5) and secondary adapters as higher (60).
-            // This ensures:
-            // 1. Windows taskbar network icon stays permanently on Wi-Fi (never switches to Ethernet).
-            // 2. All regular laptop tasks (Chrome, YouTube, Discord) stay 100% on Home Wi-Fi.
-            // 3. MultiChannelDownloader can still bind directly to phone IP (option 31) for maximum 5G boost!
+            // Apply bonding metrics based on current mode:
+            // CombineAll: Metric 15 on ALL adapters (Equal Cost Multi-Path) + IPv4 Precedence
+            // WifiOnly: Wi-Fi metric 5, Secondary 60
+            // MobileDataOnly: Mobile metric 5, Secondary 60
             if (_adapters.Any(a => a.IsEnabled && a.IsOnline))
             {
-                EnforcePrimaryWifiPriority(_adapters.Where(a => a.IsEnabled && a.IsOnline));
+                ApplyBondingModeMetrics(_adapters.Where(a => a.IsEnabled && a.IsOnline), CurrentMode);
             }
         }
 
         AdaptersChanged?.Invoke();
     }
 
-    public static void EnforcePrimaryWifiPriority(IEnumerable<NetworkAdapterInfo> adapters)
+    public static void SetIpv4Precedence(bool preferIpv4)
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters", true);
+            if (key != null)
+            {
+                if (preferIpv4)
+                {
+                    // 0x20 = RFC 3484/6724: Prefer IPv4 over IPv6. This forces game launchers like Steam to resolve IPv4 CDN edges
+                    // so connections bond across both Wi-Fi and Mobile Data (since USB tethering only provides IPv4).
+                    key.SetValue("DisabledComponents", 0x20, RegistryValueKind.DWord);
+                }
+                else
+                {
+                    key.SetValue("DisabledComponents", 0, RegistryValueKind.DWord);
+                }
+            }
+        }
+        catch { }
+    }
+
+    public static void ApplyBondingModeMetrics(IEnumerable<NetworkAdapterInfo> adapters, BondingMode mode)
     {
         Task.Run(() =>
         {
             try
             {
+                bool isCombining = mode == BondingMode.CombineAll;
+                SetIpv4Precedence(isCombining);
+
                 foreach (var adp in adapters)
                 {
                     if (adp.InterfaceIndex > 0)
                     {
-                        // Wi-Fi metric 5 (lowest = primary gateway for Windows & taskbar icon)
-                        // Phone tethering metric 60 (secondary = dedicated boost pipeline)
-                        int targetMetric = adp.IsWifi ? 5 : 60;
-                        
-                        // Enforce IPv4
+                        // In CombineAll: Equal Metric 15 for BOTH Wi-Fi and Mobile Data allows Windows ECMP to distribute connections.
+                        // In WifiOnly: Wi-Fi is 5, Mobile is 60.
+                        // In MobileOnly: Mobile is 5, Wi-Fi is 60.
+                        int targetMetric = 15;
+                        if (mode == BondingMode.WifiOnly)
+                        {
+                            targetMetric = adp.IsWifi ? 5 : 60;
+                        }
+                        else if (mode == BondingMode.MobileDataOnly)
+                        {
+                            targetMetric = adp.IsMobilePhone ? 5 : 60;
+                        }
+
+                        // Enforce IPv4 Metric
                         try
                         {
                             using var proc4 = Process.Start(new ProcessStartInfo
@@ -228,7 +263,21 @@ public class NetworkBondingManager : IDisposable
                         }
                         catch { }
 
-                        // Enforce IPv6
+                        // Enable WeakHostSend and WeakHostReceive for multi-path routing
+                        try
+                        {
+                            using var procWeak = Process.Start(new ProcessStartInfo
+                            {
+                                FileName = "netsh",
+                                Arguments = $"interface ipv4 set interface {adp.InterfaceIndex} weakhostsend=enabled weakhostreceive=enabled",
+                                CreateNoWindow = true,
+                                UseShellExecute = false
+                            });
+                            procWeak?.WaitForExit(300);
+                        }
+                        catch { }
+
+                        // Enforce IPv6 Metric
                         try
                         {
                             using var proc6 = Process.Start(new ProcessStartInfo
@@ -246,6 +295,38 @@ public class NetworkBondingManager : IDisposable
             }
             catch { }
         });
+    }
+
+    public static void EnforcePrimaryWifiPriority(IEnumerable<NetworkAdapterInfo> adapters)
+    {
+        ApplyBondingModeMetrics(adapters, BondingMode.CombineAll);
+    }
+
+    public static void RestoreDefaultMetrics(IEnumerable<NetworkAdapterInfo> adapters)
+    {
+        try
+        {
+            SetIpv4Precedence(false);
+            foreach (var adp in adapters)
+            {
+                if (adp.InterfaceIndex > 0)
+                {
+                    try
+                    {
+                        using var proc = Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "netsh",
+                            Arguments = $"interface ipv4 set interface {adp.InterfaceIndex} metric=automatic",
+                            CreateNoWindow = true,
+                            UseShellExecute = false
+                        });
+                        proc?.WaitForExit(200);
+                    }
+                    catch { }
+                }
+            }
+        }
+        catch { }
     }
 
     public HttpClient GetOrCreateClient(NetworkAdapterInfo adapter)
@@ -340,6 +421,7 @@ public class NetworkBondingManager : IDisposable
     {
         _pollTimer?.Dispose();
         _heartbeatTimer?.Dispose();
+        RestoreDefaultMetrics(_adapters);
         foreach (var client in _clientPool.Values)
         {
             client.Dispose();

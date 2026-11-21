@@ -333,6 +333,8 @@ public class GameBoostProxyServer : IDisposable
                 .Where(n => n.OperationalStatus == OperationalStatus.Up && n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
                 .ToList();
 
+            var adapterSamples = new List<(NetworkAdapterInfo Adapter, long DeltaBytes, double SpeedBps)>();
+
             foreach (var adapter in _bondingManager.Adapters)
             {
                 var nic = currentNics.FirstOrDefault(n => n.Id == adapter.Id || n.Name.Equals(adapter.Name, StringComparison.OrdinalIgnoreCase));
@@ -348,13 +350,17 @@ public class GameBoostProxyServer : IDisposable
                         long deltaBytes = Math.Max(0, currentBytes - previousBytes);
                         double adapterSpeedBps = deltaBytes / elapsedSeconds;
 
-                        // Only assign speed if adapter is online
+                        // Only assign speed if adapter is online and enabled
                         if (adapter.IsEnabled && adapter.IsOnline)
                         {
                             adapter.CurrentSpeedBps = (adapter.CurrentSpeedBps <= 0)
                                 ? adapterSpeedBps
-                                : (adapter.CurrentSpeedBps * 0.6) + (adapterSpeedBps * 0.4);
+                                : (adapter.CurrentSpeedBps * 0.70) + (adapterSpeedBps * 0.30);
+
+                            if (adapter.CurrentSpeedBps < 5000) adapter.CurrentSpeedBps = 0;
+
                             totalInstantBps += adapterSpeedBps;
+                            adapterSamples.Add((adapter, deltaBytes, adapterSpeedBps));
                         }
                     }
 
@@ -371,9 +377,21 @@ public class GameBoostProxyServer : IDisposable
             if (isGenuineDownload)
             {
                 activeTrafficStopwatch.Restart();
-                smoothedSpeedBps = (smoothedSpeedBps <= 0) ? totalInstantBps : (smoothedSpeedBps * 0.7) + (totalInstantBps * 0.3);
+                // 1-second rolling EMA to match Steam's 1-second counter and avoid erratic >300 spikes
+                smoothedSpeedBps = (smoothedSpeedBps <= 0) 
+                    ? totalInstantBps 
+                    : (smoothedSpeedBps * 0.72) + (totalInstantBps * 0.28);
 
-                // Add to total downloaded bytes ONLY during active game downloads
+                // Add to per-adapter downloaded bytes and total downloaded bytes
+                foreach (var sample in adapterSamples)
+                {
+                    if (sample.DeltaBytes > 0)
+                    {
+                        sample.Adapter.AddDownloadedBytes(sample.DeltaBytes);
+                        sample.Adapter.NotifyMetricsChanged();
+                    }
+                }
+
                 long frameBytes = (long)(totalInstantBps * elapsedSeconds);
                 if (frameBytes > 0)
                 {
@@ -390,9 +408,8 @@ public class GameBoostProxyServer : IDisposable
             if (isGameActive && activeTrafficStopwatch.ElapsedMilliseconds < 3500 && (totalInstantBps >= MinActiveDownloadBps || smoothedSpeedBps >= MinActiveDownloadBps))
             {
                 _activeConnections = Math.Max(4, Math.Min(16, activeStreamsCount * 2));
-                double reportSpeed = totalInstantBps >= MinActiveDownloadBps
-                    ? ((totalInstantBps * 0.65) + (smoothedSpeedBps * 0.35))
-                    : smoothedSpeedBps;
+                // Use smoothedSpeedBps so speed matches Steam's 1-second counter without spiking above 300 on tiny 250ms bursts
+                double reportSpeed = smoothedSpeedBps;
 
                 // Throttled detection: Check for auto-detected game download sizes from Steam / Epic only once every 4s to eliminate disk thrashing
                 if (_detectedGameSizeBytes <= 0 || sizeDetectionStopwatch.ElapsedMilliseconds >= 4000)
@@ -586,9 +603,8 @@ public class GameBoostProxyServer : IDisposable
             var flagMatch = Regex.Match(content, @"""StateFlags""\s+""(\d+)""");
             if (flagMatch.Success && int.TryParse(flagMatch.Groups[1].Value, out int sf)) stateFlags = sf;
 
-            // Prioritize the user-visible install footprint (e.g. 93 GB), or the network download size
-            long effectiveSize = Math.Max(bytesStage, bytesDownload);
-            if (effectiveSize == 0 && (stateFlags & 1024) != 0) effectiveSize = sizeOnDisk;
+            // Prioritize the user-visible full game size (e.g. 70 GB), or the stage / network download size
+            long effectiveSize = Math.Max(sizeOnDisk, Math.Max(bytesStage, bytesDownload));
 
             if (effectiveSize > 0 && ((stateFlags & (4 | 1024)) != 0 || bytesDownload > 0 || bytesStage > 0))
             {

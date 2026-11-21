@@ -92,7 +92,7 @@ public class DownloadSession
         get
         {
             if (Status == DownloadStatus.Paused) return "0.0 Mbps";
-            double mbps = (CombinedSpeedBps * 8) / (1024 * 1024);
+            double mbps = (CombinedSpeedBps * 8) / 1_000_000.0;
             if (mbps >= 1000)
             {
                 return $"{(mbps / 1000):F2} Gbps";

@@ -96,7 +96,7 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
         OnPropertyChanged(nameof(FormattedTotalBytes));
     }
 
-    public double SpeedMbps => (CurrentSpeedBps * 8) / (1024 * 1024);
+    public double SpeedMbps => (CurrentSpeedBps * 8) / 1_000_000.0;
 
     public string DisplaySpeed
     {
