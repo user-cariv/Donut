@@ -83,33 +83,45 @@ body.dark-mode .boost-steps article, body.dark-mode .boost-download-card { borde
 .boost-currency-arrow { position: absolute; right: 12px; pointer-events: none; font-size: 10px; color: var(--hub-muted); }
 .boost-fx-status { font-size: 11px; color: var(--hub-muted); margin-top: 4px; max-width: 320px; line-height: 1.4; }
 
-.boost-pricing-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-top: 10px; }
-.boost-pricing-card { position: relative; display: flex; flex-direction: column; padding: 30px 24px; border: 1px solid #fff; border-radius: 26px; background: #fff9; box-shadow: var(--hub-shadow); transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease; }
-.boost-pricing-card:hover { transform: translateY(-5px); box-shadow: 0 24px 48px rgba(0,0,0,0.09); }
-.boost-pricing-card.popular { border: 1.5px solid #ff764f; background: linear-gradient(180deg, rgba(255,118,79,0.07), #fff9 38%); }
-.boost-pricing-card.best-value { border: 1.5px solid #30d158; background: linear-gradient(180deg, rgba(48,209,88,0.07), #fff9 38%); }
+.boost-pricing-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 10px; }
+.boost-pricing-card { position: relative; display: flex; flex-direction: column; padding: 22px 18px; border: 1px solid #ffffffd0; border-radius: 20px; background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.04); transition: transform .22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow .22s cubic-bezier(0.16, 1, 0.3, 1), border-color .22s ease; }
+.boost-pricing-card:hover { transform: translateY(-4px); box-shadow: 0 18px 36px rgba(0, 0, 0, 0.08); }
 
-.boost-plan-badge { position: absolute; top: -11px; right: 20px; padding: 5px 14px; border-radius: 100px; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #fff; box-shadow: 0 4px 14px rgba(0,0,0,0.18); }
-.boost-plan-badge.popular { background: linear-gradient(135deg, #ff9a58, #ff5722); }
-.boost-plan-badge.best-value { background: linear-gradient(135deg, #34c759, #10b981); }
+/* Card Variants with Cool Neon Accents */
+.boost-pricing-card.starter { border-color: rgba(255, 255, 255, 0.9); }
+.boost-pricing-card.starter:hover { border-color: #cbd5e1; }
+.boost-pricing-card.popular { border: 1.5px solid #ff764f; background: linear-gradient(180deg, rgba(255, 118, 79, 0.08), rgba(255, 255, 255, 0.75) 45%); box-shadow: 0 10px 30px rgba(255, 118, 79, 0.12); }
+.boost-pricing-card.popular:hover { box-shadow: 0 18px 40px rgba(255, 118, 79, 0.22); }
+.boost-pricing-card.pro { border: 1.5px solid rgba(139, 92, 246, 0.35); background: linear-gradient(180deg, rgba(139, 92, 246, 0.05), rgba(255, 255, 255, 0.75) 45%); }
+.boost-pricing-card.pro:hover { border-color: rgba(139, 92, 246, 0.6); box-shadow: 0 18px 36px rgba(139, 92, 246, 0.15); }
+.boost-pricing-card.best-value { border: 1.5px solid #10b981; background: linear-gradient(180deg, rgba(16, 185, 129, 0.08), rgba(255, 255, 255, 0.75) 45%); box-shadow: 0 10px 30px rgba(16, 185, 129, 0.12); }
+.boost-pricing-card.best-value:hover { box-shadow: 0 18px 40px rgba(16, 185, 129, 0.22); }
 
-.boost-plan-header { margin-bottom: 16px; }
-.boost-plan-duration { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: var(--hub-orange, #ff6b35); margin-bottom: 6px; }
-.boost-plan-title { margin: 0; font-size: 23px; font-weight: 800; letter-spacing: -0.04em; }
-.boost-plan-desc { font-size: 12px; color: var(--hub-muted); margin: 6px 0 0; line-height: 1.5; min-height: 36px; }
+.boost-plan-badge { position: absolute; top: -10px; right: 14px; padding: 3px 10px; border-radius: 100px; font-size: 9px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; color: #fff; box-shadow: 0 3px 10px rgba(0,0,0,0.18); }
+.boost-plan-badge.popular { background: linear-gradient(135deg, #ff764f, #ff3d00); }
+.boost-plan-badge.best-value { background: linear-gradient(135deg, #10b981, #059669); }
 
-.boost-plan-price-wrap { display: flex; align-items: baseline; gap: 5px; margin: 16px 0 20px; }
-.boost-price-amount { font-size: 36px; font-weight: 900; letter-spacing: -0.05em; font-family: 'Manrope', sans-serif; color: inherit; }
-.boost-price-cycle { font-size: 12px; color: var(--hub-muted); font-weight: 500; }
+.boost-plan-header { margin-bottom: 12px; }
+.boost-plan-duration { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: var(--hub-orange, #ff6b35); margin-bottom: 4px; }
+.boost-plan-title { margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -0.03em; }
+.boost-plan-desc { font-size: 11px; color: var(--hub-muted); margin: 4px 0 0; line-height: 1.45; min-height: 32px; }
 
-.boost-plan-features { list-style: none; padding: 0; margin: 0 0 24px; display: flex; flex-direction: column; gap: 11px; flex-grow: 1; border-top: 1px solid rgba(0,0,0,0.06); padding-top: 18px; }
-.boost-plan-features li { display: flex; align-items: flex-start; gap: 9px; font-size: 12px; color: var(--hub-muted); line-height: 1.45; }
-.boost-plan-features li svg { width: 15px; height: 15px; stroke: #30d158; flex-shrink: 0; margin-top: 1px; }
+.boost-plan-price-wrap { display: flex; align-items: baseline; gap: 4px; margin: 10px 0 14px; }
+.boost-price-amount { font-size: 30px; font-weight: 900; letter-spacing: -0.05em; font-family: 'Manrope', sans-serif; color: inherit; line-height: 1; }
+.boost-price-cycle { font-size: 11px; color: var(--hub-muted); font-weight: 500; }
 
-.boost-plan-action { width: 100%; text-align: center; justify-content: center; padding: 13px 18px; font-size: 13px; font-weight: 700; border-radius: 14px; box-sizing: border-box; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: transform .2s, background .2s, border-color .2s; }
+.boost-plan-features { list-style: none; padding: 0; margin: 0 0 18px; display: flex; flex-direction: column; gap: 8px; flex-grow: 1; border-top: 1px solid rgba(0,0,0,0.06); padding-top: 13px; }
+.boost-plan-features li { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--hub-muted); line-height: 1.35; }
+.boost-plan-features li svg { width: 13px; height: 13px; stroke: #10b981; flex-shrink: 0; }
+
+.boost-plan-action { width: 100%; text-align: center; justify-content: center; padding: 10px 14px; font-size: 12px; font-weight: 700; border-radius: 12px; box-sizing: border-box; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: transform .2s, background .2s, border-color .2s, box-shadow .2s; }
 .boost-plan-action:hover { transform: translateY(-2px); }
-.boost-plan-action.outline { background: transparent; border: 1.5px solid rgba(0,0,0,0.15); color: inherit; }
-.boost-plan-action.outline:hover { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.3); }
+.boost-plan-action.outline { background: rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.12); color: inherit; }
+.boost-plan-action.outline:hover { background: rgba(0,0,0,0.07); border-color: rgba(0,0,0,0.25); }
+.boost-plan-action.popular-btn { background: #181412; color: #fff; border: 1px solid rgba(255, 118, 79, 0.4); box-shadow: 0 4px 14px rgba(255, 118, 79, 0.25); }
+.boost-plan-action.popular-btn:hover { background: #000; box-shadow: 0 6px 18px rgba(255, 118, 79, 0.4); }
+.boost-plan-action.value-btn { background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3); }
+.boost-plan-action.value-btn:hover { box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45); }
 
 /* How to Activate Steps Guide */
 .boost-activation-guide { margin-top: 40px; padding: 36px 32px; border: 1px solid #fff; border-radius: 28px; background: #fff9; box-shadow: var(--hub-shadow); }
@@ -129,13 +141,19 @@ body.dark-mode .boost-steps article, body.dark-mode .boost-download-card { borde
 .boost-activation-note { font-size: 12px; color: var(--hub-muted); display: inline-flex; align-items: center; gap: 6px; }
 
 /* Dark mode pricing overrides */
-body.dark-mode .boost-pricing-card, body.dark-mode .boost-activation-guide { border-color: #3c2e29; background: #211a17; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-body.dark-mode .boost-pricing-card.popular { border-color: #ff764f; background: linear-gradient(180deg, rgba(255,118,79,0.1), #211a17 40%); }
-body.dark-mode .boost-pricing-card.best-value { border-color: #30d158; background: linear-gradient(180deg, rgba(48,209,88,0.1), #211a17 40%); }
+body.dark-mode .boost-pricing-card { border-color: #382c27; background: #201815cc; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+body.dark-mode .boost-pricing-card.starter { border-color: #3c2f2a; }
+body.dark-mode .boost-pricing-card.starter:hover { border-color: #64748b; }
+body.dark-mode .boost-pricing-card.popular { border-color: #ff764f; background: linear-gradient(180deg, rgba(255,118,79,0.12), #201815cc 45%); box-shadow: 0 10px 30px rgba(255, 118, 79, 0.2); }
+body.dark-mode .boost-pricing-card.pro { border-color: rgba(139, 92, 246, 0.45); background: linear-gradient(180deg, rgba(139, 92, 246, 0.08), #201815cc 45%); }
+body.dark-mode .boost-pricing-card.pro:hover { border-color: rgba(139, 92, 246, 0.75); }
+body.dark-mode .boost-pricing-card.best-value { border-color: #10b981; background: linear-gradient(180deg, rgba(16, 185, 129, 0.12), #201815cc 45%); box-shadow: 0 10px 30px rgba(16, 185, 129, 0.2); }
 body.dark-mode .boost-currency-select { background: #211a17; border-color: #3c2e29; color: #f7f4ff; }
 body.dark-mode .boost-plan-features { border-top-color: rgba(255,255,255,0.08); }
-body.dark-mode .boost-plan-action.outline { border-color: rgba(255,255,255,0.2); color: #f7f4ff; }
-body.dark-mode .boost-plan-action.outline:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.4); }
+body.dark-mode .boost-plan-action.outline { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.15); color: #f7f4ff; }
+body.dark-mode .boost-plan-action.outline:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.35); }
+body.dark-mode .boost-plan-action.popular-btn { background: #2c1a14; border-color: #ff764f; color: #fff; }
+body.dark-mode .boost-activation-guide { border-color: #3c2e29; background: #211a17; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
 body.dark-mode .boost-trial-banner { background: linear-gradient(135deg, rgba(255, 118, 79, 0.12), rgba(255, 177, 86, 0.05)); border-color: #ff764f55; }
 body.dark-mode .boost-step-card { border-color: rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); }
 body.dark-mode .boost-activation-cta { border-top-color: rgba(255,255,255,0.08); }
