@@ -28,7 +28,7 @@
 .boost-download-copy h3 { margin: 0; font-size: clamp(23px, 2.4vw, 30px); letter-spacing: -.06em; }
 .boost-download-copy > p:not(.hub-eyebrow) { max-width: 650px; color: var(--hub-muted); line-height: 1.65; font-size: 14px; }
 .boost-download-copy .hub-button { margin-top: 5px; }
-.boost-runtime-note { font-size: 12px !important; }.boost-runtime-note a { color: var(--hub-orange); text-decoration: underline; text-underline-offset: 3px; }
+.boost-runtime-note { font-size: 12px !important; }.boost-license-note { max-width: 560px; margin: 10px 0 0; color: var(--hub-muted); font-size: 12px; line-height: 1.6; }.boost-runtime-note a { color: var(--hub-orange); text-decoration: underline; text-underline-offset: 3px; }
 .boost-macos-card { align-content: start; }.boost-macos-icon { display: grid; place-items: center; color: #fff; background: #17110f; font: 700 32px Manrope, sans-serif; }.boost-coming-soon { display: inline-flex; margin-top: 7px; padding: 8px 12px; border-radius: 100px; color: #80502e; background: #ffe4c9; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
 body.dark-mode .boost-steps article, body.dark-mode .boost-download-card, body.dark-mode .boost-game-card { border-color: #3c2e29; background: #211a17; }body.dark-mode .boost-coming-soon { color: #ffcc9b; background: #453022; }body.dark-mode .boost-game-badge { color: #ddc8ff; border-color: #8b5cf666; background: #302344; }
 @media (max-width: 900px) { .boost-hero { gap: 28px; }.boost-hero h1 { font-size: clamp(46px, 6.4vw, 68px); } }
