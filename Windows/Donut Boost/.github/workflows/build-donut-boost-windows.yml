@@ -1,0 +1,62 @@
+name: Build and sign Donut Boost for Windows
+
+on:
+  push:
+    tags:
+      - "boost-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build-sign-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Publish
+        run: dotnet publish DonutBoost.csproj -c Release -r win-x64 --self-contained true -o publish/win-x64
+
+      - name: Package unsigned app
+        shell: pwsh
+        run: Compress-Archive -Path "publish/win-x64/*" -DestinationPath "Donut-Boost-Windows-x64-unsigned.zip"
+
+      - name: Upload unsigned app
+        id: unsigned-app
+        uses: actions/upload-artifact@v4
+        with:
+          name: Donut-Boost-Windows-unsigned
+          path: Donut-Boost-Windows-x64-unsigned.zip
+
+      - name: Submit app signing request
+        uses: signpath/github-action-submit-signing-request@v0.3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: donut-boost-windows
+          signing-policy-slug: release-signing
+          github-artifact-id: ${{ steps.unsigned-app.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed-app
+
+      - name: Package signed release
+        shell: pwsh
+        run: |
+          $archive = "Donut-Boost-Windows-x64-${{ github.ref_name }}.zip"
+          Compress-Archive -Path "signed-app/*" -DestinationPath $archive
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            "Donut-Boost-Windows-x64-${{ github.ref_name }}.zip" \
+            --title "Donut Boost ${{ github.ref_name }}" \
+            --generate-notes

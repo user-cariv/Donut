@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>DonutBoost</AssemblyName>
+    <RootNamespace>DonutBoost</RootNamespace>
+    <Product>Donut Boost</Product>
+    <Company>Donut</Company>
+    <Authors>Donut</Authors>
+    <Description>Donut Boost - Multi-Connection &amp; Speed Bonding Downloader</Description>
+    <Version>1.0.0</Version>
+    <ApplicationIcon>Assets\Donut.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Assets\**" />
+    <None Remove="photos\**" />
+    <Resource Include="Assets\**" />
+    <Resource Include="photos\**" />
+  </ItemGroup>
+</Project>

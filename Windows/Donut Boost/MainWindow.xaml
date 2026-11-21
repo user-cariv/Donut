@@ -1,0 +1,680 @@
+<Window x:Class="DonutBoost.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Donut Boost — Multi-Connection Speed Bonding Downloader" 
+        Icon="Assets/Donut.ico"
+        WindowState="Maximized"
+        Height="800" Width="1100"
+        MinHeight="560" MinWidth="880"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        AllowsTransparency="False"
+        Background="{StaticResource BgBrush}"
+        FontFamily="{StaticResource AppleFontFamily}"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
+        RenderOptions.ClearTypeHint="Enabled">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="50" ResizeBorderThickness="8" GlassFrameThickness="0" CornerRadius="0"/>
+    </WindowChrome.WindowChrome>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Apple Title Bar (Row 0 - Fixed) -->
+            <RowDefinition Height="*"/>    <!-- Main Scrollable Content Area (Row 1) -->
+            <RowDefinition Height="Auto"/> <!-- Apple Status Bar (Row 2 - Fixed) -->
+        </Grid.RowDefinitions>
+
+        <!-- Custom Apple macOS Dark Title Bar -->
+        <Border Grid.Row="0" Background="#18181B" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="0,0,0,1" Height="50" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+            <Grid Margin="18,0,16,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/> <!-- Left: Traffic Lights & Brand -->
+                    <ColumnDefinition Width="*"/>    <!-- Center: Sticky Live Status -->
+                    <ColumnDefinition Width="Auto"/> <!-- Right: Actions & Window Controls -->
+                </Grid.ColumnDefinitions>
+
+                <!-- Left: Brand Header & License Status -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" WindowChrome.IsHitTestVisibleInChrome="True">
+                    <!-- Donut Logo & Title -->
+                    <Image Source="Assets/DonutBoostLogo.png" Width="24" Height="24" Margin="0,0,10,0" RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <TextBlock Text="DONUT" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                    <TextBlock Text="BOOST" FontWeight="Bold" FontSize="14" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"/>
+                    <Border Background="#25252A" CornerRadius="8" Padding="7,2" Margin="10,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="Speed Bonding" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}"/>
+                    </Border>
+
+                    <!-- License Status Pill (Click to view details or renew) -->
+                    <Button x:Name="TitleBarLicenseButton" Click="TitleBarLicenseButton_Click" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" Margin="10,0,0,0" ToolTip="Click to view license status or enter a new redeem code">
+                        <Border x:Name="TitleBarLicenseBadge" Background="#182A1C" BorderBrush="#30D158" BorderThickness="1" CornerRadius="8" Padding="7,2">
+                            <TextBlock x:Name="TitleBarLicenseText" Text="⚡ PRO: ACTIVE" FontSize="10" FontWeight="Bold" Foreground="#30D158"/>
+                        </Border>
+                    </Button>
+
+                    <!-- Eye-Catching Official Website CTA Button (Next to License Status) -->
+                    <Button Click="OpenWebsiteButton_Click" Cursor="Hand" Margin="10,0,0,0" ToolTip="Visit Official Donut Website (https://user-cariv.github.io/Donut/)">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="WebBadgeBorder" CornerRadius="8" Padding="10,3.5" BorderThickness="1" SnapsToDevicePixels="True">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop Color="#FFB340" Offset="0.0"/>
+                                            <GradientStop Color="#FF8800" Offset="1.0"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                    <Border.BorderBrush>
+                                        <SolidColorBrush Color="#FFD480"/>
+                                    </Border.BorderBrush>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="🌐" FontSize="11" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="WEBSITE" FontSize="11" FontWeight="Black" Foreground="#000000" VerticalAlignment="Center"/>
+                                        <TextBlock Text="↗" FontSize="11" FontWeight="Black" Foreground="#442200" Margin="3,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="WebBadgeBorder" Property="Background">
+                                            <Setter.Value>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                    <GradientStop Color="#FFC766" Offset="0.0"/>
+                                                    <GradientStop Color="#FFA020" Offset="1.0"/>
+                                                </LinearGradientBrush>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Setter TargetName="WebBadgeBorder" Property="BorderBrush" Value="#FFFFFF"/>
+                                    </Trigger>
+                                    <Trigger Property="IsPressed" Value="True">
+                                        <Setter TargetName="WebBadgeBorder" Property="Opacity" Value="0.85"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </StackPanel>
+
+                <!-- Center: Live Sticky Status Capsule (Always visible when scrolling) -->
+                <Grid Grid.Column="1">
+                    <StackPanel x:Name="TitleBarLiveStatusPanel" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
+                        <Border Background="#241E15" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1" CornerRadius="12" Padding="14,4">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="TitleBarSpeedTextBlock" Text="0.0 Mbps" FontWeight="Bold" FontSize="13" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0"/>
+                                <TextBlock x:Name="TitleBarStatusBadge" Text="BOOSTING SPEED" FontWeight="Bold" FontSize="11" Foreground="{StaticResource SuccessBrush}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <TextBlock x:Name="TitleBarProgressText" Text="0% (ETA: --:--)" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Right: Utility & Windows Window Controls -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Button Click="RefreshAdaptersButton_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="12,5" Margin="0,0,12,0" ToolTip="Refresh network adapters and connected phones">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔄" FontSize="11" Margin="0,0,6,0"/>
+                            <TextBlock Text="Rescan Connections" FontSize="11" FontWeight="Medium"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Click="MinimizeButton_Click" Style="{StaticResource WindowControlButtonStyle}" ToolTip="Minimize">
+                        <TextBlock Text="—" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                    </Button>
+                    <Button x:Name="MaximizeButton" Click="MaximizeRestoreButton_Click" Style="{StaticResource WindowControlButtonStyle}" ToolTip="Maximize / Restore">
+                        <TextBlock x:Name="MaximizeIconText" Text="🗖" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                    </Button>
+                    <Button Click="CloseButton_Click" Style="{StaticResource WindowCloseButtonStyle}" ToolTip="Close">
+                        <TextBlock Text="✕" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Body ScrollViewer with crisp text rendering -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+            <Grid Margin="18,12,18,12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/> <!-- 0. Download Control Center -->
+                    <RowDefinition Height="Auto"/> <!-- 1. Game Launcher Accelerator -->
+                    <RowDefinition Height="*"/>    <!-- 2. Main Dashboard (Speedometer + Connected Networks) -->
+                </Grid.RowDefinitions>
+
+                <!-- 1. Apple Download Control Center Card (Crisp Hairline Border, Zero Blur) -->
+                <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="16" Padding="14,12" Margin="0,0,0,10">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/> <!-- Row 0: URL Input -->
+                            <RowDefinition Height="Auto"/> <!-- Row 1: Bonding Mode Segmented Control -->
+                            <RowDefinition Height="Auto"/> <!-- Row 2: Bandwidth Speed Limiter (Home Wi-Fi Only) -->
+                            <RowDefinition Height="Auto"/> <!-- Row 3: Destination Folder -->
+                        </Grid.RowDefinitions>
+
+                        <!-- Row 0: URL Field + Action Buttons -->
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Background="#121214" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="4,2">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="🔗" FontSize="13" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="10,0,6,0"/>
+                                    <TextBox x:Name="UrlTextBox" Grid.Column="1" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" Background="Transparent" BorderThickness="0" Padding="4,7" VerticalContentAlignment="Center" Text="https://speed.hetzner.de/1GB.bin"/>
+                                </Grid>
+                            </Border>
+
+                            <Button Grid.Column="1" Click="PasteUrlButton_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="8,0,0,0" ToolTip="Paste URL from Clipboard">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="📋" FontSize="11" Margin="0,0,5,0"/>
+                                    <TextBlock Text="Paste"/>
+                                </StackPanel>
+                            </Button>
+
+                            <Button x:Name="StartBoostButton" Grid.Column="2" Click="StartBoostButton_Click" Style="{StaticResource BoostButtonStyle}" Margin="8,0,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="⚡" FontSize="13" Margin="0,0,6,0"/>
+                                    <TextBlock Text="BOOST DOWNLOAD"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                        <!-- Row 1: macOS Segmented Control for Download Mode -->
+                        <Border Grid.Row="1" Background="{StaticResource SurfaceSubtleBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="4" Margin="0,10,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Text="DOWNLOAD MODE" VerticalAlignment="Center" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" Margin="10,0,12,0"/>
+
+                                <!-- Option 1: Combine Both -->
+                                <RadioButton x:Name="ModeCombineBothRadio" Grid.Column="1" GroupName="BondingModeGroup" Style="{StaticResource ModeRadioButtonStyle}" IsChecked="True" Click="ModeCombineBoth_Click">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <TextBlock Text="⚡ Combine Both (Max Speed)" FontSize="12"/>
+                                    </StackPanel>
+                                </RadioButton>
+
+                                <!-- Option 2: Wi-Fi Only -->
+                                <RadioButton x:Name="ModeWifiOnlyRadio" Grid.Column="2" GroupName="BondingModeGroup" Style="{StaticResource ModeRadioButtonStyle}" Margin="4,0,0,0" Click="ModeWifiOnly_Click">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <TextBlock Text="📶 Home Wi-Fi Only" FontSize="12"/>
+                                    </StackPanel>
+                                </RadioButton>
+
+                                <!-- Option 3: Mobile Data Only -->
+                                <RadioButton x:Name="ModeMobileOnlyRadio" Grid.Column="3" GroupName="BondingModeGroup" Style="{StaticResource ModeRadioButtonStyle}" Margin="4,0,0,0" Click="ModeMobileOnly_Click">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <TextBlock Text="📱 Mobile Data Only" FontSize="12"/>
+                                    </StackPanel>
+                                </RadioButton>
+                            </Grid>
+                        </Border>
+
+                        <!-- Row 2: Bandwidth Speed Limiter Segmented Control (Home Wi-Fi Only, Numbers Only) -->
+                        <Border Grid.Row="2" Background="{StaticResource SurfaceSubtleBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="4" Margin="0,8,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,14,0">
+                                    <TextBlock Text="📶 WI-FI SPEED LIMIT" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"/>
+                                    <Border Background="#25252E" BorderBrush="#353540" BorderThickness="1" CornerRadius="5" Padding="5,1" Margin="8,0,0,0" ToolTip="Speed limit applies ONLY to Home Wi-Fi so other family members/surfing stays fast. Mobile 5G runs at 100% uncapped speed!">
+                                        <TextBlock Text="Mobile 5G Uncapped" FontSize="8.5" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
+                                    </Border>
+                                </StackPanel>
+
+                                <!-- Preset Options -->
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <RadioButton x:Name="SpeedLimitUnlimitedRadio" Content="⚡ Unlimited" GroupName="SpeedLimitGroup" Style="{StaticResource ModeRadioButtonStyle}" IsChecked="True" Click="SpeedLimitUnlimited_Click" Margin="0,0,4,0"/>
+                                    <RadioButton x:Name="SpeedLimit50Radio" Content="50 Mbps" GroupName="SpeedLimitGroup" Style="{StaticResource ModeRadioButtonStyle}" Click="SpeedLimit50_Click" Margin="0,0,4,0"/>
+                                    <RadioButton x:Name="SpeedLimit100Radio" Content="100 Mbps" GroupName="SpeedLimitGroup" Style="{StaticResource ModeRadioButtonStyle}" Click="SpeedLimit100_Click" Margin="0,0,4,0"/>
+                                    <RadioButton x:Name="SpeedLimit200Radio" Content="200 Mbps" GroupName="SpeedLimitGroup" Style="{StaticResource ModeRadioButtonStyle}" Click="SpeedLimit200_Click" Margin="0,0,4,0"/>
+                                </StackPanel>
+
+                                <!-- Custom Speed Input (Strictly Numbers Only) -->
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0">
+                                    <TextBlock Text="Custom:" FontSize="11" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <Border Background="#121214" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="2,1">
+                                        <TextBox x:Name="CustomSpeedLimitTextBox" Width="50" Height="22" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Background="Transparent" BorderThickness="0" Padding="2,1" VerticalContentAlignment="Center" TextAlignment="Center" Text="" PreviewTextInput="CustomSpeedLimitTextBox_PreviewTextInput" DataObject.Pasting="CustomSpeedLimitTextBox_Pasting" MaxLength="5" ToolTip="Enter Wi-Fi speed limit in Mbps (numbers only)"/>
+                                    </Border>
+                                    <TextBlock Text="Mbps" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="4,0,8,0"/>
+                                    <Button x:Name="ApplyCustomSpeedLimitButton" Click="ApplyCustomSpeedLimit_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="9,3" ToolTip="Apply Wi-Fi Speed Limit">
+                                        <TextBlock Text="Apply" FontSize="10" FontWeight="SemiBold"/>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Row 3: Destination Folder -->
+                        <Grid Grid.Row="3" Margin="4,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Text="Destination:" VerticalAlignment="Center" FontSize="11" FontWeight="Medium" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,8,0"/>
+                            <TextBlock x:Name="OutputFolderTextBlock" Grid.Column="1" VerticalAlignment="Center" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
+                            <Button Grid.Column="2" Click="BrowseFolderButton_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="10,4">
+                                <TextBlock Text="Change..." FontSize="11"/>
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <!-- 2. Apple Game Launcher Accelerator Card (Game Mode) -->
+                <Border Grid.Row="1" Background="#181820" BorderBrush="#2C283E" BorderThickness="1" CornerRadius="16" Padding="14,10" Margin="0,0,0,10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Modern High-Contrast Gaming Accelerator Badge -->
+                        <Border Width="44" Height="44" CornerRadius="13" BorderThickness="1.5" Margin="0,0,14,0" VerticalAlignment="Center">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="#1C1433" Offset="0.0"/>
+                                    <GradientStop Color="#0F0C1B" Offset="1.0"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <Border.BorderBrush>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="#A855F7" Offset="0.0"/>
+                                    <GradientStop Color="#FF6B00" Offset="1.0"/>
+                                </LinearGradientBrush>
+                            </Border.BorderBrush>
+                            <Viewbox Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Canvas Width="32" Height="32">
+                                    <!-- Crisp Ergonomic Controller Shell -->
+                                    <Path Data="M8,11 C8,8.5 11,6.5 16,6.5 C21,6.5 24,8.5 24,11 C24.5,14.5 26.5,20.5 25,23 C23.5,24.5 21.5,23.5 20,19.5 L18.5,16.5 L13.5,16.5 L12,19.5 C10.5,23.5 8.5,24.5 7,23 C5.5,20.5 7.5,14.5 8,11 Z" 
+                                          Fill="#251642" Stroke="#C084FC" StrokeThickness="1.6" StrokeLineJoin="Round"/>
+                                    
+                                    <!-- High-Visibility Crisp D-Pad (Left) -->
+                                    <Path Data="M10,10.5 L10,14.5 M8,12.5 L12,12.5" Stroke="#FFFFFF" StrokeThickness="1.8"/>
+                                    
+                                    <!-- Vibrant Action Gem Buttons (Right) -->
+                                    <Ellipse Canvas.Left="20" Canvas.Top="9" Width="2.4" Height="2.4" Fill="#38BDF8"/>
+                                    <Ellipse Canvas.Left="18" Canvas.Top="11" Width="2.4" Height="2.4" Fill="#34D399"/>
+                                    <Ellipse Canvas.Left="22" Canvas.Top="11" Width="2.4" Height="2.4" Fill="#F43F5E"/>
+                                    <Ellipse Canvas.Left="20" Canvas.Top="13" Width="2.4" Height="2.4" Fill="#FBBF24"/>
+                                    
+                                    <!-- Center Neon Gold Speed Lightning Bolt -->
+                                    <Path Data="M16.5,5.5 L14,11.5 L16.8,11.5 L14.5,17.5 L19,10.5 L16.2,10.5 Z" Fill="#FFD700"/>
+                                </Canvas>
+                            </Viewbox>
+                        </Border>
+
+                        <!-- Info -->
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="GAME LAUNCHER ACCELERATOR" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                <Border x:Name="GameBoostBadgeBorder" Background="#0A2D1B" BorderBrush="#30D158" BorderThickness="1" CornerRadius="10" Padding="8,2">
+                                    <TextBlock x:Name="GameBoostBadgeText" Text="🟢 AUTO-ON (Active)" FontSize="10" FontWeight="SemiBold" Foreground="#30D158"/>
+                                </Border>
+                            </StackPanel>
+                            <TextBlock Text="Bonds Wi-Fi + Mobile 5G automatically for Steam, Epic Games, EA App, Rockstar, Ubisoft, Battle.net, Riot &amp; Xbox (No URL paste needed)" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,0">
+                                    <TextBlock Text="🎮 Steam" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
+                                </Border>
+                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,0">
+                                    <TextBlock Text="⚡ Epic Games" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
+                                </Border>
+                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,0">
+                                    <TextBlock Text="🏎️ Rockstar" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
+                                </Border>
+                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,0">
+                                    <TextBlock Text="⚽ EA App" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
+                                </Border>
+                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,0">
+                                    <TextBlock Text="🦅 Ubisoft" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
+                                </Border>
+                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,0">
+                                    <TextBlock Text="🛡️ Battle.net" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
+                                </Border>
+                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,0">
+                                    <TextBlock Text="⚔️ Riot" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
+                                </Border>
+                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,0">
+                                    <TextBlock Text="🟩 Xbox" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
+                                </Border>
+                                <TextBlock x:Name="GameBoostStreamsText" Text="• Game Launcher Standby" FontSize="10" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Right: Authentic iOS/macOS Toggle Switch -->
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0,4,0">
+                            <ToggleButton x:Name="GameBoostToggle" IsChecked="True" Style="{StaticResource ModernToggleSwitchStyle}" Click="GameBoostToggle_Click" ToolTip="Toggle Game Launcher Acceleration ON / OFF"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- 3. Main Dashboard (2 Columns) -->
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.15*"/> <!-- Left: Speedometer & Active Task -->
+                        <ColumnDefinition Width="*"/>     <!-- Right: Connected Networks -->
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left Column: Activity Ring Speedometer & Active Task -->
+                    <Grid Grid.Column="0" Margin="0,0,8,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Apple-Style Circular Activity Gauge Card -->
+                        <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="16" Padding="14,10" Margin="0,0,0,10">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock Text="COMBINED REAL-TIME BANDWIDTH" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+
+                                <!-- Apple Activity Ring Container -->
+                                <Grid Width="150" Height="150" Margin="0,2">
+                                    <!-- Outer Track -->
+                                    <Border CornerRadius="75" BorderBrush="#25252D" BorderThickness="4.5" Background="#141418"/>
+                                    
+                                    <!-- Glowing Accent Ring -->
+                                    <Border CornerRadius="75" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1.5" Margin="3" Opacity="0.5"/>
+
+                                    <!-- Center Metrics -->
+                                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                        <Image Source="Assets/DonutBoostLogo.png" Width="32" Height="32" Margin="0,0,0,4" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                        <TextBlock x:Name="CombinedSpeedTextBlock" Text="0.0 Mbps" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center"/>
+                                        <TextBlock x:Name="StatusBadgeTextBlock" Text="Ready to Boost" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" TextAlignment="Center" MaxWidth="140" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Real-time Status Pills -->
+                                <StackPanel x:Name="ActiveAdaptersSummaryPanel" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,6,0,0">
+                                    <!-- Populated dynamically with Apple pills -->
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Active Task Card -->
+                        <Border Grid.Row="1" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="16" Padding="14,12">
+                            <StackPanel>
+                                <!-- Active Task Header + Game Size Target Selector -->
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="ACTIVE TASK" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"/>
+                                    
+                                    <!-- Game Size Target Quick Selector -->
+                                    <StackPanel x:Name="GameSizeSelectorPanel" Grid.Column="2" Orientation="Horizontal" Visibility="Collapsed" VerticalAlignment="Center">
+                                        <TextBlock Text="Target:" FontSize="10" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="0,0,4,0" ToolTip="Auto uses a launcher-reported size when available; otherwise set the target manually."/>
+                                        <Button x:Name="SizeAutoBtn" Content="Auto" Click="GameSizeButton_Click" Tag="0" Style="{StaticResource QuickSizeButtonStyle}"/>
+                                        <Button x:Name="Size10GBBtn" Content="10 GB" Click="GameSizeButton_Click" Tag="10" Style="{StaticResource QuickSizeButtonStyle}"/>
+                                        <Button x:Name="Size25GBBtn" Content="25 GB" Click="GameSizeButton_Click" Tag="25" Style="{StaticResource QuickSizeButtonStyle}"/>
+                                        <Button x:Name="Size50GBBtn" Content="50 GB" Click="GameSizeButton_Click" Tag="50" Style="{StaticResource QuickSizeButtonStyle}"/>
+                                        <Button x:Name="Size90GBBtn" Content="90 GB" Click="GameSizeButton_Click" Tag="90" Style="{StaticResource QuickSizeButtonStyle}"/>
+                                        <Button x:Name="Size100GBBtn" Content="100 GB" Click="GameSizeButton_Click" Tag="100" Style="{StaticResource QuickSizeButtonStyle}"/>
+                                        <TextBox x:Name="CustomGameSizeTextBox" Width="34" Height="22" Margin="4,0,2,0" Padding="2,1" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" Background="#1C1C22" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" VerticalContentAlignment="Center" TextAlignment="Center" MaxLength="3" ToolTip="Enter a custom game target in GB (for example, 93)." PreviewTextInput="CustomSpeedLimitTextBox_PreviewTextInput" DataObject.Pasting="CustomSpeedLimitTextBox_Pasting"/>
+                                        <TextBlock Text="GB" FontSize="9" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="0,0,3,0"/>
+                                        <Button Content="Set" Click="CustomGameSizeButton_Click" Style="{StaticResource QuickSizeButtonStyle}" ToolTip="Use the custom target size"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- File Name & Total Size -->
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="FileNameTextBlock" Text="No active download" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock x:Name="FileSizeTextBlock" Grid.Column="1" Text="-- / --" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,0,0,0"/>
+                                </Grid>
+
+                                <!-- Apple Pill Progress Bar -->
+                                <ProgressBar x:Name="DownloadProgressBar" Height="8" Value="0" Maximum="100" Background="#141418" Foreground="{StaticResource AccentBrush}">
+                                    <ProgressBar.Resources>
+                                        <Style TargetType="{x:Type Border}">
+                                            <Setter Property="CornerRadius" Value="4"/>
+                                        </Style>
+                                    </ProgressBar.Resources>
+                                </ProgressBar>
+
+                                <Grid Margin="0,6,0,10">
+                                    <TextBlock x:Name="ProgressPercentTextBlock" Text="0%" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                                    <TextBlock x:Name="EtaTextBlock" Text="ETA: --:--" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" HorizontalAlignment="Right"/>
+                                </Grid>
+
+                                <!-- Action Buttons -->
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,10">
+                                    <Button x:Name="PauseResumeButton" Click="PauseResumeButton_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0" IsEnabled="False">
+                                        <TextBlock x:Name="PauseResumeButtonText" Text="⏸ Pause"/>
+                                    </Button>
+                                    <Button x:Name="CancelDownloadButton" Click="CancelDownloadButton_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0" IsEnabled="False">
+                                        <TextBlock Text="✕ Cancel"/>
+                                    </Button>
+                                    <Button x:Name="OpenFolderButton" Click="OpenFolderButton_Click" Style="{StaticResource SecondaryButtonStyle}" IsEnabled="False">
+                                        <TextBlock Text="📁 Open Folder"/>
+                                    </Button>
+                                </StackPanel>
+
+                                <!-- Apple Minimalist Terminal Console -->
+                                <Border Background="#121214" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="8">
+                                    <ScrollViewer MaxHeight="62" VerticalScrollBarVisibility="Auto">
+                                        <TextBlock x:Name="LogOutputTextBlock" Text="Ready to boost downloads with multi-channel speed bonding..." FontSize="10.5" FontFamily="Consolas" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
+                                    </ScrollViewer>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- Right Column: Bonded Internet Connections (Apple System Settings Style) -->
+                    <Border Grid.Column="1" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="16" Padding="14,12" Margin="8,0,0,0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Grid Grid.Row="0" Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="BONDED INTERNET CONNECTIONS" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}"/>
+                                <TextBlock x:Name="AdapterCountTextBlock" Grid.Column="1" Text="0 Detected" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                            </Grid>
+
+                            <TextBlock Grid.Row="1" Text="Wi-Fi is locked as your laptop's primary internet. Connected phones are dedicated exclusively to speed-bonding downloads:" FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                            <!-- Adapters List -->
+                            <ItemsControl Grid.Row="2" x:Name="AdaptersItemsControl">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{StaticResource SurfaceSubtleBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="10" Margin="0,0,0,8">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Squircle Icon Container -->
+                                                <Border Width="38" Height="38" CornerRadius="9" Background="#24242A" Margin="0,0,10,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding IconGlyph}" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+
+                                                <!-- Info -->
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,6,0"/>
+                                                        <Border Background="#282830" CornerRadius="4" Padding="5,1">
+                                                            <TextBlock Text="{Binding TypeLabel}" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
+                                                        </Border>
+                                                        <Border Background="#1A2520" BorderBrush="{Binding RoleBadgeColor}" BorderThickness="1" CornerRadius="4" Padding="5,1" Margin="6,0,0,0">
+                                                            <TextBlock Text="{Binding RoleBadgeText}" FontSize="8.5" FontWeight="Bold" Foreground="{Binding RoleBadgeColor}"/>
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding Description}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                                                    <TextBlock Text="{Binding LocalIp}" FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                                                </StackPanel>
+
+                                                <!-- Speed & Apple iOS Toggle Switch -->
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="8,0,0,0">
+                                                    <TextBlock Text="{Binding DisplaySpeed}" FontWeight="Bold" FontSize="14" Foreground="{StaticResource SuccessBrush}" HorizontalAlignment="Right"/>
+                                                    <TextBlock Text="{Binding FormattedTotalBytes, StringFormat='Downloaded: {0}'}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Right" Margin="0,1,0,3"/>
+                                                    <ToggleButton IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                                                  Style="{StaticResource ModernToggleSwitchStyle}"
+                                                                  Click="AdapterToggle_Click"
+                                                                  ToolTip="{Binding ToggleTooltip}"
+                                                                  HorizontalAlignment="Right"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+        </ScrollViewer>
+
+        <!-- Fixed Apple Bottom Status Bar -->
+        <Border Grid.Row="2" Background="#161618" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="18,7">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Left: Mode and Connections -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="FooterStatusModeText" Text="⚡ Mode: Combine Both (Max Speed)" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,12,0"/>
+                    <TextBlock Text="•" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,12,0"/>
+                    <TextBlock x:Name="FooterActiveConnectionsText" Text="2 of 2 Connections Bonded (Wi-Fi + Phone)" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,12,0"/>
+                    <TextBlock Text="•" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,12,0"/>
+                    <TextBlock x:Name="FooterLicenseText" Text="⚡ License: Lifetime" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" Margin="0,0,12,0"/>
+                    <TextBlock Text="•" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,12,0"/>
+                    <Button Click="OpenWebsiteButton_Click" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="0" ToolTip="Visit https://user-cariv.github.io/Donut/">
+                        <TextBlock Text="WEBSITE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" TextDecorations="Underline"/>
+                    </Button>
+                </StackPanel>
+
+                <!-- Right: Speed & Overall Status -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="FooterLiveSpeedText" Text="0.0 Mbps" FontWeight="Bold" FontSize="12" Foreground="{StaticResource SuccessBrush}" Margin="0,0,10,0"/>
+                    <TextBlock Text="•" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,10,0"/>
+                    <TextBlock x:Name="FooterProgressText" Text="Ready to Boost" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ============================================================== -->
+        <!-- Apple Activation Gate / Blank Page Asking for Redeem Code      -->
+        <!-- Displayed on install until a valid redeem code is activated     -->
+        <!-- ============================================================== -->
+        <Grid x:Name="ActivationOverlayGrid" Grid.Row="1" Grid.RowSpan="2" Background="#141416" Visibility="Collapsed">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <Grid VerticalAlignment="Center" HorizontalAlignment="Center" Margin="20,40">
+                    <!-- Apple macOS Frosted Acrylic Activation Card (Crisp Hairline Border) -->
+                    <Border Width="520" Background="#1C1C1E" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="20" Padding="34,30">
+                        <StackPanel HorizontalAlignment="Center" Width="440">
+                            <!-- Logo Container with Glowing Ring -->
+                            <Border Width="68" Height="68" CornerRadius="18" Background="#242018" BorderBrush="#FF9F0A" BorderThickness="1.5" HorizontalAlignment="Center" Margin="0,0,0,16">
+                                <Grid>
+                                    <Ellipse Width="56" Height="56" Fill="#FF9F0A" Opacity="0.12"/>
+                                    <Image Source="Assets/DonutBoostLogo.png" Width="44" Height="44" HorizontalAlignment="Center" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- Title & Subtitle -->
+                            <TextBlock Text="Unlock Donut Boost" FontSize="21" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                            <TextBlock Text="Enter your redeem code to activate multi-connection speed bonding on this device." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" Margin="0,0,0,20"/>
+
+                            <!-- Code Input Box -->
+                            <Border Background="#121214" BorderBrush="#383842" BorderThickness="1.5" CornerRadius="11" Padding="12,6" Margin="0,0,0,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="RedeemCodeTextBox" FontFamily="Consolas, -apple-system, sans-serif" FontSize="18" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Background="Transparent" BorderThickness="0" VerticalContentAlignment="Center" TextAlignment="Center" CharacterCasing="Upper" MaxLength="19" Text="" KeyDown="RedeemCodeTextBox_KeyDown" ToolTip="Format: XXXX-XXXX-XXXX-XXXX"/>
+                                    <Button Grid.Column="1" Click="PasteRedeemCode_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="10,4" Margin="6,0,0,0" ToolTip="Paste code from clipboard">
+                                        <TextBlock Text="📋 Paste" FontSize="11"/>
+                                    </Button>
+                                </Grid>
+                            </Border>
+
+                            <!-- Status / Error Message -->
+                            <TextBlock x:Name="ActivationStatusTextBlock" Text="" FontSize="11" FontWeight="SemiBold" Foreground="#FF453A" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,14" Visibility="Collapsed"/>
+
+                            <!-- Supported Passes Showcase -->
+                            <Border Background="#16161A" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10,6" Margin="0,0,0,18">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="⚡ 1 Day" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                                    <TextBlock Grid.Column="1" Text="⚡ 7 Days" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="⚡ 1 Month" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                                    <TextBlock Grid.Column="3" Text="⚡ Lifetime" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- Primary Activate Button -->
+                            <Button x:Name="RedeemCodeButton" Click="RedeemCodeButton_Click" Style="{StaticResource BoostButtonStyle}" Height="44" HorizontalAlignment="Stretch" Margin="0,0,0,14">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Text="⚡" FontSize="14" Margin="0,0,8,0"/>
+                                    <TextBlock Text="ACTIVATE &amp; UNLOCK APP" FontSize="13" FontWeight="Bold"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Optional Free Trial Pass (Once per device) -->
+                            <Button x:Name="ActivateTrialButton" Click="ActivateTrialButton_Click" Background="Transparent" BorderThickness="0" Cursor="Hand" Margin="0,0,0,10">
+                                <TextBlock Text="🎁 Or Start 24-Hour Free Pass (Once per device)" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" TextDecorations="Underline" HorizontalAlignment="Center"/>
+                            </Button>
+
+                            <!-- Official Website Link Button -->
+                            <Button Click="OpenWebsiteButton_Click" Background="Transparent" BorderThickness="0" Cursor="Hand" Margin="0,0,0,12" ToolTip="Visit https://user-cariv.github.io/Donut/">
+                                <Border Background="#25252E" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1" CornerRadius="8" Padding="12,5">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <TextBlock Text="🌐" FontSize="11" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="VISIT WEBSITE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="↗" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                            </Button>
+
+                            <!-- Cancel / Return to App button -->
+                            <Button x:Name="CloseActivationSheetButton" Click="CloseActivationSheetButton_Click" Style="{StaticResource SecondaryButtonStyle}" HorizontalAlignment="Center" Margin="0,0,0,10" Visibility="Collapsed">
+                                <TextBlock Text="✕ Back to Donut Boost" FontSize="11"/>
+                            </Button>
+
+                            <!-- Device Hardware ID -->
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0">
+                                <TextBlock Text="Device ID: " FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
+                                <TextBlock x:Name="HwidTextBlock" Text="XXXX-XXXX-XXXX" FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Window>

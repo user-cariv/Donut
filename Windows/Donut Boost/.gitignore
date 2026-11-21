@@ -1,0 +1,7 @@
+bin/
+obj/
+publish/
+Redeem_Codes/
+*.pfx
+*.p12
+*.snk
