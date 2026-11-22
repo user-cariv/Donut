@@ -1,6 +1,6 @@
 <div align="center">
 
-<a href="https://user-cariv.github.io/Donut/"><img src="assets/hero.svg" width="100%" alt="Donut. Small apps. Big relief." /></a>
+<a href="https://user-cariv.github.io/Donut/"><img src="assets/hero.svg?v=2" width="100%" alt="Donut. Small apps. Big relief." /></a>
 
 <br/>
 
@@ -48,11 +48,11 @@
 
 <br/><br/>
 
-<a href="https://user-cariv.github.io/Donut/convert.html"><img src="assets/convert.svg" width="100%" alt="Donut Convert" /></a>
+<a href="https://user-cariv.github.io/Donut/convert.html"><img src="assets/convert.svg?v=2" width="100%" alt="Donut Convert" /></a>
 
-<a href="https://user-cariv.github.io/Donut/island.html"><img src="assets/island.svg" width="100%" alt="Donut Island" /></a>
+<a href="https://user-cariv.github.io/Donut/island.html"><img src="assets/island.svg?v=2" width="100%" alt="Donut Island" /></a>
 
-<a href="https://user-cariv.github.io/Donut/boost.html"><img src="assets/boost.svg" width="100%" alt="Donut Boost" /></a>
+<a href="https://user-cariv.github.io/Donut/boost.html"><img src="assets/boost.svg?v=2" width="100%" alt="Donut Boost" /></a>
 
 </div>
 
