@@ -54,6 +54,10 @@ jobs:
           $installer = "Windows/Donut Boost/installer/Install Donut Boost.exe"
           if (-not (Test-Path $installer)) { throw "Donut Boost installer output is missing" }
           Copy-Item $installer "_site/Install Donut Boost.exe" -Force
+          $manifestPath = "_site/boost-version.json"
+          $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+          $manifest | Add-Member -NotePropertyName installerSha256 -NotePropertyValue (Get-FileHash "_site/Install Donut Boost.exe" -Algorithm SHA256).Hash -Force
+          $manifest | ConvertTo-Json -Depth 10 | Set-Content $manifestPath -Encoding utf8
 
       - name: Configure Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0

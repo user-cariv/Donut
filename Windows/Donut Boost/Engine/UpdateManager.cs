@@ -27,6 +27,9 @@ public class UpdateManifest
 
     [JsonPropertyName("fallbackUrl")]
     public string FallbackUrl { get; set; } = "";
+
+    [JsonPropertyName("installerSha256")]
+    public string InstallerSha256 { get; set; } = "";
 }
 
 /// <summary>
@@ -57,8 +60,8 @@ public class UpdateManager
 
     private static readonly string[] ManifestUrls = new[]
     {
-        "https://raw.githubusercontent.com/user-cariv/Donut/main/Website/boost-version.json",
-        "https://user-cariv.github.io/Donut/boost-version.json"
+        "https://user-cariv.github.io/Donut/boost-version.json",
+        "https://raw.githubusercontent.com/user-cariv/Donut/main/Website/boost-version.json"
     };
 
     public static async Task<(bool HasUpdate, UpdateManifest? Manifest)> CheckForUpdatesAsync()
@@ -83,6 +86,9 @@ public class UpdateManager
                     {
                         if (IsVersionNewer(manifest.LatestVersion, CurrentVersion))
                         {
+                            // Only offer an update if the build pipeline supplied
+                            // the checksum for the installer that it published.
+                            if (!IsValidSha256(manifest.InstallerSha256)) continue;
                             return (true, manifest);
                         }
                         return (false, manifest);
@@ -120,6 +126,9 @@ public class UpdateManager
         return v;
     }
 
+    private static bool IsValidSha256(string? value) =>
+        value != null && value.Length == 64 && value.All(Uri.IsHexDigit);
+
     public static async Task<bool> DownloadAndInstallUpdateAsync(
         UpdateManifest manifest, 
         Action<int, long, long> onProgress, 
@@ -137,6 +146,8 @@ public class UpdateManager
         Directory.CreateDirectory(tempFolder);
         string installerPath = Path.Combine(tempFolder, "Install Donut Boost.exe");
 
+        if (!IsValidSha256(manifest.InstallerSha256)) return false;
+
         bool downloaded = false;
 
         foreach (var url in downloadCandidates)
@@ -145,7 +156,10 @@ public class UpdateManager
 
             try
             {
-                using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                if (!Uri.TryCreate(url, UriKind.Absolute, out var downloadUri) || downloadUri.Scheme != Uri.UriSchemeHttps)
+                    continue;
+
+                using var response = await _httpClient.GetAsync(downloadUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
                 if (!response.IsSuccessStatusCode) continue;
 
                 long totalBytes = response.Content.Headers.ContentLength ?? 0;
@@ -169,6 +183,20 @@ public class UpdateManager
                 }
 
                 fileStream.Flush();
+                fileStream.Close();
+
+                string actualHash;
+                await using (var verifyStream = File.OpenRead(installerPath))
+                {
+                    actualHash = Convert.ToHexString(await System.Security.Cryptography.SHA256.HashDataAsync(verifyStream, cancellationToken));
+                }
+
+                if (!string.Equals(actualHash, manifest.InstallerSha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    File.Delete(installerPath);
+                    continue;
+                }
+
                 downloaded = true;
                 break;
             }
