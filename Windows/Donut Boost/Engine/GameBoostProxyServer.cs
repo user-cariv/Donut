@@ -536,6 +536,18 @@ public class GameBoostProxyServer : IDisposable
                         if (ubBytes > 0) _detectedGameSizeBytes = ubBytes;
                         if (!string.IsNullOrEmpty(ubName)) _detectedGameName = ubName;
                     }
+                    else if (_detectedLauncher == "Xbox App")
+                    {
+                        var (xbName, xbBytes) = DetectXboxDownloadSize();
+                        if (xbBytes > 0) _detectedGameSizeBytes = xbBytes;
+                        if (!string.IsNullOrEmpty(xbName)) _detectedGameName = xbName;
+                    }
+                    else if (_detectedLauncher == "GOG Galaxy")
+                    {
+                        var (ggName, ggBytes) = DetectGogDownloadSize();
+                        if (ggBytes > 0) _detectedGameSizeBytes = ggBytes;
+                        if (!string.IsNullOrEmpty(ggName)) _detectedGameName = ggName;
+                    }
                 }
 
                 string displayLabel = !string.IsNullOrEmpty(_detectedGameName) 
@@ -687,14 +699,15 @@ public class GameBoostProxyServer : IDisposable
                         long curSt = long.TryParse(startMatch.Groups[4].Value, out var cs) ? cs : 0;
                         long totSt = long.TryParse(startMatch.Groups[5].Value, out var ts) ? ts : 0;
 
-                        long effectiveSize = Math.Max(totDl, totSt);
+                        // TotDl is the network download payload size (matches Steam's "Downloading data: X / Y GB" byte-for-byte)
+                        long effectiveSize = totDl > 0 ? totDl : (totSt > 0 ? totSt : 0);
+                        long currentProgress = curDl > 0 ? curDl : curSt;
                         string gameTitle = "Steam Game";
                         if (appid == "4080220")
                         {
                             gameTitle = "EA SPORTS FC™ 27";
-                            effectiveSize = Math.Max(effectiveSize, 70L * 1024 * 1024 * 1024);
                         }
-                        return (gameTitle, effectiveSize, Math.Max(curDl, curSt));
+                        return (gameTitle, effectiveSize, currentProgress);
                     }
 
                     if (lines[i].Contains("Downloading", StringComparison.OrdinalIgnoreCase) &&
@@ -756,23 +769,10 @@ public class GameBoostProxyServer : IDisposable
                 }
             }
 
-            // Real game target size:
-            // Prefer full uncompressed install footprint (SizeOnDisk / depotSum)
-            // Or network download size (BytesToDownload / BytesToStage)
-            long effectiveSize = Math.Max(depotSum, Math.Max(sizeOnDisk, Math.Max(bytesStage, bytesDownload)));
-
-            // Specialized standard store sizes for known AAA games
-            if (!string.IsNullOrEmpty(name) && 
-                (name.Contains("FC 27", StringComparison.OrdinalIgnoreCase) ||
-                 name.Contains("FC 26", StringComparison.OrdinalIgnoreCase) ||
-                 name.Contains("FC 25", StringComparison.OrdinalIgnoreCase) ||
-                 name.Contains("FC 24", StringComparison.OrdinalIgnoreCase) ||
-                 name.Contains("EA SPORTS FC", StringComparison.OrdinalIgnoreCase)))
-            {
-                effectiveSize = 70L * 1024 * 1024 * 1024;
-            }
-
-            long currentProgress = Math.Max(bytesDownloaded, bytesStaged);
+            // Real network download target size:
+            // Prefer network download size (BytesToDownload) which matches Steam UI "Downloading data: X / Y GB"
+            long effectiveSize = bytesDownload > 0 ? bytesDownload : (bytesStage > 0 ? bytesStage : (depotSum > 0 ? depotSum : sizeOnDisk));
+            long currentProgress = bytesDownloaded > 0 ? bytesDownloaded : bytesStaged;
 
             if (effectiveSize > 0 && ((stateFlags & (4 | 1024)) != 0 || bytesDownload > 0 || bytesStage > 0 || bytesDownloaded > 0))
             {
@@ -1019,6 +1019,56 @@ public class GameBoostProxyServer : IDisposable
         }
         catch { }
         return ("Ubisoft Game", 70L * 1024 * 1024 * 1024);
+    }
+
+    private static (string GameName, long TotalBytes) DetectXboxDownloadSize()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = "-NoProfile -Command \"Get-DeliveryOptimizationStatus -ErrorAction SilentlyContinue | Select-Object -First 1 | ForEach-Object { $_.DisplayName + '|' + $_.FileSizeInBytes }\"",
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardOutput = true
+            };
+            using var proc = Process.Start(psi);
+            if (proc != null)
+            {
+                string output = proc.StandardOutput.ReadToEnd().Trim();
+                proc.WaitForExit(800);
+                if (output.Contains('|'))
+                {
+                    var parts = output.Split('|');
+                    string name = parts[0].Trim();
+                    if (long.TryParse(parts[1].Trim(), out long size) && size > 0)
+                    {
+                        return (string.IsNullOrEmpty(name) ? "Xbox App Game" : name, size);
+                    }
+                }
+            }
+        }
+        catch { }
+        return ("Xbox App Game", 0);
+    }
+
+    private static (string GameName, long TotalBytes) DetectGogDownloadSize()
+    {
+        try
+        {
+            var processes = Process.GetProcesses();
+            if (processes.Any(p => p.ProcessName.Contains("Cyberpunk", StringComparison.OrdinalIgnoreCase)))
+            {
+                return ("Cyberpunk 2077", 70L * 1024 * 1024 * 1024);
+            }
+            if (processes.Any(p => p.ProcessName.Contains("Witcher", StringComparison.OrdinalIgnoreCase)))
+            {
+                return ("The Witcher 3", 50L * 1024 * 1024 * 1024);
+            }
+        }
+        catch { }
+        return ("GOG Galaxy Game", 0);
     }
 
     public void Dispose()

@@ -51,8 +51,8 @@ Name: "{autoprograms}\Donut Boost"; Filename: "{app}\{#MyAppExeName}"; IconFilen
 Name: "{autodesktop}\Donut Boost"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\Donut.ico"; Tasks: desktopicon
 
 [Run]
-; Launch Donut Boost upon setup completion (inherits installer administrative token so code 740 elevation error never occurs)
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch Donut Boost"; Flags: nowait postinstall skipifsilent
+; Launch Donut Boost upon setup completion using ShellExecute so elevation manifests succeed without code 740
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch Donut Boost"; Flags: shellexec nowait postinstall skipifsilent
 
 [UninstallRun]
 ; Cleanly reset proxy and any registry modifications

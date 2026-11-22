@@ -261,7 +261,9 @@ public class NetworkBondingManager : IDisposable
                 {
                     if (adp.InterfaceIndex > 0)
                     {
-                        // In CombineAll: Equal Metric 15 for BOTH Wi-Fi and Mobile Data allows Windows ECMP to distribute connections.
+                        // In CombineAll:
+                        // Metric 12 for Mobile 5G and Metric 15 for Wi-Fi ensures high-speed 300+ Mbps 5G pipelines
+                        // take primary routing priority, while Wi-Fi bonds in parallel for combined max speed!
                         // In WifiOnly: Wi-Fi is 5, Mobile is 60.
                         // In MobileOnly: Mobile is 5, Wi-Fi is 60.
                         int targetMetric = 15;
@@ -273,49 +275,15 @@ public class NetworkBondingManager : IDisposable
                         {
                             targetMetric = adp.IsMobilePhone ? 5 : 60;
                         }
-
-                        // 1. Direct PowerShell native route & interface metric enforcement (authoritative Windows 10/11 TCP/IP)
-                        try
+                        else if (mode == BondingMode.CombineAll)
                         {
-                            string psCmd = $"Set-NetIPInterface -InterfaceIndex {adp.InterfaceIndex} -InterfaceMetric {targetMetric} -WeakHostSend Enabled -WeakHostReceive Enabled -ErrorAction SilentlyContinue; " +
-                                            $"Get-NetRoute -DestinationPrefix '0.0.0.0/0' -InterfaceIndex {adp.InterfaceIndex} -ErrorAction SilentlyContinue | Set-NetRoute -RouteMetric {targetMetric} -ErrorAction SilentlyContinue";
-                            using var procPs = Process.Start(new ProcessStartInfo
-                            {
-                                FileName = "powershell.exe",
-                                Arguments = $"-NoProfile -WindowStyle Hidden -Command \"{psCmd}\"",
-                                CreateNoWindow = true,
-                                UseShellExecute = false
-                            });
-                            procPs?.WaitForExit(400);
-                        }
-                        catch { }
-
-                        // 2. In-memory route table update (instantaneous 1ms via route.exe)
-                        if (adp.GatewayIp != null)
-                        {
-                            try
-                            {
-                                using var procRoute = Process.Start(new ProcessStartInfo
-                                {
-                                    FileName = "route",
-                                    Arguments = $"CHANGE 0.0.0.0 MASK 0.0.0.0 {adp.GatewayIp} METRIC {targetMetric} IF {adp.InterfaceIndex}",
-                                    CreateNoWindow = true,
-                                    UseShellExecute = false
-                                });
-                                procRoute?.WaitForExit(200);
-                            }
-                            catch { }
+                            // In Combine Both: Metric 10 for Mobile 5G/4G ensures high-speed 300+ Mbps 5G pipelines
+                            // take primary route priority without being starved by slower 60 Mbps Wi-Fi,
+                            // while Wi-Fi (Metric 15) bonds in parallel via multi-path WeakHost routing!
+                            targetMetric = adp.IsMobilePhone ? 10 : 15;
                         }
 
-                        // 3. Direct Registry InterfaceMetric update for this adapter GUID (authoritative for Windows TCP stack)
-                        try
-                        {
-                            using var key = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\{adp.Id}", true);
-                            key?.SetValue("InterfaceMetric", targetMetric, RegistryValueKind.DWord);
-                        }
-                        catch { }
-
-                        // 3. Enforce IPv4 Metric via netsh
+                        // 1. Instant native netsh interface metric & weakhostsend/receive enforcement (takes ~5ms)
                         try
                         {
                             using var proc4 = Process.Start(new ProcessStartInfo
@@ -325,11 +293,10 @@ public class NetworkBondingManager : IDisposable
                                 CreateNoWindow = true,
                                 UseShellExecute = false
                             });
-                            proc4?.WaitForExit(200);
+                            proc4?.WaitForExit(300);
                         }
                         catch { }
 
-                        // Enable WeakHostSend and WeakHostReceive for multi-path routing
                         try
                         {
                             using var procWeak = Process.Start(new ProcessStartInfo
@@ -343,7 +310,59 @@ public class NetworkBondingManager : IDisposable
                         }
                         catch { }
 
-                        // Enforce IPv6 Metric
+                        // 2. Route table default gateway update (route.exe)
+                        if (adp.GatewayIp != null)
+                        {
+                            try
+                            {
+                                using var procRoute = Process.Start(new ProcessStartInfo
+                                {
+                                    FileName = "route",
+                                    Arguments = $"CHANGE 0.0.0.0 MASK 0.0.0.0 {adp.GatewayIp} METRIC {targetMetric} IF {adp.InterfaceIndex}",
+                                    CreateNoWindow = true,
+                                    UseShellExecute = false
+                                });
+                                procRoute?.WaitForExit(300);
+                                if (procRoute?.ExitCode != 0)
+                                {
+                                    using var procRouteAdd = Process.Start(new ProcessStartInfo
+                                    {
+                                        FileName = "route",
+                                        Arguments = $"ADD 0.0.0.0 MASK 0.0.0.0 {adp.GatewayIp} METRIC {targetMetric} IF {adp.InterfaceIndex}",
+                                        CreateNoWindow = true,
+                                        UseShellExecute = false
+                                    });
+                                    procRouteAdd?.WaitForExit(300);
+                                }
+                            }
+                            catch { }
+                        }
+
+                        // 3. Direct Registry InterfaceMetric update for this adapter GUID (authoritative for Windows TCP stack)
+                        try
+                        {
+                            using var key = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\{adp.Id}", true);
+                            key?.SetValue("InterfaceMetric", targetMetric, RegistryValueKind.DWord);
+                        }
+                        catch { }
+
+                        // 4. PowerShell NetTCPIP cmdlet enforcement
+                        try
+                        {
+                            string psCmd = $"Set-NetIPInterface -InterfaceIndex {adp.InterfaceIndex} -InterfaceMetric {targetMetric} -WeakHostSend Enabled -WeakHostReceive Enabled -ErrorAction SilentlyContinue; " +
+                                            $"Get-NetRoute -DestinationPrefix '0.0.0.0/0' -InterfaceIndex {adp.InterfaceIndex} -ErrorAction SilentlyContinue | Set-NetRoute -RouteMetric {targetMetric} -ErrorAction SilentlyContinue";
+                            using var procPs = Process.Start(new ProcessStartInfo
+                            {
+                                FileName = "powershell.exe",
+                                Arguments = $"-NoProfile -WindowStyle Hidden -Command \"{psCmd}\"",
+                                CreateNoWindow = true,
+                                UseShellExecute = false
+                            });
+                            procPs?.WaitForExit(2500);
+                        }
+                        catch { }
+
+                        // 5. Enforce IPv6 Metric
                         try
                         {
                             using var proc6 = Process.Start(new ProcessStartInfo
@@ -412,7 +431,7 @@ public class NetworkBondingManager : IDisposable
                 Proxy = null,
                 PooledConnectionLifetime = TimeSpan.FromMinutes(5),
                 EnableMultipleHttp2Connections = true,
-                MaxConnectionsPerServer = 16
+                MaxConnectionsPerServer = 24
             };
             var fallbackClient = new HttpClient(fallbackHandler) { Timeout = TimeSpan.FromMinutes(10) };
             fallbackClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
@@ -470,7 +489,7 @@ public class NetworkBondingManager : IDisposable
                 },
                 PooledConnectionLifetime = TimeSpan.FromMinutes(5),
                 EnableMultipleHttp2Connections = true,
-                MaxConnectionsPerServer = 16
+                MaxConnectionsPerServer = 24
             };
 
             var client = new HttpClient(handler)

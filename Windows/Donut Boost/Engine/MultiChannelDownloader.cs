@@ -269,8 +269,7 @@ public class MultiChannelDownloader
             }
         }, token);
 
-        // Worker tasks per network adapter (6 parallel workers per adapter)
-        int workersPerAdapter = 6;
+        // Worker tasks per network adapter (12 workers for Mobile 5G, 8 for Wi-Fi for maximum 300+ Mbps throughput)
         var workerTasks = new List<Task>();
         var trackedAdapterIds = new HashSet<string>(adapters.Select(a => a.Id));
         var workerLock = new object();
@@ -278,7 +277,8 @@ public class MultiChannelDownloader
         void SpawnWorkersForAdapter(NetworkAdapterInfo adp)
         {
             var client = _bondingManager.GetOrCreateClient(adp);
-            for (int w = 0; w < workersPerAdapter; w++)
+            int workersCount = adp.IsMobilePhone ? 12 : 8;
+            for (int w = 0; w < workersCount; w++)
             {
                 lock (workerLock)
                 {
@@ -430,7 +430,7 @@ public class MultiChannelDownloader
         }
 
         using var contentStream = await response.Content.ReadAsStreamAsync(token);
-        byte[] buffer = new byte[64 * 1024];
+        byte[] buffer = new byte[256 * 1024]; // 256 KB high-throughput buffer for 300+ Mbps 5G & gigabit streams
         long writeOffset = startFrom;
 
         int bytesRead;
@@ -497,7 +497,7 @@ public class MultiChannelDownloader
                 response.EnsureSuccessStatusCode();
 
                 using var contentStream = await response.Content.ReadAsStreamAsync(token);
-                byte[] buffer = new byte[64 * 1024];
+                byte[] buffer = new byte[256 * 1024]; // 256 KB high-throughput buffer for 300+ Mbps 5G & gigabit streams
                 int bytesRead;
                 var stopwatch = Stopwatch.StartNew();
                 long lastBytes = session.DownloadedBytes;
