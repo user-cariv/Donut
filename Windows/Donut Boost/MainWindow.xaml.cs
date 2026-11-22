@@ -15,6 +15,8 @@ public partial class MainWindow : Window
     private readonly GameBoostProxyServer _gameBoostProxy;
     private readonly LicenseManager _licenseManager;
     private readonly System.Windows.Threading.DispatcherTimer _licenseTimer;
+    private UpdateManifest? _availableUpdate;
+    private System.Windows.Threading.DispatcherTimer? _autoUpdateTimer;
     private string _outputFolder;
 
     public MainWindow()
@@ -91,6 +93,23 @@ public partial class MainWindow : Window
                 GameBoostBadgeText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88));
             }
         }
+
+        // Automatic In-App Update Check:
+        // Runs quietly in background 2.5s after launch. If a new version was published,
+        // it notifies the user inside the app and allows 1-click update without opening browser!
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(2500);
+            await CheckForAppUpdatesAsync(silent: true);
+        });
+
+        // Periodic background update check every 4 hours while running
+        _autoUpdateTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromHours(4)
+        };
+        _autoUpdateTimer.Tick += async (_, _) => await CheckForAppUpdatesAsync(silent: true);
+        _autoUpdateTimer.Start();
     }
 
     private void UpdateLicenseUI()
@@ -905,8 +924,113 @@ public partial class MainWindow : Window
         });
     }
 
+    private async Task CheckForAppUpdatesAsync(bool silent)
+    {
+        try
+        {
+            var (hasUpdate, manifest) = await UpdateManager.CheckForUpdatesAsync();
+            Dispatcher.Invoke(() =>
+            {
+                if (hasUpdate && manifest != null)
+                {
+                    _availableUpdate = manifest;
+                    AppUpdateBanner.Visibility = Visibility.Visible;
+                    TitleBarUpdateBadge.Visibility = Visibility.Visible;
+                    UpdateVersionTag.Text = $"v{manifest.LatestVersion}";
+                    UpdateReleaseNotesText.Text = string.IsNullOrWhiteSpace(manifest.ReleaseNotes)
+                        ? "New update available with faster bonding and performance improvements."
+                        : manifest.ReleaseNotes;
+                    FooterUpdateCheckText.Text = $"🚀 v{manifest.LatestVersion} Available";
+                    FooterUpdateCheckText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(168, 85, 247));
+                    OnLogReceived($"🚀 [UPDATE] Donut Boost v{manifest.LatestVersion} is available! Click 'Update Now' in the banner to update.");
+                }
+                else if (!silent)
+                {
+                    FooterUpdateCheckText.Text = $"✓ Latest (v{UpdateManager.CurrentVersion})";
+                    FooterUpdateCheckText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88));
+                    OnLogReceived($"✓ You are running the latest version of Donut Boost (v{UpdateManager.CurrentVersion}).");
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            if (!silent)
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    FooterUpdateCheckText.Text = "Check for Updates";
+                    OnLogReceived($"✕ Could not check for updates: {ex.Message}");
+                });
+            }
+        }
+    }
+
+    private async void UpdateNowButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_availableUpdate == null) return;
+
+        UpdateNowButton.IsEnabled = false;
+        UpdateProgressPanel.Visibility = Visibility.Visible;
+        UpdateNowButtonText.Text = "Updating...";
+        OnLogReceived($"⬇ [UPDATE] Downloading update v{_availableUpdate.LatestVersion} directly inside app...");
+
+        try
+        {
+            bool success = await UpdateManager.DownloadAndInstallUpdateAsync(
+                _availableUpdate,
+                (percent, readBytes, totalBytes) =>
+                {
+                    Dispatcher.BeginInvoke(() =>
+                    {
+                        UpdateProgressBar.Value = percent;
+                        UpdateProgressPercentText.Text = totalBytes > 0
+                            ? $"Downloading update... {percent}% ({DownloadSession.FormatBytes(readBytes)} / {DownloadSession.FormatBytes(totalBytes)})"
+                            : $"Downloading update... {DownloadSession.FormatBytes(readBytes)}";
+                    });
+                });
+
+            if (!success)
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    UpdateNowButton.IsEnabled = true;
+                    UpdateNowButtonText.Text = "Try Again";
+                    UpdateProgressPercentText.Text = "✕ Download failed. Click 'Try Again' or download from website.";
+                    OnLogReceived("✕ In-app update failed to download. Please download from the website.");
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                UpdateNowButton.IsEnabled = true;
+                UpdateNowButtonText.Text = "Try Again";
+                UpdateProgressPercentText.Text = $"✕ Error: {ex.Message}";
+                OnLogReceived($"✕ Update error: {ex.Message}");
+            });
+        }
+    }
+
+    private void DismissUpdateBanner_Click(object sender, RoutedEventArgs e)
+    {
+        AppUpdateBanner.Visibility = Visibility.Collapsed;
+    }
+
+    private void TitleBarUpdateBadge_Click(object sender, RoutedEventArgs e)
+    {
+        AppUpdateBanner.Visibility = Visibility.Visible;
+    }
+
+    private async void CheckForUpdatesButton_Click(object sender, RoutedEventArgs e)
+    {
+        FooterUpdateCheckText.Text = "Checking...";
+        await CheckForAppUpdatesAsync(silent: false);
+    }
+
     protected override void OnClosed(EventArgs e)
     {
+        _autoUpdateTimer?.Stop();
         _licenseTimer?.Stop();
         WindowsProxyManager.DisableProxy();
         _gameBoostProxy.Dispose();

@@ -93,6 +93,16 @@
                             </ControlTemplate>
                         </Button.Template>
                     </Button>
+
+                    <!-- In-App Update Ready Badge (Top bar alert) -->
+                    <Button x:Name="TitleBarUpdateBadge" Click="TitleBarUpdateBadge_Click" Visibility="Collapsed" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" Margin="8,0,0,0" ToolTip="New update is ready! Click to view update details">
+                        <Border Background="#2E1065" BorderBrush="#A855F7" BorderThickness="1" CornerRadius="8" Padding="7,2">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🚀 " FontSize="10"/>
+                                <TextBlock x:Name="TitleBarUpdateBadgeText" Text="UPDATE READY" FontSize="10" FontWeight="Bold" Foreground="#DDD6FE"/>
+                            </StackPanel>
+                        </Border>
+                    </Button>
                 </StackPanel>
 
                 <!-- Center: Live Sticky Status Capsule (Always visible when scrolling) -->
@@ -134,13 +144,64 @@
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
             <Grid Margin="18,12,18,12">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/> <!-- 0. Download Control Center -->
-                    <RowDefinition Height="Auto"/> <!-- 1. Game Launcher Accelerator -->
-                    <RowDefinition Height="*"/>    <!-- 2. Main Dashboard (Speedometer + Connected Networks) -->
+                    <RowDefinition Height="Auto"/> <!-- 0. In-App Auto-Update Banner -->
+                    <RowDefinition Height="Auto"/> <!-- 1. Download Control Center -->
+                    <RowDefinition Height="Auto"/> <!-- 2. Game Launcher Accelerator -->
+                    <RowDefinition Height="*"/>    <!-- 3. Main Dashboard (Speedometer + Connected Networks) -->
                 </Grid.RowDefinitions>
 
+                <!-- 0. In-App Auto-Update Notification Banner (Appears when new version is available) -->
+                <Border x:Name="AppUpdateBanner" Grid.Row="0" Visibility="Collapsed" Background="#1E192B" BorderBrush="#8B5CF6" BorderThickness="1.5" CornerRadius="12" Margin="0,0,0,12" Padding="16,12">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Left Icon -->
+                        <Border Grid.Column="0" Background="#2E1065" CornerRadius="10" Width="38" Height="38" Margin="0,0,14,0" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="🚀" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+
+                        <!-- Center: Update Info & Progress -->
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,3">
+                                <TextBlock x:Name="UpdateBannerTitle" Text="New Donut Boost Update Available" FontSize="13" FontWeight="Bold" Foreground="#EDE9FE"/>
+                                <Border Background="#4C1D95" CornerRadius="6" Padding="6,1.5" Margin="8,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock x:Name="UpdateVersionTag" Text="v1.0.1" FontSize="10" FontWeight="Bold" Foreground="#DDD6FE"/>
+                                </Border>
+                            </StackPanel>
+                            <TextBlock x:Name="UpdateReleaseNotesText" Text="Performance bonding improvements and automatic game launcher size detection." FontSize="11" Foreground="#C4B5FD" TextWrapping="Wrap"/>
+                            
+                            <!-- Download Progress Strip -->
+                            <Grid x:Name="UpdateProgressPanel" Visibility="Collapsed" Margin="0,8,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <ProgressBar x:Name="UpdateProgressBar" Height="6" Value="0" Maximum="100" Background="#2E1065" Foreground="#A855F7" BorderThickness="0"/>
+                                <TextBlock x:Name="UpdateProgressPercentText" Grid.Row="1" Text="Downloading update... 0%" FontSize="10" Foreground="#DDD6FE" Margin="0,4,0,0"/>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- Right: Actions -->
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0">
+                            <Button x:Name="UpdateNowButton" Click="UpdateNowButton_Click" Style="{StaticResource PrimaryButtonStyle}" Padding="14,6" Margin="0,0,8,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="⬇" Margin="0,0,6,0" FontWeight="Bold"/>
+                                    <TextBlock x:Name="UpdateNowButtonText" Text="Update Now" FontWeight="Bold"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Click="DismissUpdateBanner_Click" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="6" ToolTip="Dismiss for now">
+                                <TextBlock Text="✕" FontSize="13" Foreground="#8B5CF6"/>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
                 <!-- 1. Apple Download Control Center Card (Crisp Hairline Border, Zero Blur) -->
-                <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="16" Padding="14,12" Margin="0,0,0,10">
+                <Border Grid.Row="1" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="16" Padding="14,12" Margin="0,0,0,10">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/> <!-- Row 0: URL Input -->
@@ -274,7 +335,7 @@
                 </Border>
 
                 <!-- 2. Apple Game Launcher Accelerator Card (Game Mode) -->
-                <Border Grid.Row="1" Background="#181820" BorderBrush="#2C283E" BorderThickness="1" CornerRadius="16" Padding="14,10" Margin="0,0,0,10">
+                <Border Grid.Row="2" Background="#181820" BorderBrush="#2C283E" BorderThickness="1" CornerRadius="16" Padding="14,10" Margin="0,0,0,10">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -370,7 +431,7 @@
                 </Border>
 
                 <!-- 3. Main Dashboard (2 Columns) -->
-                <Grid Grid.Row="2">
+                <Grid Grid.Row="3">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="1.15*"/> <!-- Left: Speedometer & Active Task -->
                         <ColumnDefinition Width="*"/>     <!-- Right: Connected Networks -->
@@ -557,6 +618,10 @@
                     <TextBlock Text="•" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,12,0"/>
                     <Button Click="OpenWebsiteButton_Click" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="0" ToolTip="Visit https://user-cariv.github.io/Donut/">
                         <TextBlock Text="WEBSITE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" TextDecorations="Underline"/>
+                    </Button>
+                    <TextBlock Text="•" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="12,0,12,0"/>
+                    <Button Click="CheckForUpdatesButton_Click" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="0" ToolTip="Check for app updates">
+                        <TextBlock x:Name="FooterUpdateCheckText" Text="Check for Updates" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" TextDecorations="Underline"/>
                     </Button>
                 </StackPanel>
 
