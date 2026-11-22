@@ -1,7 +1,6 @@
 <Application x:Class="DonutBoost.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             StartupUri="MainWindow.xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Application.Resources>
         <!-- Apple macOS Dark Mode Color Palette -->
         <Color x:Key="BgColor">#141416</Color>
@@ -98,6 +97,9 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Compatibility key used by early 1.0.x window markup. -->
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource BoostButtonStyle}"/>
 
         <!-- Apple Secondary / Glass Button -->
         <Style x:Key="SecondaryButtonStyle" TargetType="Button">

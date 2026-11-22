@@ -25,6 +25,21 @@ public partial class App : Application
 
         base.OnStartup(e);
 
+        try
+        {
+            var mainWindow = new MainWindow();
+            MainWindow = mainWindow;
+            mainWindow.Show();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Donut Boost could not finish opening. Please install the latest version from the Donut website.\n\nDetails: {ex.Message}",
+                "Donut Boost startup error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            Shutdown(-1);
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)

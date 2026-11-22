@@ -1,8 +1,8 @@
 {
-  "latestVersion": "1.0.5",
+  "latestVersion": "1.0.6",
   "minRequiredVersion": "1.0.0",
   "releaseDate": "2026-11-22",
-  "releaseNotes": "Shows measured adapter receive rates, removes guessed launcher sizes, preserves Windows network routing, and improves download range validation and startup reliability.",
+  "releaseNotes": "Fixes a startup resource error, reports real adapter receive rates, keeps Windows network routing unchanged, and improves in-app update verification.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }

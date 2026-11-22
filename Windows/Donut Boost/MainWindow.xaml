@@ -169,7 +169,7 @@
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,3">
                                 <TextBlock x:Name="UpdateBannerTitle" Text="New Donut Boost Update Available" FontSize="13" FontWeight="Bold" Foreground="#EDE9FE"/>
                                 <Border Background="#4C1D95" CornerRadius="6" Padding="6,1.5" Margin="8,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock x:Name="UpdateVersionTag" Text="v1.0.5" FontSize="10" FontWeight="Bold" Foreground="#DDD6FE"/>
+                                    <TextBlock x:Name="UpdateVersionTag" Text="v1.0.6" FontSize="10" FontWeight="Bold" Foreground="#DDD6FE"/>
                                 </Border>
                             </StackPanel>
                             <TextBlock x:Name="UpdateReleaseNotesText" Text="Measured adapter rates, more reliable downloads, and verified Steam progress." FontSize="11" Foreground="#C4B5FD" TextWrapping="Wrap"/>
