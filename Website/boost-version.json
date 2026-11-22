@@ -1,8 +1,8 @@
 {
-  "latestVersion": "1.0.2",
+  "latestVersion": "1.0.3",
   "minRequiredVersion": "1.0.0",
   "releaseDate": "2026-11-22",
-  "releaseNotes": "Fixes a startup crash in the update banner and includes the latest Donut Boost launch fixes.",
+  "releaseNotes": "Fixes startup when a previous windowless Donut Boost process is still running, and fixes the update banner style.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://raw.githubusercontent.com/user-cariv/Donut/main/Website/Install%20Donut%20Boost.exe"
 }

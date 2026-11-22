@@ -1,5 +1,5 @@
 #define MyAppName "Donut Boost"
-#define MyAppVersion "1.0.2"
+#define MyAppVersion "1.0.3"
 #define MyAppPublisher "Donut"
 #define MyAppURL "https://user-cariv.github.io/Donut/boost.html"
 #define MyAppExeName "DonutBoost.exe"
