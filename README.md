@@ -1,13 +1,13 @@
 <div align="center">
 
-<img src="assets/hero.svg" width="100%" alt="Donut. Small apps. Big relief." />
+<a href="https://user-cariv.github.io/Donut/"><img src="assets/hero.svg" width="100%" alt="Donut. Small apps. Big relief." /></a>
 
 <br/>
 
 <a href="https://user-cariv.github.io/Donut/"><b>Website</b></a> &nbsp;·&nbsp;
-<a href="#-the-lineup"><b>Apps</b></a> &nbsp;·&nbsp;
-<a href="#-compare"><b>Compare</b></a> &nbsp;·&nbsp;
-<a href="#-tech-specs"><b>Tech Specs</b></a> &nbsp;·&nbsp;
+<a href="#the-lineup"><b>Apps</b></a> &nbsp;·&nbsp;
+<a href="#compare"><b>Compare</b></a> &nbsp;·&nbsp;
+<a href="#tech-specs"><b>Tech Specs</b></a> &nbsp;·&nbsp;
 <a href="https://user-cariv.github.io/Donut/#support"><b>Support</b></a> &nbsp;·&nbsp;
 <a href="https://www.youtube.com/@Meet_Donut"><b>YouTube</b></a>
 
@@ -42,7 +42,7 @@
 
 <div align="center">
 
-## 🍩 The Lineup
+## The Lineup
 
 <sub>Pick a Donut app and make your everyday workflow a little lighter.</sub>
 
@@ -64,7 +64,7 @@
 
 <div align="center">
 
-## ⚖️ Compare
+## Compare
 
 <sub>Find the Donut that fits your day.</sub>
 
@@ -166,7 +166,7 @@
 
 <div align="center">
 
-## 🔬 Tech Specs
+## Tech Specs
 
 <sub>Under the hood.</sub>
 
@@ -191,7 +191,16 @@
 
 ```text
 Donut/
+├── Donut Island/             # Donut Island
+├── Mac OS/Donut/             # macOS app
+├── Windows/                  # Windows apps
+├── android/                  # Android
+├── Website/                  # Donut website
+├── src/  public/  scripts/   # Shared source, assets, tooling
 ├── supabase/                 # Support ticket backend
+├── signpath/                 # Code signing setup
+├── .github/workflows/        # CI/CD
+├── assets/                   # README artwork
 ├── .env.example              # Environment template
 ├── CODE_SIGNING_POLICY.md    # How releases are signed
 ├── THIRD-PARTY-NOTICES.md    # Open-source attributions
@@ -209,8 +218,9 @@ Donut/
 git clone https://github.com/user-cariv/Donut.git
 cd Donut
 cp .env.example .env
-npm install
 ```
+
+Each app lives in its own folder. Open the one you want for its build steps.
 
 </details>
 
