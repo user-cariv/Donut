@@ -1,8 +1,8 @@
 {
-  "latestVersion": "1.0.6",
+  "latestVersion": "1.0.8",
   "minRequiredVersion": "1.0.0",
-  "releaseDate": "2026-11-22",
-  "releaseNotes": "Fixes a startup resource error, reports real adapter receive rates, keeps Windows network routing unchanged, and improves in-app update verification.",
+  "releaseDate": "2026-11-23",
+  "releaseNotes": "Adds a reversible Wi-Fi priority control for Windows, improves USB adapter monitoring, and shows verified Steam download progress.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }

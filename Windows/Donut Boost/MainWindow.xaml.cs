@@ -32,6 +32,8 @@ public partial class MainWindow : Window
 
         _outputFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "DonutBoost");
         OutputFolderTextBlock.Text = _outputFolder;
+        if (WifiRoutePreferenceManager.HasSavedMetrics)
+            WifiRoutePreferenceText.Text = "Restore route settings";
 
         _licenseManager = new LicenseManager();
         _bondingManager = new NetworkBondingManager();
@@ -738,6 +740,43 @@ public partial class MainWindow : Window
         _bondingManager.RefreshAdapters();
     }
 
+    private async void PreferWifiRouteButton_Click(object sender, RoutedEventArgs e)
+    {
+        var wifi = _bondingManager.Adapters.FirstOrDefault(a => a.IsOnline && a.IsWifi && a.InterfaceIndex > 0);
+        var mobileIndexes = _bondingManager.Adapters.Where(a => a.IsOnline && a.IsMobilePhone && a.InterfaceIndex > 0)
+            .Select(a => a.InterfaceIndex).Distinct().ToArray();
+        if (wifi == null || mobileIndexes.Length == 0)
+        {
+            MessageBox.Show("Connect home Wi-Fi and a phone tether first, then rescan connections.", "Prefer Home Wi-Fi", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        bool restore = WifiRoutePreferenceManager.HasSavedMetrics;
+        string action = restore ? "restore the Windows network metrics saved before this change" : "make Windows prefer Wi-Fi over phone tethering until you restore the setting or restart Windows";
+        if (MessageBox.Show($"Donut will {action}. Windows will ask for administrator approval. Game launchers will continue to use Windows networking. Continue?", "Windows Network Preference", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+
+        WifiRoutePreferenceButton.IsEnabled = false;
+        try
+        {
+            if (!await WifiRoutePreferenceManager.RunAsync(restore, wifi.InterfaceIndex, mobileIndexes))
+                throw new InvalidOperationException("Windows did not apply the requested interface metrics.");
+            WifiRoutePreferenceText.Text = restore ? "Prefer Wi-Fi" : "Restore route settings";
+            OnLogReceived(restore
+                ? "Restored the Windows interface metrics saved before the Wi-Fi preference was applied."
+                : $"Windows now prefers Wi-Fi (interface {wifi.InterfaceIndex}) over phone tethering for the normal system route. Donut direct downloads can still use selected adapters.");
+        }
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            OnLogReceived("Windows network preference was not changed because administrator approval was cancelled.");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not change Windows network preference: {ex.Message}", "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally { WifiRoutePreferenceButton.IsEnabled = true; }
+    }
+
     private void AdapterCheckBox_Changed(object sender, RoutedEventArgs e)
     {
         UpdateAdaptersUI();
@@ -814,6 +853,15 @@ public partial class MainWindow : Window
             string speedText = mbps >= 1000 ? $"{(mbps / 1000):F2} Gbps" : $"{mbps:F1} Mbps";
             CombinedSpeedTextBlock.Text = speedText;
             FooterLiveSpeedText.Text = speedText;
+
+            // Show per-adapter speed breakdown in footer
+            var adapters = _bondingManager.Adapters;
+            var parts = adapters
+                .Where(a => a.IsOnline && a.CurrentSpeedBps > 0)
+                .Select(a => $"{a.IconGlyph}{(a.CurrentSpeedBps * 8 / 1_000_000.0):F1}")
+                .ToList();
+            if (parts.Count > 1)
+                FooterProgressText.Text = $"{string.Join(" + ", parts)} = {speedText}";
         });
     }
 
@@ -825,6 +873,16 @@ public partial class MainWindow : Window
             string speedText = mbps >= 1000 ? $"{(mbps / 1000):F2} Gbps" : $"{mbps:F1} Mbps";
             CombinedSpeedTextBlock.Text = speedText;
             FooterLiveSpeedText.Text = speedText;
+
+            // Build per-adapter speed breakdown string (📶300.0 + 📱500.0 = 800.0 Mbps)
+            var adapters = _bondingManager.Adapters;
+            var parts = adapters
+                .Where(a => a.IsOnline && a.CurrentSpeedBps > 0)
+                .Select(a => $"{a.IconGlyph}{(a.CurrentSpeedBps * 8 / 1_000_000.0):F1}")
+                .ToList();
+            string breakdownText = parts.Count > 1
+                ? $" ({string.Join(" + ", parts)})"
+                : "";
 
             if (hasLauncherActivity)
                 GameBoostStreamsText.Text = $"• Monitoring {lastHost} activity";
@@ -908,8 +966,8 @@ public partial class MainWindow : Window
                     ? $"{lastHost} · {percent:F1}% · ETA {eta}"
                     : $"{lastHost} · adapter traffic {speedText} · progress unavailable";
                 FooterProgressText.Text = canShowProgress
-                    ? $"{lastHost} · {DownloadSession.FormatBytes(gameBytes)} / {DownloadSession.FormatBytes(gameSizeBytes)} · ETA {eta}"
-                    : $"{lastHost} · game progress/ETA not exposed; combined adapter receive rate {speedText}";
+                    ? $"{lastHost} · {DownloadSession.FormatBytes(gameBytes)} / {DownloadSession.FormatBytes(gameSizeBytes)} · ETA {eta}{breakdownText}"
+                    : $"{lastHost} · game progress/ETA not exposed; combined adapter receive rate {speedText}{breakdownText}";
             }
             else
             {
@@ -927,13 +985,13 @@ public partial class MainWindow : Window
                 {
                     StatusBadgeTextBlock.Text = "READY";
                     FileNameTextBlock.Text = $"Launcher detected: {lastHost}";
-                    FooterProgressText.Text = $"{lastHost} is idle · combined adapter receive rate {speedText}";
+                    FooterProgressText.Text = $"{lastHost} is idle · combined receive rate {speedText}{breakdownText}";
                 }
                 else
                 {
                     StatusBadgeTextBlock.Text = "NETWORK MONITORING";
                     FileNameTextBlock.Text = "No active launcher download detected";
-                    FooterProgressText.Text = $"Combined adapter receive rate {speedText}";
+                    FooterProgressText.Text = $"Combined receive rate {speedText}{breakdownText}";
                 }
             }
         });

@@ -20,6 +20,10 @@ public class NetworkBondingManager : IDisposable
     private readonly NetworkAddressChangedEventHandler _addressChangedHandler;
     private readonly NetworkAvailabilityChangedEventHandler _availabilityChangedHandler;
 
+    // Debounce rapid-fire NetworkChange events during USB plug/unplug
+    private long _lastRefreshRequestTick;
+    private int _refreshInFlight;
+
     public BondingMode CurrentMode { get; set; } = BondingMode.CombineAll;
 
     public IReadOnlyList<NetworkAdapterInfo> Adapters
@@ -38,29 +42,61 @@ public class NetworkBondingManager : IDisposable
 
     public NetworkBondingManager()
     {
-        _addressChangedHandler = (_, _) => SafeRefreshAdapters();
-        _availabilityChangedHandler = (_, _) => SafeRefreshAdapters();
+        _addressChangedHandler = (_, _) => DebouncedRefreshAdapters();
+        _availabilityChangedHandler = (_, _) => DebouncedRefreshAdapters();
         NetworkChange.NetworkAddressChanged += _addressChangedHandler;
         NetworkChange.NetworkAvailabilityChanged += _availabilityChangedHandler;
         RefreshAdapters();
 
-        // Automatically poll every 2 seconds to immediately detect phones when plugged in or tethered
-        _pollTimer = new Timer(_ => SafeRefreshAdapters(), null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+        // Poll every 3 seconds (was 2s — reduced frequency to avoid WMI contention during USB changes)
+        _pollTimer = new Timer(_ => DebouncedRefreshAdapters(), null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3));
         _speedTimer = new Timer(_ => RefreshAdapterRates(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(500));
-
     }
 
-    private void SafeRefreshAdapters()
+    /// <summary>
+    /// Coalesces multiple rapid refresh requests (e.g. during USB plug/unplug)
+    /// into a single background refresh, preventing UI thread stalls.
+    /// </summary>
+    private void DebouncedRefreshAdapters()
     {
-        try { RefreshAdapters(); }
-        catch { /* Network metadata may disappear while USB tethering changes. */ }
+        long now = Environment.TickCount64;
+        long last = Interlocked.Read(ref _lastRefreshRequestTick);
+        // Skip if another refresh happened less than 800ms ago
+        if (now - last < 800) return;
+        Interlocked.Exchange(ref _lastRefreshRequestTick, now);
+
+        // Only allow one refresh in-flight at a time
+        if (Interlocked.CompareExchange(ref _refreshInFlight, 1, 0) != 0) return;
+        Task.Run(() =>
+        {
+            try { RefreshAdapters(); }
+            catch { /* Network metadata may disappear while USB tethering changes. */ }
+            finally { Interlocked.Exchange(ref _refreshInFlight, 0); }
+        });
     }
+
+    /// <summary>
+    /// Reads per-adapter NIC receive counters using a snapshot cached from
+    /// the last RefreshAdapters() call, avoiding a second heavy
+    /// GetAllNetworkInterfaces() call every 500ms.
+    /// </summary>
+    private NetworkInterface[]? _cachedNics;
+    private readonly object _nicCacheLock = new();
 
     private void RefreshAdapterRates()
     {
         try
         {
-            var nics = NetworkInterface.GetAllNetworkInterfaces()
+            // Use the NIC snapshot cached by RefreshAdapters() so this 500ms
+            // timer never calls the expensive GetAllNetworkInterfaces().
+            // If no cache exists yet, build one (first call before any refresh).
+            NetworkInterface[] nics;
+            lock (_nicCacheLock)
+            {
+                nics = _cachedNics ?? NetworkInterface.GetAllNetworkInterfaces();
+            }
+
+            var nicDict = nics
                 .Where(n => n.OperationalStatus == OperationalStatus.Up &&
                             n.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
                             n.NetworkInterfaceType != NetworkInterfaceType.Tunnel &&
@@ -74,7 +110,7 @@ public class NetworkBondingManager : IDisposable
                 foreach (var adapter in Adapters)
                 {
                     double rate = 0;
-                    if (adapter.IsOnline && nics.TryGetValue(adapter.Id, out var nic))
+                    if (adapter.IsOnline && nicDict.TryGetValue(adapter.Id, out var nic))
                     {
                         try
                         {
@@ -132,10 +168,29 @@ public class NetworkBondingManager : IDisposable
 
     public void RefreshAdapters()
     {
+        // Run the expensive WMI call OUTSIDE the lock so the UI thread
+        // is never blocked waiting for _lock while GetAllNetworkInterfaces()
+        // stalls during USB plug/unplug events.
+        NetworkInterface[] allInterfaces;
+        try
+        {
+            allInterfaces = NetworkInterface.GetAllNetworkInterfaces();
+        }
+        catch (NetworkInformationException)
+        {
+            return; // transient — adapter is mid-plug; next poll will catch it
+        }
+
+        // Cache the NIC array so RefreshAdapterRates (500ms timer) never
+        // has to call GetAllNetworkInterfaces() independently.
+        lock (_nicCacheLock)
+        {
+            _cachedNics = allInterfaces;
+        }
+
         lock (_lock)
         {
             var detected = new List<NetworkAdapterInfo>();
-            var allInterfaces = NetworkInterface.GetAllNetworkInterfaces();
 
             foreach (var nic in allInterfaces)
             {

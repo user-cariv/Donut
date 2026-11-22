@@ -120,6 +120,12 @@
 
                 <!-- Right: Utility & Windows Window Controls -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Button x:Name="WifiRoutePreferenceButton" Click="PreferWifiRouteButton_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="12,5" Margin="0,0,8,0" ToolTip="Set Windows to prefer home Wi-Fi over phone tethering until reboot or restore. Requires administrator approval.">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📶" FontSize="11" Margin="0,0,6,0"/>
+                            <TextBlock x:Name="WifiRoutePreferenceText" Text="Prefer Wi-Fi" FontSize="11" FontWeight="Medium"/>
+                        </StackPanel>
+                    </Button>
                     <Button Click="RefreshAdaptersButton_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="12,5" Margin="0,0,12,0" ToolTip="Refresh network adapters and connected phones">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔄" FontSize="11" Margin="0,0,6,0"/>
@@ -169,10 +175,10 @@
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,3">
                                 <TextBlock x:Name="UpdateBannerTitle" Text="New Donut Boost Update Available" FontSize="13" FontWeight="Bold" Foreground="#EDE9FE"/>
                                 <Border Background="#4C1D95" CornerRadius="6" Padding="6,1.5" Margin="8,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock x:Name="UpdateVersionTag" Text="v1.0.6" FontSize="10" FontWeight="Bold" Foreground="#DDD6FE"/>
+                                    <TextBlock x:Name="UpdateVersionTag" Text="v1.0.8" FontSize="10" FontWeight="Bold" Foreground="#DDD6FE"/>
                                 </Border>
                             </StackPanel>
-                            <TextBlock x:Name="UpdateReleaseNotesText" Text="Measured adapter rates, more reliable downloads, and verified Steam progress." FontSize="11" Foreground="#C4B5FD" TextWrapping="Wrap"/>
+                            <TextBlock x:Name="UpdateReleaseNotesText" Text="Keep Windows on home Wi-Fi, improve adapter monitoring, and show verified Steam download progress." FontSize="11" Foreground="#C4B5FD" TextWrapping="Wrap"/>
                             
                             <!-- Download Progress Strip -->
                             <Grid x:Name="UpdateProgressPanel" Visibility="Collapsed" Margin="0,8,0,0">
