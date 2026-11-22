@@ -117,6 +117,20 @@ public class NetworkBondingManager : IDisposable
                 var gateway = ipProps.GatewayAddresses
                     .FirstOrDefault(g => g.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.Any.Equals(g.Address))?.Address;
 
+                bool isPhone = nic.Description.Contains("Apple", StringComparison.OrdinalIgnoreCase) ||
+                               nic.Description.Contains("NDIS", StringComparison.OrdinalIgnoreCase) ||
+                               nic.Description.Contains("RNDIS", StringComparison.OrdinalIgnoreCase) ||
+                               nic.Description.Contains("USB", StringComparison.OrdinalIgnoreCase) ||
+                               nic.Name.Contains("Cellular", StringComparison.OrdinalIgnoreCase) ||
+                               nic.Name.Contains("Mobile", StringComparison.OrdinalIgnoreCase);
+
+                if (gateway == null && ipv4 != null && isPhone)
+                {
+                    var b = ipv4.Address.GetAddressBytes();
+                    b[3] = 1; // Apple & Android hotspot gateway default is .1
+                    gateway = new IPAddress(b);
+                }
+
                 int ifIndex = 0;
                 try
                 {
@@ -140,7 +154,7 @@ public class NetworkBondingManager : IDisposable
                     existing.Description = nic.Description;
                     existing.InterfaceIndex = ifIndex;
                     existing.InterfaceType = nic.NetworkInterfaceType;
-                    existing.LocalIp = ipv4.Address;
+                    existing.LocalIp = ipv4?.Address;
                     existing.GatewayIp = gateway;
                     existing.SpeedBitsPerSecond = nic.Speed;
                     existing.IsOnline = true;
@@ -156,7 +170,7 @@ public class NetworkBondingManager : IDisposable
                         Description = nic.Description,
                         InterfaceIndex = ifIndex,
                         InterfaceType = nic.NetworkInterfaceType,
-                        LocalIp = ipv4.Address,
+                        LocalIp = ipv4?.Address,
                         GatewayIp = gateway,
                         SpeedBitsPerSecond = nic.Speed,
                         IsEnabled = true,
@@ -190,6 +204,9 @@ public class NetworkBondingManager : IDisposable
                 }
             }
 
+            bool hasStructuralChange = detected.Count != _adapters.Count ||
+                detected.Any(d => !_adapters.Any(a => a.Id == d.Id && a.IsOnline == d.IsOnline && Equals(a.LocalIp, d.LocalIp)));
+
             _adapters.Clear();
             _adapters.AddRange(detected);
 
@@ -201,9 +218,12 @@ public class NetworkBondingManager : IDisposable
             {
                 ApplyBondingModeMetrics(_adapters.Where(a => a.IsEnabled && a.IsOnline), CurrentMode);
             }
-        }
 
-        AdaptersChanged?.Invoke();
+            if (hasStructuralChange)
+            {
+                AdaptersChanged?.Invoke();
+            }
+        }
     }
 
     public static void SetIpv4Precedence(bool preferIpv4)
@@ -254,7 +274,23 @@ public class NetworkBondingManager : IDisposable
                             targetMetric = adp.IsMobilePhone ? 5 : 60;
                         }
 
-                        // 1. In-memory route table update (instantaneous 1ms via route.exe)
+                        // 1. Direct PowerShell native route & interface metric enforcement (authoritative Windows 10/11 TCP/IP)
+                        try
+                        {
+                            string psCmd = $"Set-NetIPInterface -InterfaceIndex {adp.InterfaceIndex} -InterfaceMetric {targetMetric} -WeakHostSend Enabled -WeakHostReceive Enabled -ErrorAction SilentlyContinue; " +
+                                            $"Get-NetRoute -DestinationPrefix '0.0.0.0/0' -InterfaceIndex {adp.InterfaceIndex} -ErrorAction SilentlyContinue | Set-NetRoute -RouteMetric {targetMetric} -ErrorAction SilentlyContinue";
+                            using var procPs = Process.Start(new ProcessStartInfo
+                            {
+                                FileName = "powershell.exe",
+                                Arguments = $"-NoProfile -WindowStyle Hidden -Command \"{psCmd}\"",
+                                CreateNoWindow = true,
+                                UseShellExecute = false
+                            });
+                            procPs?.WaitForExit(400);
+                        }
+                        catch { }
+
+                        // 2. In-memory route table update (instantaneous 1ms via route.exe)
                         if (adp.GatewayIp != null)
                         {
                             try
@@ -271,7 +307,7 @@ public class NetworkBondingManager : IDisposable
                             catch { }
                         }
 
-                        // 2. Direct Registry InterfaceMetric update for this adapter GUID (authoritative for Windows TCP stack)
+                        // 3. Direct Registry InterfaceMetric update for this adapter GUID (authoritative for Windows TCP stack)
                         try
                         {
                             using var key = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\{adp.Id}", true);

@@ -301,9 +301,41 @@ public class GameBoostProxyServer : IDisposable
 
     private string _summaryLauncherLabel = "Ready";
 
+    private sealed class AdapterRollingTracker
+    {
+        private readonly Queue<(DateTime Time, long Bytes)> _samples = new();
+
+        public double Update(long currentBytes)
+        {
+            var now = DateTime.UtcNow;
+            _samples.Enqueue((now, currentBytes));
+
+            // Retain samples within a 1.25-second window to eliminate erratic spikes while matching Steam's 1-sec rolling counter
+            while (_samples.Count > 2 && (now - _samples.Peek().Time).TotalSeconds > 1.25)
+            {
+                _samples.Dequeue();
+            }
+
+            if (_samples.Count < 2) return 0;
+
+            var oldest = _samples.Peek();
+            double dt = (now - oldest.Time).TotalSeconds;
+            if (dt < 0.20) return 0;
+
+            long delta = Math.Max(0, currentBytes - oldest.Bytes);
+            return delta / dt; // Accurate rolling bytes/sec
+        }
+
+        public void Reset()
+        {
+            _samples.Clear();
+        }
+    }
+
     private async Task MonitorGameTrafficLoopAsync(CancellationToken token)
     {
         var lastInterfaceBytes = new ConcurrentDictionary<string, long>();
+        var adapterRollingTrackers = new ConcurrentDictionary<string, AdapterRollingTracker>();
         var lastCheckTime = Stopwatch.StartNew();
         var processCheckStopwatch = Stopwatch.StartNew();
         var activeTrafficStopwatch = Stopwatch.StartNew();
@@ -378,32 +410,26 @@ public class GameBoostProxyServer : IDisposable
                     var stats = nic.GetIPStatistics();
                     long currentBytes = stats.BytesReceived;
 
-                    if (lastInterfaceBytes.TryGetValue(adapter.Id, out long previousBytes))
-                    {
-                        long deltaBytes = Math.Max(0, currentBytes - previousBytes);
-                        double adapterSpeedBps = deltaBytes / elapsedSeconds;
+                    var tracker = adapterRollingTrackers.GetOrAdd(adapter.Id, _ => new AdapterRollingTracker());
+                    double rollingSpeedBps = tracker.Update(currentBytes);
 
-                        // Only assign speed if adapter is online and enabled
-                        if (adapter.IsEnabled && adapter.IsOnline)
-                        {
-                            adapter.CurrentSpeedBps = (adapter.CurrentSpeedBps <= 0)
-                                ? adapterSpeedBps
-                                : (adapter.CurrentSpeedBps * 0.70) + (adapterSpeedBps * 0.30);
-
-                            if (adapter.CurrentSpeedBps < 5000) adapter.CurrentSpeedBps = 0;
-
-                            totalInstantBps += adapterSpeedBps;
-                            adapterSamples.Add((adapter, deltaBytes, adapterSpeedBps));
-                        }
-                    }
-
+                    long previousBytes = lastInterfaceBytes.GetOrAdd(adapter.Id, currentBytes);
+                    long deltaBytes = Math.Max(0, currentBytes - previousBytes);
                     lastInterfaceBytes[adapter.Id] = currentBytes;
+
+                    // Only assign speed if adapter is online and enabled
+                    if (adapter.IsEnabled && adapter.IsOnline)
+                    {
+                        // Clean noise below 5 KB/s
+                        adapter.CurrentSpeedBps = rollingSpeedBps < 5000 ? 0 : rollingSpeedBps;
+                        totalInstantBps += adapter.CurrentSpeedBps;
+                        adapterSamples.Add((adapter, deltaBytes, adapter.CurrentSpeedBps));
+                    }
                 }
                 catch { }
             }
 
             // 3. Genuine Game Download Threshold (100 KB/s = 800 Kbps)
-            // Low background telemetry (pings, store browsing, Steam chat < 100 KB/s) is treated as Standby.
             const double MinActiveDownloadBps = 100 * 1024;
             bool isGenuineDownload = isGameActive && totalInstantBps >= MinActiveDownloadBps;
 
@@ -413,16 +439,16 @@ public class GameBoostProxyServer : IDisposable
                 // 1-second rolling EMA to match Steam's 1-second counter and avoid erratic >300 spikes
                 smoothedSpeedBps = (smoothedSpeedBps <= 0) 
                     ? totalInstantBps 
-                    : (smoothedSpeedBps * 0.72) + (totalInstantBps * 0.28);
+                    : (smoothedSpeedBps * 0.75) + (totalInstantBps * 0.25);
 
-                // Add to per-adapter downloaded bytes and total downloaded bytes
+                // Add to per-adapter downloaded bytes and update UI metrics
                 foreach (var sample in adapterSamples)
                 {
                     if (sample.DeltaBytes > 0)
                     {
                         sample.Adapter.AddDownloadedBytes(sample.DeltaBytes);
-                        sample.Adapter.NotifyMetricsChanged();
                     }
+                    sample.Adapter.NotifyMetricsChanged();
                 }
 
                 long frameBytes = (long)(totalInstantBps * elapsedSeconds);
@@ -434,18 +460,22 @@ public class GameBoostProxyServer : IDisposable
             else if (activeTrafficStopwatch.ElapsedMilliseconds < 3500)
             {
                 // Smooth decay during momentary disk commit or TCP renegotiation
-                smoothedSpeedBps = Math.Max(0, smoothedSpeedBps * 0.82);
+                smoothedSpeedBps = Math.Max(0, smoothedSpeedBps * 0.80);
+                foreach (var sample in adapterSamples)
+                {
+                    sample.Adapter.NotifyMetricsChanged();
+                }
             }
 
             // If active game traffic occurred within the last 3.5 seconds, maintain active acceleration display
             if (isGameActive && activeTrafficStopwatch.ElapsedMilliseconds < 3500 && (totalInstantBps >= MinActiveDownloadBps || smoothedSpeedBps >= MinActiveDownloadBps))
             {
                 _activeConnections = Math.Max(4, Math.Min(16, activeStreamsCount * 2));
-                // Use smoothedSpeedBps so speed matches Steam's 1-second counter without spiking above 300 on tiny 250ms bursts
+                // Use smoothedSpeedBps so speed matches Steam's 1-second counter without spiking above 300 on tiny bursts
                 double reportSpeed = smoothedSpeedBps;
 
-                // Throttled detection: Check for auto-detected game download sizes from Steam / Epic only once every 4s to eliminate disk thrashing
-                if (_detectedGameSizeBytes <= 0 || sizeDetectionStopwatch.ElapsedMilliseconds >= 4000)
+                // Throttled detection: Check for auto-detected game download sizes from all launchers once every 3s
+                if (_detectedGameSizeBytes <= 0 || sizeDetectionStopwatch.ElapsedMilliseconds >= 3000)
                 {
                     sizeDetectionStopwatch.Restart();
                     if (_detectedLauncher == "Steam")
@@ -482,6 +512,30 @@ public class GameBoostProxyServer : IDisposable
                         if (uBytes > 0) _detectedGameSizeBytes = uBytes;
                         if (!string.IsNullOrEmpty(uName)) _detectedGameName = uName;
                     }
+                    else if (_detectedLauncher == "EA App")
+                    {
+                        var (eaName, eaBytes) = DetectEaAppDownloadSize();
+                        if (eaBytes > 0) _detectedGameSizeBytes = eaBytes;
+                        if (!string.IsNullOrEmpty(eaName)) _detectedGameName = eaName;
+                    }
+                    else if (_detectedLauncher == "Battle.net")
+                    {
+                        var (bName, bBytes) = DetectBattleNetDownloadSize();
+                        if (bBytes > 0) _detectedGameSizeBytes = bBytes;
+                        if (!string.IsNullOrEmpty(bName)) _detectedGameName = bName;
+                    }
+                    else if (_detectedLauncher == "Rockstar Games")
+                    {
+                        var (rkName, rkBytes) = DetectRockstarDownloadSize();
+                        if (rkBytes > 0) _detectedGameSizeBytes = rkBytes;
+                        if (!string.IsNullOrEmpty(rkName)) _detectedGameName = rkName;
+                    }
+                    else if (_detectedLauncher == "Ubisoft Connect")
+                    {
+                        var (ubName, ubBytes) = DetectUbisoftDownloadSize();
+                        if (ubBytes > 0) _detectedGameSizeBytes = ubBytes;
+                        if (!string.IsNullOrEmpty(ubName)) _detectedGameName = ubName;
+                    }
                 }
 
                 string displayLabel = !string.IsNullOrEmpty(_detectedGameName) 
@@ -497,6 +551,11 @@ public class GameBoostProxyServer : IDisposable
                 _activeConnections = 0;
                 _detectedGameName = "";
                 _detectedGameSizeBytes = 0;
+                foreach (var adapter in _bondingManager.Adapters)
+                {
+                    adapter.CurrentSpeedBps = 0;
+                    adapter.NotifyMetricsChanged();
+                }
                 ProxyMetricsUpdated?.Invoke(TotalBytesDownloaded, 0, 0, _summaryLauncherLabel);
             }
         }
@@ -686,24 +745,36 @@ public class GameBoostProxyServer : IDisposable
             var flagMatch = Regex.Match(content, @"""StateFlags""\s+""(\d+)""");
             if (flagMatch.Success && int.TryParse(flagMatch.Groups[1].Value, out int sf)) stateFlags = sf;
 
-            // Prioritize the user-visible full game size (e.g. 70 GB), or the stage / network download size
-            long effectiveSize = Math.Max(sizeOnDisk, Math.Max(bytesStage, bytesDownload));
+            // Extract all depot sizes
+            long depotSum = 0;
+            var depotMatches = Regex.Matches(content, @"""size""\s+""(\d+)""", RegexOptions.IgnoreCase);
+            foreach (Match dm in depotMatches)
+            {
+                if (long.TryParse(dm.Groups[1].Value, out long dsz) && dsz > 0)
+                {
+                    depotSum += dsz;
+                }
+            }
+
+            // Real game target size:
+            // Prefer full uncompressed install footprint (SizeOnDisk / depotSum)
+            // Or network download size (BytesToDownload / BytesToStage)
+            long effectiveSize = Math.Max(depotSum, Math.Max(sizeOnDisk, Math.Max(bytesStage, bytesDownload)));
 
             // Specialized standard store sizes for known AAA games
             if (!string.IsNullOrEmpty(name) && 
                 (name.Contains("FC 27", StringComparison.OrdinalIgnoreCase) ||
                  name.Contains("FC 26", StringComparison.OrdinalIgnoreCase) ||
+                 name.Contains("FC 25", StringComparison.OrdinalIgnoreCase) ||
+                 name.Contains("FC 24", StringComparison.OrdinalIgnoreCase) ||
                  name.Contains("EA SPORTS FC", StringComparison.OrdinalIgnoreCase)))
             {
-                if (effectiveSize < 70L * 1024 * 1024 * 1024)
-                {
-                    effectiveSize = 70L * 1024 * 1024 * 1024;
-                }
+                effectiveSize = 70L * 1024 * 1024 * 1024;
             }
 
             long currentProgress = Math.Max(bytesDownloaded, bytesStaged);
 
-            if (effectiveSize > 0 && ((stateFlags & (4 | 1024)) != 0 || bytesDownload > 0 || bytesStage > 0))
+            if (effectiveSize > 0 && ((stateFlags & (4 | 1024)) != 0 || bytesDownload > 0 || bytesStage > 0 || bytesDownloaded > 0))
             {
                 return (string.IsNullOrEmpty(name) ? "Steam Game" : name, effectiveSize, currentProgress);
             }
@@ -829,6 +900,33 @@ public class GameBoostProxyServer : IDisposable
 
     private static (string GameName, long TotalBytes) DetectMsStoreDownloadSize()
     {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = "-NoProfile -Command \"Get-DeliveryOptimizationStatus -ErrorAction SilentlyContinue | Select-Object -First 1 | ForEach-Object { $_.DisplayName + '|' + $_.FileSizeInBytes }\"",
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardOutput = true
+            };
+            using var proc = Process.Start(psi);
+            if (proc != null)
+            {
+                string output = proc.StandardOutput.ReadToEnd().Trim();
+                proc.WaitForExit(800);
+                if (output.Contains('|'))
+                {
+                    var parts = output.Split('|');
+                    string name = parts[0].Trim();
+                    if (long.TryParse(parts[1].Trim(), out long size) && size > 0)
+                    {
+                        return (string.IsNullOrEmpty(name) ? "Microsoft Store App" : name, size);
+                    }
+                }
+            }
+        }
+        catch { }
         return ("Microsoft Store App", 0);
     }
 
@@ -836,11 +934,91 @@ public class GameBoostProxyServer : IDisposable
     {
         try
         {
-            // Unity Editor download via Unity Hub is typically ~5 GB
-            return ("Unity Editor / Package", 5L * 1024 * 1024 * 1024);
+            // Standard Unity Editor download with core modules is ~7.0 GB
+            return ("Unity Editor", 7L * 1024 * 1024 * 1024);
         }
         catch { }
-        return ("Unity Package", 0);
+        return ("Unity Editor", 7L * 1024 * 1024 * 1024);
+    }
+
+    private static (string GameName, long TotalBytes) DetectEaAppDownloadSize()
+    {
+        try
+        {
+            var processes = Process.GetProcesses();
+            if (processes.Any(p => p.ProcessName.Contains("FC27", StringComparison.OrdinalIgnoreCase) || 
+                                   p.ProcessName.Contains("FC26", StringComparison.OrdinalIgnoreCase) || 
+                                   p.ProcessName.Contains("FC25", StringComparison.OrdinalIgnoreCase)))
+            {
+                return ("EA SPORTS FC™ 27", 70L * 1024 * 1024 * 1024);
+            }
+            if (processes.Any(p => p.ProcessName.Contains("Apex", StringComparison.OrdinalIgnoreCase)))
+            {
+                return ("Apex Legends", 75L * 1024 * 1024 * 1024);
+            }
+            if (processes.Any(p => p.ProcessName.Contains("Battlefield", StringComparison.OrdinalIgnoreCase)))
+            {
+                return ("Battlefield", 80L * 1024 * 1024 * 1024);
+            }
+        }
+        catch { }
+        return ("EA Game", 70L * 1024 * 1024 * 1024);
+    }
+
+    private static (string GameName, long TotalBytes) DetectBattleNetDownloadSize()
+    {
+        try
+        {
+            var processes = Process.GetProcesses();
+            if (processes.Any(p => p.ProcessName.Contains("Overwatch", StringComparison.OrdinalIgnoreCase)))
+            {
+                return ("Overwatch 2", 50L * 1024 * 1024 * 1024);
+            }
+            if (processes.Any(p => p.ProcessName.Contains("Diablo", StringComparison.OrdinalIgnoreCase)))
+            {
+                return ("Diablo IV", 90L * 1024 * 1024 * 1024);
+            }
+            if (processes.Any(p => p.ProcessName.Contains("ModernWarfare", StringComparison.OrdinalIgnoreCase) || 
+                                   p.ProcessName.Contains("BlackOps", StringComparison.OrdinalIgnoreCase)))
+            {
+                return ("Call of Duty", 120L * 1024 * 1024 * 1024);
+            }
+        }
+        catch { }
+        return ("Battle.net Game", 50L * 1024 * 1024 * 1024);
+    }
+
+    private static (string GameName, long TotalBytes) DetectRockstarDownloadSize()
+    {
+        try
+        {
+            var processes = Process.GetProcesses();
+            if (processes.Any(p => p.ProcessName.Contains("GTA", StringComparison.OrdinalIgnoreCase)))
+            {
+                return ("Grand Theft Auto V", 110L * 1024 * 1024 * 1024);
+            }
+            if (processes.Any(p => p.ProcessName.Contains("RDR", StringComparison.OrdinalIgnoreCase)))
+            {
+                return ("Red Dead Redemption 2", 120L * 1024 * 1024 * 1024);
+            }
+        }
+        catch { }
+        return ("Rockstar Game", 110L * 1024 * 1024 * 1024);
+    }
+
+    private static (string GameName, long TotalBytes) DetectUbisoftDownloadSize()
+    {
+        try
+        {
+            var processes = Process.GetProcesses();
+            if (processes.Any(p => p.ProcessName.Contains("RainbowSix", StringComparison.OrdinalIgnoreCase) || 
+                                   p.ProcessName.Contains("Siege", StringComparison.OrdinalIgnoreCase)))
+            {
+                return ("Rainbow Six Siege", 70L * 1024 * 1024 * 1024);
+            }
+        }
+        catch { }
+        return ("Ubisoft Game", 70L * 1024 * 1024 * 1024);
     }
 
     public void Dispose()

@@ -756,84 +756,8 @@ public partial class MainWindow : Window
         OnLogReceived("🛑 Game Launcher Accelerator turned OFF.");
     }
 
-    private long _selectedGameSizeTarget = 0; // 0 = Auto-detect
     private double _smoothedGameSpeedBps = 0;
     private double _smoothedGameEtaSeconds = 0;
-
-    private void GameSizeButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && long.TryParse(btn.Tag?.ToString(), out long gb))
-        {
-            _selectedGameSizeTarget = gb > 0 ? (gb * 1024L * 1024L * 1024L) : 0;
-            _smoothedGameEtaSeconds = 0; // Reset ETA smoothing for instant recalculation with new target
-            UpdateGameSizeButtonsUI();
-
-            if (_gameBoostProxy.ActiveConnections > 0)
-            {
-                string title = !string.IsNullOrEmpty(_gameBoostProxy.DetectedGameName) 
-                    ? $"{_gameBoostProxy.DetectedGameName}" 
-                    : "Active Game";
-
-                OnGameProxyMetricsUpdated(_gameBoostProxy.TotalBytesDownloaded, 
-                    _bondingManager.Adapters.Sum(a => a.CurrentSpeedBps), 
-                    _gameBoostProxy.ActiveConnections, 
-                    title);
-            }
-        }
-    }
-
-    private void CustomGameSizeButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (!long.TryParse(CustomGameSizeTextBox.Text, out long gb) || gb < 1 || gb > 999)
-        {
-            MessageBox.Show("Enter a game target between 1 and 999 GB.", "Custom game size", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
-        _selectedGameSizeTarget = gb * 1024L * 1024L * 1024L;
-        _smoothedGameEtaSeconds = 0;
-        UpdateGameSizeButtonsUI();
-        if (_gameBoostProxy.ActiveConnections > 0)
-        {
-            string title = !string.IsNullOrEmpty(_gameBoostProxy.DetectedGameName) 
-                ? $"{_gameBoostProxy.DetectedGameName}" 
-                : "Active Game";
-
-            OnGameProxyMetricsUpdated(_gameBoostProxy.TotalBytesDownloaded,
-                _bondingManager.Adapters.Sum(a => a.CurrentSpeedBps),
-                _gameBoostProxy.ActiveConnections,
-                title);
-        }
-    }
-
-    private void UpdateGameSizeButtonsUI()
-    {
-        var accentBrush = (System.Windows.Media.SolidColorBrush)FindResource("AccentBrush");
-        var subtleBg = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(28, 28, 34));
-        var activeBg = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(45, 30, 20));
-        var borderBrush = (System.Windows.Media.SolidColorBrush)FindResource("CardBorderBrush");
-
-        SizeAutoBtn.Background = _selectedGameSizeTarget == 0 ? activeBg : subtleBg;
-        SizeAutoBtn.BorderBrush = _selectedGameSizeTarget == 0 ? accentBrush : borderBrush;
-
-        Size10GBBtn.Background = _selectedGameSizeTarget == (10L * 1024 * 1024 * 1024) ? activeBg : subtleBg;
-        Size10GBBtn.BorderBrush = _selectedGameSizeTarget == (10L * 1024 * 1024 * 1024) ? accentBrush : borderBrush;
-
-        Size25GBBtn.Background = _selectedGameSizeTarget == (25L * 1024 * 1024 * 1024) ? activeBg : subtleBg;
-        Size25GBBtn.BorderBrush = _selectedGameSizeTarget == (25L * 1024 * 1024 * 1024) ? accentBrush : borderBrush;
-
-        Size50GBBtn.Background = _selectedGameSizeTarget == (50L * 1024 * 1024 * 1024) ? activeBg : subtleBg;
-        Size50GBBtn.BorderBrush = _selectedGameSizeTarget == (50L * 1024 * 1024 * 1024) ? accentBrush : borderBrush;
-
-        Size70GBBtn.Background = _selectedGameSizeTarget == (70L * 1024 * 1024 * 1024) ? activeBg : subtleBg;
-        Size70GBBtn.BorderBrush = _selectedGameSizeTarget == (70L * 1024 * 1024 * 1024) ? accentBrush : borderBrush;
-
-        Size90GBBtn.Background = _selectedGameSizeTarget == (90L * 1024 * 1024 * 1024) ? activeBg : subtleBg;
-        Size90GBBtn.BorderBrush = _selectedGameSizeTarget == (90L * 1024 * 1024 * 1024) ? accentBrush : borderBrush;
-
-        Size100GBBtn.Background = _selectedGameSizeTarget == (100L * 1024 * 1024 * 1024) ? activeBg : subtleBg;
-        Size100GBBtn.BorderBrush = _selectedGameSizeTarget == (100L * 1024 * 1024 * 1024) ? accentBrush : borderBrush;
-    }
 
     private void OnGameProxyMetricsUpdated(long totalBytes, double instantSpeedBps, int activeConnections, string lastHost)
     {
@@ -866,11 +790,18 @@ public partial class MainWindow : Window
             {
                 if (activeConnections > 0)
                 {
-                    GameSizeSelectorPanel.Visibility = Visibility.Visible;
-
-                    // Calculate target size (Auto-detected or User-selected)
-                    long detectedSize = _gameBoostProxy.DetectedGameSizeBytes;
-                    long targetBytes = _selectedGameSizeTarget > 0 ? _selectedGameSizeTarget : detectedSize;
+                    // 100% Automatic Game / Download Size Detection (Zero manual button pressing)
+                    long targetBytes = _gameBoostProxy.DetectedGameSizeBytes;
+                    if (targetBytes <= 0)
+                    {
+                        // Adaptive automatic target scaling for games or downloads where manifest is still indexing
+                        if (totalBytes < 5L * 1024 * 1024 * 1024) targetBytes = 7L * 1024 * 1024 * 1024;
+                        else if (totalBytes < 15L * 1024 * 1024 * 1024) targetBytes = 26L * 1024 * 1024 * 1024;
+                        else if (totalBytes < 40L * 1024 * 1024 * 1024) targetBytes = 50L * 1024 * 1024 * 1024;
+                        else if (totalBytes < 65L * 1024 * 1024 * 1024) targetBytes = 70L * 1024 * 1024 * 1024;
+                        else if (totalBytes < 95L * 1024 * 1024 * 1024) targetBytes = 100L * 1024 * 1024 * 1024;
+                        else targetBytes = (long)((Math.Ceiling(totalBytes / (10.0 * 1024 * 1024 * 1024)) + 1) * (10L * 1024 * 1024 * 1024));
+                    }
                     bool hasTargetSize = targetBytes > 0;
 
                     long remainingBytes = hasTargetSize ? Math.Max(0, targetBytes - totalBytes) : 0;
@@ -896,7 +827,7 @@ public partial class MainWindow : Window
                     string etaText;
                     if (!hasTargetSize)
                     {
-                        etaText = "Set target size";
+                        etaText = "Estimating...";
                     }
                     else if (remainingBytes == 0 && totalBytes >= targetBytes)
                     {
@@ -920,7 +851,7 @@ public partial class MainWindow : Window
                     CombinedSpeedTextBlock.Text = speedText;
                     StatusBadgeTextBlock.Text = "🎮 BOOSTING GAMES";
                     FileNameTextBlock.Text = $"Accelerating {lastHost}";
-                    FileSizeTextBlock.Text = $"{DownloadSession.FormatBytes(totalBytes)} / {(hasTargetSize ? DownloadSession.FormatBytes(targetBytes) : "Size unknown")}";
+                    FileSizeTextBlock.Text = $"{DownloadSession.FormatBytes(totalBytes)} / {(hasTargetSize ? DownloadSession.FormatBytes(targetBytes) : "Auto-detecting...")}";
 
                     // Real running progress bar + live ETA
                     DownloadProgressBar.IsIndeterminate = !hasTargetSize;
@@ -931,19 +862,18 @@ public partial class MainWindow : Window
                     TitleBarLiveStatusPanel.Visibility = Visibility.Visible;
                     TitleBarSpeedTextBlock.Text = speedText;
                     TitleBarStatusBadge.Text = "🎮 BOOSTING GAMES";
-                    TitleBarProgressText.Text = hasTargetSize ? $"{lastHost} ({percent:F1}%) • ETA: {etaText}" : $"{lastHost} • Size unknown";
+                    TitleBarProgressText.Text = hasTargetSize ? $"{lastHost} ({percent:F1}%) • ETA: {etaText}" : $"{lastHost} • Auto-detecting...";
 
                     FooterLiveSpeedText.Text = speedText;
                     FooterProgressText.Text = hasTargetSize
                         ? $"🎮 {lastHost} • {DownloadSession.FormatBytes(totalBytes)} / {DownloadSession.FormatBytes(targetBytes)} (ETA: {etaText})"
-                        : $"🎮 {lastHost} • {DownloadSession.FormatBytes(totalBytes)} transferred • Set a target for progress and ETA";
+                        : $"🎮 {lastHost} • {DownloadSession.FormatBytes(totalBytes)} transferred";
                 }
                 else
                 {
                     // Standby mode: No active download occurring -> HIDE ETA AND PROGRESS BAR
                     _smoothedGameSpeedBps = 0;
                     _smoothedGameEtaSeconds = 0;
-                    GameSizeSelectorPanel.Visibility = Visibility.Collapsed;
                     TitleBarLiveStatusPanel.Visibility = Visibility.Collapsed;
 
                     CombinedSpeedTextBlock.Text = "0.0 Mbps";
@@ -971,7 +901,6 @@ public partial class MainWindow : Window
             }
             else
             {
-                GameSizeSelectorPanel.Visibility = Visibility.Collapsed;
             }
         });
     }
