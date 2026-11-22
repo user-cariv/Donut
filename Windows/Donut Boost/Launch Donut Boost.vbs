@@ -1,10 +1,3 @@
-Set WshShell = CreateObject("WScript.Shell")
-
-' 1. If Donut Boost is already running, immediately bring it to the foreground
-If WshShell.AppActivate("Donut Boost") Then
-    WScript.Quit
-End If
-
 Set fso = CreateObject("Scripting.FileSystemObject")
 Set shellApp = CreateObject("Shell.Application")
 
