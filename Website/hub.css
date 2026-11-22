@@ -62,7 +62,7 @@ body.dark-mode .hub-app-card { border-color: #ffffff2b; background: #211b17f2; b
 body.dark-mode .hub-app-card:hover { box-shadow: 0 35px 75px #0009; }
 .hub-card-top { display: flex; justify-content: space-between; align-items: center; }
 .hub-app-icon { width: 43px; height: 43px; padding: 8px; display: grid; place-items: center; border-radius: 14px; background: #fff; box-shadow: 0 8px 20px #9b4c2918; }
-.hub-app-icon img { width: 100%; height: 100%; }.hub-island-icon { padding: 0; color: #fff; background: #15100f; font-size: 26px; }.hub-card-arrow { color: var(--hub-orange); font-size: 23px; }
+.hub-app-icon img { width: 100%; height: 100%; }.hub-product-icon { padding: 0; overflow: hidden; background: transparent; box-shadow: none; }.hub-product-icon img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }.hub-island-icon { color: #fff; font-size: 0; }.hub-card-arrow { color: var(--hub-orange); font-size: 23px; }
 .hub-card-art { height: 235px; margin: 18px -26px 26px; display: grid; place-items: center; position: relative; overflow: hidden; }
 .hub-convert-art { background: #f27b52; }.hub-convert-art img, .hub-island-art img { width: 100%; height: 100%; display: block; object-fit: contain; }
 .hub-island-art { background: #1b110d; }
