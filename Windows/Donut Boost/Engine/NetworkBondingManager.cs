@@ -89,7 +89,10 @@ public class NetworkBondingManager : IDisposable
                         break;
                 }
             }
-            ApplyBondingModeMetrics(_adapters.Where(a => a.IsEnabled && a.IsOnline), CurrentMode);
+            // Apply metrics to disabled adapters too. If Wi-Fi keeps its old
+            // low route metric when Mobile Data Only is selected, Windows can
+            // keep sending launcher traffic over Wi-Fi.
+            ApplyBondingModeMetrics(_adapters.Where(a => a.IsOnline).ToList(), CurrentMode);
         }
         AdaptersChanged?.Invoke();
     }
@@ -216,7 +219,7 @@ public class NetworkBondingManager : IDisposable
             // MobileDataOnly: Mobile metric 5, Secondary 60
             if (_adapters.Any(a => a.IsEnabled && a.IsOnline))
             {
-                ApplyBondingModeMetrics(_adapters.Where(a => a.IsEnabled && a.IsOnline), CurrentMode);
+                ApplyBondingModeMetrics(_adapters.Where(a => a.IsOnline).ToList(), CurrentMode);
             }
 
             if (hasStructuralChange)

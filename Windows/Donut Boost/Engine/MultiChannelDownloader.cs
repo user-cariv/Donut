@@ -134,10 +134,11 @@ public class MultiChannelDownloader
             session.Status = DownloadStatus.Downloading;
             StatusChanged?.Invoke(session);
 
-            // 2. Schedule Chunks across all available adapters for dynamic live switching
-            if (supportsRanges && totalSize > 0 && allAdapters.Count > 0)
+            // Only enabled adapters may receive chunks. Passing allAdapters here
+            // caused Wi-Fi to keep downloading in Mobile Data Only mode.
+            if (supportsRanges && totalSize > 0 && enabledAdapters.Count > 0)
             {
-                await DownloadMultiChannelAsync(session, allAdapters, token);
+                await DownloadMultiChannelAsync(session, enabledAdapters, token);
             }
             else
             {

@@ -28,6 +28,7 @@ public class GameBoostProxyServer : IDisposable
     private volatile bool _isRunning = false;
 
     private long _totalBytesDownloaded = 0;
+    private long _steamCurrentDownloadBytes = 0;
     private int _activeConnections = 0;
     private string _detectedLauncher = "Game Launcher";
     private long _detectedGameSizeBytes = 0;
@@ -363,6 +364,12 @@ public class GameBoostProxyServer : IDisposable
 
                     if (!string.IsNullOrEmpty(activeLauncher))
                     {
+                        if (!string.Equals(_detectedLauncher, activeLauncher, StringComparison.OrdinalIgnoreCase))
+                        {
+                            _detectedGameSizeBytes = 0;
+                            _detectedGameName = "";
+                            Interlocked.Exchange(ref _steamCurrentDownloadBytes, 0);
+                        }
                         isGameActive = true;
                         _detectedLauncher = activeLauncher;
                         _summaryLauncherLabel = summaryLabel;
@@ -370,6 +377,9 @@ public class GameBoostProxyServer : IDisposable
                     }
                     else
                     {
+                        _detectedGameSizeBytes = 0;
+                        _detectedGameName = "";
+                        Interlocked.Exchange(ref _steamCurrentDownloadBytes, 0);
                         isGameActive = false;
                         activeStreamsCount = 0;
                         _activeConnections = 0;
@@ -481,12 +491,9 @@ public class GameBoostProxyServer : IDisposable
                     if (_detectedLauncher == "Steam")
                     {
                         var (sName, sBytes, sCur) = DetectSteamDownloadSize();
-                        if (sBytes > 0) _detectedGameSizeBytes = sBytes;
-                        if (!string.IsNullOrEmpty(sName)) _detectedGameName = sName;
-                        if (sCur > 0 && sCur > Interlocked.Read(ref _totalBytesDownloaded))
-                        {
-                            Interlocked.Exchange(ref _totalBytesDownloaded, sCur);
-                        }
+                        _detectedGameSizeBytes = sBytes;
+                        _detectedGameName = sName;
+                        Interlocked.Exchange(ref _steamCurrentDownloadBytes, sCur);
                     }
                     else if (_detectedLauncher == "Epic Games")
                     {
@@ -554,7 +561,10 @@ public class GameBoostProxyServer : IDisposable
                     ? $"{_detectedLauncher} - {_detectedGameName}" 
                     : _detectedLauncher;
 
-                ProxyMetricsUpdated?.Invoke(TotalBytesDownloaded, reportSpeed, _activeConnections, displayLabel);
+                long displayedBytes = _detectedLauncher == "Steam" && _detectedGameSizeBytes > 0
+                    ? Interlocked.Read(ref _steamCurrentDownloadBytes)
+                    : TotalBytesDownloaded;
+                ProxyMetricsUpdated?.Invoke(displayedBytes, reportSpeed, _activeConnections, displayLabel);
             }
             else
             {
@@ -563,6 +573,7 @@ public class GameBoostProxyServer : IDisposable
                 _activeConnections = 0;
                 _detectedGameName = "";
                 _detectedGameSizeBytes = 0;
+                Interlocked.Exchange(ref _steamCurrentDownloadBytes, 0);
                 foreach (var adapter in _bondingManager.Adapters)
                 {
                     adapter.CurrentSpeedBps = 0;
@@ -619,7 +630,9 @@ public class GameBoostProxyServer : IDisposable
                 catch { }
             }
 
-            // 3. Scan library folders for actively downloading games
+            // 3. Scan active download folders first. Steamworks Common
+            // Redistributables (AppID 228980) are a small prerequisite and must
+            // not be reported as the size of the game the user is downloading.
             foreach (var lib in libraryFolders)
             {
                 string downloadingDir = Path.Combine(lib, "downloading");
@@ -629,7 +642,8 @@ public class GameBoostProxyServer : IDisposable
                 {
                     try
                     {
-                        foreach (var sub in Directory.GetDirectories(downloadingDir))
+                        foreach (var sub in Directory.GetDirectories(downloadingDir)
+                                     .OrderByDescending(path => Directory.GetLastWriteTimeUtc(path)))
                         {
                             string appid = Path.GetFileName(sub);
                             if (long.TryParse(appid, out _)) activeAppIds.Add(appid);
@@ -638,14 +652,16 @@ public class GameBoostProxyServer : IDisposable
                     catch { }
                 }
 
-                // Check manifests for active appids first
-                foreach (var appid in activeAppIds)
+                // Prefer actual games over Steamworks Common Redistributables.
+                foreach (var appid in activeAppIds
+                             .OrderBy(id => id == "228980" ? 1 : 0))
                 {
+                    if (appid == "228980") continue;
                     string acf = Path.Combine(lib, $"appmanifest_{appid}.acf");
                     if (File.Exists(acf))
                     {
                         var res = ParseSteamManifest(acf);
-                        if (res.TotalBytes > 0 || !string.IsNullOrEmpty(res.GameName))
+                        if (res.TotalBytes > 0)
                             return res;
                     }
                 }
@@ -659,6 +675,8 @@ public class GameBoostProxyServer : IDisposable
 
                     foreach (var file in acfFiles)
                     {
+                        string appId = Regex.Match(file.Name, @"appmanifest_(\d+)\.acf", RegexOptions.IgnoreCase).Groups[1].Value;
+                        if (appId == "228980" || !Directory.Exists(Path.Combine(downloadingDir, appId))) continue;
                         var res = ParseSteamManifest(file.FullName);
                         if (res.TotalBytes > 0)
                             return res;
@@ -694,6 +712,7 @@ public class GameBoostProxyServer : IDisposable
                     if (startMatch.Success)
                     {
                         string appid = startMatch.Groups[1].Value;
+                        if (appid == "228980") continue;
                         long curDl = long.TryParse(startMatch.Groups[2].Value, out var cd) ? cd : 0;
                         long totDl = long.TryParse(startMatch.Groups[3].Value, out var td) ? td : 0;
                         long curSt = long.TryParse(startMatch.Groups[4].Value, out var cs) ? cs : 0;
@@ -750,31 +769,22 @@ public class GameBoostProxyServer : IDisposable
             var curStMatch = Regex.Match(content, @"""BytesStaged""\s+""(\d+)""");
             if (curStMatch.Success && long.TryParse(curStMatch.Groups[1].Value, out long cst)) bytesStaged = cst;
 
-            long sizeOnDisk = 0;
-            var sizeMatch = Regex.Match(content, @"""SizeOnDisk""\s+""(\d+)""");
-            if (sizeMatch.Success && long.TryParse(sizeMatch.Groups[1].Value, out long sd)) sizeOnDisk = sd;
-
             int stateFlags = 0;
             var flagMatch = Regex.Match(content, @"""StateFlags""\s+""(\d+)""");
             if (flagMatch.Success && int.TryParse(flagMatch.Groups[1].Value, out int sf)) stateFlags = sf;
 
-            // Extract all depot sizes
-            long depotSum = 0;
-            var depotMatches = Regex.Matches(content, @"""size""\s+""(\d+)""", RegexOptions.IgnoreCase);
-            foreach (Match dm in depotMatches)
-            {
-                if (long.TryParse(dm.Groups[1].Value, out long dsz) && dsz > 0)
-                {
-                    depotSum += dsz;
-                }
-            }
+            // StateFlags=4 means FullyInstalled. The old check treated that bit
+            // as active and returned stale, completed manifests. Require an
+            // actual pending download/staging state and use transfer counters,
+            // never installed size/depot size, for download ETA.
+            const int activeUpdateStates = 2 | 1024 | 2048 | 4096 | 8192 | 16384 | 32768 | 65536;
+            bool updateIsActive = (stateFlags & activeUpdateStates) != 0;
+            long effectiveSize = bytesDownload > 0 ? bytesDownload : bytesStage;
+            long currentProgress = bytesDownload > 0 ? bytesDownloaded : bytesStaged;
 
-            // Real network download target size:
-            // Prefer network download size (BytesToDownload) which matches Steam UI "Downloading data: X / Y GB"
-            long effectiveSize = bytesDownload > 0 ? bytesDownload : (bytesStage > 0 ? bytesStage : (depotSum > 0 ? depotSum : sizeOnDisk));
-            long currentProgress = bytesDownloaded > 0 ? bytesDownloaded : bytesStaged;
-
-            if (effectiveSize > 0 && ((stateFlags & (4 | 1024)) != 0 || bytesDownload > 0 || bytesStage > 0 || bytesDownloaded > 0))
+            bool isSteamworksPrerequisite = name.Contains("Steamworks Common Redistributables", StringComparison.OrdinalIgnoreCase) ||
+                                            name.Contains("Redistributable", StringComparison.OrdinalIgnoreCase);
+            if (updateIsActive && !isSteamworksPrerequisite && effectiveSize > 0)
             {
                 return (string.IsNullOrEmpty(name) ? "Steam Game" : name, effectiveSize, currentProgress);
             }

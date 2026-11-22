@@ -781,6 +781,7 @@ public partial class MainWindow : Window
 
     private double _smoothedGameSpeedBps = 0;
     private double _smoothedGameEtaSeconds = 0;
+    private string _lastGameEstimateKey = "";
 
     private void OnGameProxyMetricsUpdated(long totalBytes, double instantSpeedBps, int activeConnections, string lastHost)
     {
@@ -815,17 +816,17 @@ public partial class MainWindow : Window
                 {
                     // 100% Automatic Game / Download Size Detection (Zero manual button pressing)
                     long targetBytes = _gameBoostProxy.DetectedGameSizeBytes;
-                    if (targetBytes <= 0)
-                    {
-                        // Adaptive automatic target scaling for games or downloads where manifest is still indexing
-                        if (totalBytes < 5L * 1024 * 1024 * 1024) targetBytes = 7L * 1024 * 1024 * 1024;
-                        else if (totalBytes < 15L * 1024 * 1024 * 1024) targetBytes = 26L * 1024 * 1024 * 1024;
-                        else if (totalBytes < 40L * 1024 * 1024 * 1024) targetBytes = 50L * 1024 * 1024 * 1024;
-                        else if (totalBytes < 65L * 1024 * 1024 * 1024) targetBytes = 70L * 1024 * 1024 * 1024;
-                        else if (totalBytes < 95L * 1024 * 1024 * 1024) targetBytes = 100L * 1024 * 1024 * 1024;
-                        else targetBytes = (long)((Math.Ceiling(totalBytes / (10.0 * 1024 * 1024 * 1024)) + 1) * (10L * 1024 * 1024 * 1024));
-                    }
                     bool hasTargetSize = targetBytes > 0;
+
+                    // Reset ETA smoothing when a different launcher/game or
+                    // detected package size becomes active.
+                    string estimateKey = $"{lastHost}|{targetBytes}";
+                    if (!string.Equals(estimateKey, _lastGameEstimateKey, StringComparison.Ordinal))
+                    {
+                        _lastGameEstimateKey = estimateKey;
+                        _smoothedGameSpeedBps = 0;
+                        _smoothedGameEtaSeconds = 0;
+                    }
 
                     long remainingBytes = hasTargetSize ? Math.Max(0, targetBytes - totalBytes) : 0;
 
