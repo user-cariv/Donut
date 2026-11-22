@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Globalization;
 using System.Threading.Tasks;
 using Microsoft.Win32;
 
@@ -86,6 +87,7 @@ public class LicenseManager
     private readonly string _licenseFilePath;
     private readonly string _stealthAnchorPath;
     private readonly string _hwid;
+    private bool _cloudLicenseVerified;
 
     public LicenseInfo CurrentLicense { get; private set; } = new() { IsActive = false };
 
@@ -154,9 +156,10 @@ public class LicenseManager
             byte[] payloadRaw = Encoding.UTF8.GetBytes($"{record.Code}|{record.HardwareId}|{record.ExpiresAtUtc:o}|{(int)record.Tier}");
             string expectedSigRaw = Convert.ToHexString(hmac.ComputeHash(payloadRaw));
 
-            return string.Equals(record.Signature, expectedSigClean, StringComparison.OrdinalIgnoreCase)
+            bool signatureValid = string.Equals(record.Signature, expectedSigClean, StringComparison.OrdinalIgnoreCase)
                    || string.Equals(record.Signature, expectedSigRaw, StringComparison.OrdinalIgnoreCase)
                    || record.Tier == LicenseTier.FreeTrial;
+            return signatureValid && (record.Tier == LicenseTier.FreeTrial || _cloudLicenseVerified);
         }
         catch
         {
@@ -335,14 +338,15 @@ public class LicenseManager
         }
 
         DateTime now = DateTime.UtcNow;
-        DateTime expires = tier switch
+        DateTime activatedAt = cloudCheck.ActivatedAtUtc ?? now;
+        DateTime expires = cloudCheck.ExpiresAtUtc ?? (tier switch
         {
             LicenseTier.OneDay => now.AddDays(1),
             LicenseTier.SevenDays => now.AddDays(7),
             LicenseTier.OneMonth => now.AddDays(30),
             LicenseTier.Lifetime => now.AddYears(100),
             _ => now
-        };
+        });
 
         // Create cryptographically signed hardware-bound license record
         byte[] sigPayload = Encoding.UTF8.GetBytes($"{cleaned}|{_hwid}|{expires:o}|{(int)tier}");
@@ -352,7 +356,7 @@ public class LicenseManager
         {
             Code = rawCode.Trim().ToUpper(),
             Tier = tier,
-            ActivatedAtUtc = now,
+            ActivatedAtUtc = activatedAt,
             ExpiresAtUtc = expires,
             LastVerifiedUtc = now,
             LastVerifiedTick = Environment.TickCount64,
@@ -367,7 +371,12 @@ public class LicenseManager
             byte[] encrypted = ProtectedData.Protect(rawBytes, null, DataProtectionScope.CurrentUser);
             File.WriteAllBytes(_licenseFilePath, encrypted);
 
+            _cloudLicenseVerified = true;
             LoadLicense();
+            if (!CurrentLicense.IsActive)
+            {
+                return (false, "This activation period has already expired and cannot be restarted.", CurrentLicense);
+            }
             return (true, $"✓ Success! Activated {GetTierName(tier)}.", CurrentLicense);
         }
         catch (Exception ex)
@@ -376,13 +385,12 @@ public class LicenseManager
         }
     }
 
-    private async Task<(bool Success, string Message)> ClaimCodeWithCloudAsync(string cleanCode, string hwid, int tier)
+    private async Task<(bool Success, string Message, DateTime? ActivatedAtUtc, DateTime? ExpiresAtUtc)> ClaimCodeWithCloudAsync(string cleanCode, string hwid, int tier, DateTime? activatedAtUtc = null, DateTime? expiresAtUtc = null)
     {
         try
         {
             using var sha = SHA256.Create();
             string codeHash = Convert.ToHexString(sha.ComputeHash(Encoding.UTF8.GetBytes(cleanCode)));
-
             string supabaseUrl = "https://qigzqfntaokxnsfcejiy.supabase.co/rest/v1/rpc/claim_donut_boost_code";
             string anonKey = "sb_publishable_e4pO853gqnhrfzYp19XCNQ_h6DLr3a0";
 
@@ -390,53 +398,125 @@ public class LicenseManager
             {
                 p_code_hash = codeHash,
                 p_hwid = hwid,
-                p_tier = tier
+                p_tier = tier,
+                p_activated_at = activatedAtUtc,
+                p_expires_at = expiresAtUtc
             };
-
             using var req = new HttpRequestMessage(HttpMethod.Post, supabaseUrl);
             req.Headers.Add("apikey", anonKey);
-            req.Headers.Add("Authorization", $"Bearer {anonKey}");
             req.Content = new StringContent(JsonSerializer.Serialize(reqObj), Encoding.UTF8, "application/json");
 
-            var resp = await _authClient.SendAsync(req);
-            if (resp.IsSuccessStatusCode)
+            using var resp = await _authClient.SendAsync(req);
+            if (!resp.IsSuccessStatusCode)
             {
-                string jsonStr = await resp.Content.ReadAsStringAsync();
-                using var doc = JsonDocument.Parse(jsonStr);
-                string status = doc.RootElement.GetProperty("status").GetString() ?? "";
-                string msg = doc.RootElement.GetProperty("message").GetString() ?? "";
+                return (false, $"Donut could not verify this code with the licensing server (HTTP {(int)resp.StatusCode}). Please try again later.", null, null);
+            }
 
-                if (string.Equals(status, "SUCCESS", StringComparison.OrdinalIgnoreCase))
-                {
-                    return (true, msg);
-                }
-                else if (string.Equals(status, "ALREADY_CLAIMED", StringComparison.OrdinalIgnoreCase))
-                {
-                    return (false, "✕ This redeem code has already been claimed on another computer.");
-                }
-                else
-                {
-                    return (false, string.IsNullOrEmpty(msg) ? "✕ License claim rejected by server." : msg);
-                }
-            }
-            else if ((int)resp.StatusCode == 404 || (int)resp.StatusCode == 401)
+            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+            string status = doc.RootElement.TryGetProperty("status", out var statusValue) ? statusValue.GetString() ?? "" : "";
+            string message = doc.RootElement.TryGetProperty("message", out var messageValue) ? messageValue.GetString() ?? "" : "";
+            DateTime? activatedAt = ReadUtcDate(doc.RootElement, "activated_at");
+            DateTime? expiresAt = ReadUtcDate(doc.RootElement, "expires_at");
+
+            if (string.Equals(status, "SUCCESS", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(status, "RESTORE_SAME_DEVICE", StringComparison.OrdinalIgnoreCase))
             {
-                // Table or RPC function pending migration in Supabase Dashboard
-                // Allows local hardware activation while Supabase SQL is being run
-                return (true, "Local verification active.");
+                if (!activatedAt.HasValue || !expiresAt.HasValue || expiresAt <= activatedAt)
+                {
+                    return (false, "The licensing server returned an invalid activation period. Please contact Donut support.", null, null);
+                }
+                return (true, message, activatedAt, expiresAt);
             }
-            else
-            {
-                return (false, $"✕ Cloud validation error (HTTP {(int)resp.StatusCode}). Please try again.");
-            }
+
+            if (string.Equals(status, "ALREADY_CLAIMED", StringComparison.OrdinalIgnoreCase))
+                return (false, "This redeem code has already been activated on another device.", null, null);
+            if (string.Equals(status, "ALREADY_CLAIMED_THIS_DEVICE", StringComparison.OrdinalIgnoreCase))
+                return (false, "This redeem code was already used on this device and cannot restart or extend its pass.", null, null);
+
+            return (false, string.IsNullOrWhiteSpace(message) ? "The licensing server rejected this activation code." : message, null, null);
         }
         catch (HttpRequestException)
         {
-            return (false, "✕ An active internet connection is required to verify and activate your redeem code.");
+            return (false, "An internet connection is required to verify and activate your redeem code.", null, null);
         }
         catch
         {
-            return (true, "Local verification active.");
+            return (false, "Donut could not verify this code with the licensing server. Please try again later.", null, null);
+        }
+    }
+
+    private static DateTime? ReadUtcDate(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var value) || value.ValueKind != JsonValueKind.String)
+            return null;
+
+        return DateTime.TryParse(value.GetString(), CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsed)
+            ? parsed
+            : null;
+    }
+
+    public async Task<(bool Success, string Message)> VerifyStoredLicenseCloudAsync()
+    {
+        _cloudLicenseVerified = false;
+        LicenseInfo current = LoadLicense();
+        if (!current.IsActive)
+            return (false, current.StatusMessage);
+        if (current.Tier == LicenseTier.FreeTrial)
+            return (true, current.StatusMessage);
+
+        try
+        {
+            byte[] encrypted = File.ReadAllBytes(_licenseFilePath);
+            byte[] decrypted = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
+            var record = JsonSerializer.Deserialize<LicenseRecord>(Encoding.UTF8.GetString(decrypted));
+            if (record == null || record.Tier == LicenseTier.None || record.Tier == LicenseTier.FreeTrial)
+                return (false, "The saved activation could not be verified.");
+
+            string cleanCode = (record.Code ?? string.Empty).ToUpperInvariant().Replace("-", string.Empty).Replace(" ", string.Empty).Trim();
+            var claim = await ClaimCodeWithCloudAsync(cleanCode, _hwid, (int)record.Tier, record.ActivatedAtUtc, record.ExpiresAtUtc);
+            if (!claim.Success || !claim.ActivatedAtUtc.HasValue || !claim.ExpiresAtUtc.HasValue)
+            {
+                CurrentLicense = new LicenseInfo
+                {
+                    IsActive = false,
+                    Tier = record.Tier,
+                    TierDisplayName = GetTierName(record.Tier),
+                    ActivatedAtUtc = record.ActivatedAtUtc,
+                    ExpiresAtUtc = record.ExpiresAtUtc,
+                    HardwareId = _hwid,
+                    StatusMessage = claim.Message
+                };
+                return (false, claim.Message);
+            }
+
+            record.ActivatedAtUtc = claim.ActivatedAtUtc.Value;
+            record.ExpiresAtUtc = claim.ExpiresAtUtc.Value;
+            record.LastVerifiedUtc = DateTime.UtcNow;
+            record.LastVerifiedTick = Environment.TickCount64;
+
+            byte[] key = GetDispersedKey();
+            using var hmac = new HMACSHA256(key);
+            byte[] payload = Encoding.UTF8.GetBytes($"{cleanCode}|{record.HardwareId}|{record.ExpiresAtUtc:o}|{(int)record.Tier}");
+            record.Signature = Convert.ToHexString(hmac.ComputeHash(payload));
+
+            byte[] updated = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(record));
+            File.WriteAllBytes(_licenseFilePath, ProtectedData.Protect(updated, null, DataProtectionScope.CurrentUser));
+            _cloudLicenseVerified = true;
+            current = LoadLicense();
+            return (current.IsActive, current.StatusMessage);
+        }
+        catch (HttpRequestException)
+        {
+            CurrentLicense.IsActive = false;
+            CurrentLicense.StatusMessage = "An internet connection is required to verify this activation.";
+            return (false, CurrentLicense.StatusMessage);
+        }
+        catch
+        {
+            CurrentLicense.IsActive = false;
+            CurrentLicense.StatusMessage = "This activation could not be verified with Donut's licensing server.";
+            return (false, CurrentLicense.StatusMessage);
         }
     }
 

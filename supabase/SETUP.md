@@ -61,3 +61,16 @@ Free plans have quotas and can change. Keep attachments small, review storage
 usage, and configure retention/deletion as ticket volume grows. Public forms can
 also attract spam; before a broad launch, add a CAPTCHA such as Cloudflare
 Turnstile and stronger abuse monitoring.
+
+## Donut Boost activation-code binding
+
+Before releasing a Boost build with cloud activation checks, run
+`migrations/20261122000000_donut_boost_code_claims.sql` once in the Supabase SQL
+Editor for this project. It creates an atomic, private claim table and the RPC
+used by Boost. Each code hash is claimed once; a different hardware ID is
+rejected. Re-entry on the same device restores the original expiry and cannot
+restart the pass. The migration keeps the old three-argument RPC signature so
+already-installed builds receive the same server-side one-device decision.
+
+Do not publish the updated Boost installer before this migration has run. New
+builds fail closed when the licensing endpoint is unavailable.

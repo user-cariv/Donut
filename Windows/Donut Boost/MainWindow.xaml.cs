@@ -67,51 +67,43 @@ public partial class MainWindow : Window
             }
             UpdateLicenseUI();
         };
-        _licenseTimer.Start();
+        Loaded += MainWindow_Loaded;
 
-        // Game Launcher Acceleration starts AUTO-ON by default as requested
-        if (_licenseManager.CurrentLicense.IsActive)
-        {
-            EnableGameBoost();
-        }
-        else
-        {
-            // Auto-claim first-time 24-Hour Free Pass if eligible so new users get instant speed bonding
-            var trialResult = _licenseManager.ActivateTrial();
-            if (trialResult.Success)
-            {
-                OnLogReceived("🎁 [WELCOME] 24-Hour Free Pass automatically activated! Enjoy unlimited speed bonding.");
-                UpdateLicenseUI();
-                EnableGameBoost();
-            }
-            else
-            {
-                GameBoostToggle.IsChecked = true;
-                GameBoostBadgeBorder.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 45, 27));
-                GameBoostBadgeBorder.BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88));
-                GameBoostBadgeText.Text = "🟢 AUTO-ON (Active)";
-                GameBoostBadgeText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88));
-            }
-        }
-
-        // Automatic In-App Update Check:
-        // Runs quietly in background 2.5s after launch. If a new version was published,
-        // it notifies the user inside the app and allows 1-click update without opening browser!
-        _ = Task.Run(async () =>
-        {
-            await Task.Delay(2500);
-            await CheckForAppUpdatesAsync(silent: true);
-        });
-
-        // Periodic background update check every 4 hours while running
-        _autoUpdateTimer = new System.Windows.Threading.DispatcherTimer
-        {
-            Interval = TimeSpan.FromHours(4)
-        };
-        _autoUpdateTimer.Tick += async (_, _) => await CheckForAppUpdatesAsync(silent: true);
-        _autoUpdateTimer.Start();
     }
 
+    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        IsEnabled = false;
+        try
+        {
+            if (_licenseManager.CurrentLicense.IsActive && _licenseManager.CurrentLicense.Tier != LicenseTier.FreeTrial)
+            {
+                ActivationStatusTextBlock.Text = "Verifying this device activation...";
+                var verification = await _licenseManager.VerifyStoredLicenseCloudAsync();
+                if (!verification.Success)
+                    OnLogReceived($"[LICENSE] {verification.Message}");
+            }
+
+            if (!_licenseManager.CurrentLicense.IsActive)
+            {
+                var trialResult = _licenseManager.ActivateTrial();
+                if (trialResult.Success)
+                    OnLogReceived("24-hour free pass activated for this device.");
+            }
+
+            UpdateLicenseUI();
+            if (_licenseManager.CurrentLicense.IsActive)
+                EnableGameBoost();
+            else
+                GameBoostToggle.IsChecked = false;
+
+            _licenseTimer.Start();
+        }
+        finally
+        {
+            IsEnabled = true;
+        }
+    }
     private void UpdateLicenseUI()
     {
         HwidTextBlock.Text = _licenseManager.MachineHwid;
