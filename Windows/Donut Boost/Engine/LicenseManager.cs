@@ -522,21 +522,26 @@ public class LicenseManager
 
     public (bool Success, string Message, LicenseInfo Info) ActivateTrial()
     {
-        // 1. Check Primary Registry Anchor
-        string trialKey = @"Software\DonutBoost";
-        using (var key = Registry.CurrentUser.CreateSubKey(trialKey))
-        {
-            if (key.GetValue("TrialActivatedUtc") != null)
-            {
-                return (false, "A free trial has already been used on this device.", CurrentLicense);
-            }
-        }
-
-        // 2. Check Stealth File Anchor in LocalAppData
+        // The protected per-user file is the primary trial marker. Registry
+        // anchors are optional because managed Windows profiles can deny HKCU
+        // writes; that must never prevent the app from opening.
         if (File.Exists(_stealthAnchorPath))
         {
             return (false, "A free trial has already been used on this device.", CurrentLicense);
         }
+
+        // Preserve the registry marker check where the profile allows reads.
+        string trialKey = @"Software\DonutBoost";
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(trialKey, writable: false);
+            if (key?.GetValue("TrialActivatedUtc") != null)
+            {
+                return (false, "A free trial has already been used on this device.", CurrentLicense);
+            }
+        }
+        catch (UnauthorizedAccessException) { }
+        catch (System.Security.SecurityException) { }
 
         // 3. Check Stealth CLSID Anchor in Explorer Registry
         try
@@ -553,18 +558,19 @@ public class LicenseManager
         DateTime now = DateTime.UtcNow;
         DateTime expires = now.AddHours(24);
 
-        // Stamp all 3 stealth anchors simultaneously
+        // The encrypted per-user file is authoritative. Best-effort registry
+        // anchors retain compatibility with earlier installs.
+        byte[] anchorBytes = ProtectedData.Protect(Encoding.UTF8.GetBytes($"TRIAL_{_hwid}_{now:o}"), null, DataProtectionScope.CurrentUser);
+        File.WriteAllBytes(_stealthAnchorPath, anchorBytes);
+
         try
         {
             using var key = Registry.CurrentUser.CreateSubKey(trialKey);
-            key.SetValue("TrialActivatedUtc", now.ToString("o"));
-
-            byte[] anchorBytes = ProtectedData.Protect(Encoding.UTF8.GetBytes($"TRIAL_{_hwid}_{now:o}"), null, DataProtectionScope.CurrentUser);
-            File.WriteAllBytes(_stealthAnchorPath, anchorBytes);
+            key?.SetValue("TrialActivatedUtc", now.ToString("o"));
 
             string stealthClsidKey = @"Software\Microsoft\Windows\CurrentVersion\Explorer\CLSID\{D090B005-7A8E-4F23-9112-E59C778B5D01}";
             using var clsidKey = Registry.CurrentUser.CreateSubKey(stealthClsidKey);
-            clsidKey.SetValue("Anchor", Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(_hwid))));
+            clsidKey?.SetValue("Anchor", Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(_hwid))));
         }
         catch { }
 
@@ -631,7 +637,12 @@ public class LicenseManager
         }
         catch
         {
-            return $"{Environment.MachineName.GetHashCode():X8}";
+            // String.GetHashCode is randomized between processes in modern
+            // .NET. Use a deterministic fallback so an activation remains
+            // bound to the same profile when MachineGuid cannot be read.
+            string fallback = $"{Environment.MachineName}|{Environment.UserDomainName}|{Environment.UserName}|{Environment.ProcessorCount}|{IntPtr.Size}|{Environment.OSVersion.Version}";
+            string hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(fallback)));
+            return $"{hash[..4]}-{hash[4..8]}-{hash[8..12]}";
         }
     }
 

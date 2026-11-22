@@ -116,19 +116,22 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
 
     public string FormattedTotalBytes => DownloadSession.FormatBytes(TotalBytesDownloaded);
 
-    public bool IsMobilePhone => 
-        Description.Contains("Apple", StringComparison.OrdinalIgnoreCase) ||
-        Description.Contains("NDIS", StringComparison.OrdinalIgnoreCase) ||
-        Description.Contains("RNDIS", StringComparison.OrdinalIgnoreCase) ||
-        Description.Contains("USB", StringComparison.OrdinalIgnoreCase) ||
-        Description.Contains("Remote", StringComparison.OrdinalIgnoreCase) ||
-        Description.Contains("Samsung", StringComparison.OrdinalIgnoreCase) ||
-        Description.Contains("Pixel", StringComparison.OrdinalIgnoreCase) ||
-        Description.Contains("Android", StringComparison.OrdinalIgnoreCase) ||
-        Description.Contains("Tether", StringComparison.OrdinalIgnoreCase) ||
-        Description.Contains("Phone", StringComparison.OrdinalIgnoreCase) ||
-        Name.Contains("Cellular", StringComparison.OrdinalIgnoreCase) ||
-        Name.Contains("Mobile", StringComparison.OrdinalIgnoreCase);
+    public bool IsMobilePhone => LooksLikeMobileAdapter(Name, Description);
+
+    public static bool LooksLikeMobileAdapter(string? name, string? description)
+    {
+        string value = $"{name} {description}";
+        return value.Contains("Apple Mobile", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("iPhone", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("RNDIS", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("Android", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("Samsung", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("Pixel", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("Tether", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("Cellular", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("Mobile", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("Phone", StringComparison.OrdinalIgnoreCase);
+    }
 
     public bool IsWifi =>
         InterfaceType == NetworkInterfaceType.Wireless80211 ||
@@ -191,7 +194,7 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
         }
     }
 
-    public string RoleBadgeText => IsWifi ? "Default Internet (Wi-Fi)" : (IsMobilePhone ? "Dedicated Speed Pipeline" : "Bonded Network");
+    public string RoleBadgeText => IsWifi ? "Wi-Fi adapter" : (IsMobilePhone ? "Mobile data adapter" : "Network adapter");
     public string RoleBadgeColor => IsWifi ? "#10B981" : (IsMobilePhone ? "#F59E0B" : "#38BDF8");
 
     public event PropertyChangedEventHandler? PropertyChanged;

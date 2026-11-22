@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -15,75 +14,32 @@ using DonutBoost.Models;
 namespace DonutBoost.Engine;
 
 /// <summary>
-/// Game Launcher Accelerator & Live Network Traffic Monitor.
-/// Auto-detects active game downloads (Steam, Epic Games, EA, Rockstar, Battle.net)
-/// and monitors real-time multi-channel bandwidth across Home Wi-Fi and Mobile Data
-/// without hijacking the Windows system proxy or breaking browser downloads.
+/// Monitors game-launcher process activity and actual receive rates reported by
+/// Windows network-interface counters. It does not intercept launcher traffic.
 /// </summary>
 public class GameBoostProxyServer : IDisposable
 {
     private readonly NetworkBondingManager _bondingManager;
     private readonly LicenseManager? _licenseManager;
     private CancellationTokenSource? _cts;
+    private Task? _monitorTask;
     private volatile bool _isRunning = false;
 
-    private long _totalBytesDownloaded = 0;
-    private long _steamCurrentDownloadBytes = 0;
-    private long _lastSteamProgressBytes = -1;
-    private DateTime _lastSteamProgressSampleUtc;
-    private double _steamDownloadSpeedBps;
-    private int _activeConnections = 0;
     private string _detectedLauncher = "Game Launcher";
     private long _detectedGameSizeBytes = 0;
+    private long _detectedGameProgressBytes = 0;
+    private bool _hasReliableGameProgress;
     private string _detectedGameName = "";
 
     public bool IsRunning => _isRunning;
     public int Port => 9090;
-    public long TotalBytesDownloaded => Interlocked.Read(ref _totalBytesDownloaded);
-    public int ActiveConnections => _activeConnections;
     public long DetectedGameSizeBytes => _detectedGameSizeBytes;
-    public bool HasAuthoritativeGameSize => _detectedLauncher == "Steam" && _detectedGameSizeBytes > 0;
+    public long DetectedGameProgressBytes => _detectedGameProgressBytes;
+    public bool HasReliableGameProgress => _hasReliableGameProgress;
     public string DetectedGameName => _detectedGameName;
 
-    public event Action<long, double, int, string>? ProxyMetricsUpdated;
+    public event Action<long, long, double, bool, bool, string>? ProxyMetricsUpdated;
     public event Action<string>? LogReceived;
-
-    // Known game launcher process names
-    private static readonly string[] GameLauncherProcesses = new[]
-    {
-        "EpicGamesLauncher",
-        "UnrealCEFSubProcess",
-        "steam",
-        "steamwebhelper",
-        "EADesktop",
-        "EALauncher",
-        "Link2EA",
-        "Battle.net",
-        "Agent",
-        "RockstarService",
-        "Launcher",
-        "SocialClubHelper",
-        "upc",
-        "uplay",
-        "UbisoftConnect",
-        "XboxApp",
-        "GamingServices",
-        "GOG Galaxy",
-        "GalaxyClient",
-        "RiotClientServices",
-        "RiotClientUx",
-        "RiotClientCrashHandler",
-        "LeagueClient",
-        "VALORANT",
-        "UnityHub",
-        "Unity",
-        "UnityPackageInstaller",
-        "WinStore.App",
-        "Microsoft.Store",
-        "DeliveryOptimization",
-        "InstallAgent",
-        "wsappx"
-    };
 
     public GameBoostProxyServer(NetworkBondingManager bondingManager, LicenseManager? licenseManager = null)
     {
@@ -97,7 +53,7 @@ public class GameBoostProxyServer : IDisposable
 
         if (_licenseManager != null && !_licenseManager.ValidateActiveSessionToken())
         {
-            LogReceived?.Invoke("🔒 Security: Active valid license required to use Game Launcher Accelerator.");
+            LogReceived?.Invoke("🔒 Security: Active valid license required to use Game Launcher Monitor.");
             return false;
         }
 
@@ -105,14 +61,24 @@ public class GameBoostProxyServer : IDisposable
         {
             _isRunning = true;
             _cts = new CancellationTokenSource();
-            _ = MonitorGameTrafficLoopAsync(_cts.Token);
+            var token = _cts.Token;
+            _monitorTask = Task.Run(async () =>
+            {
+                try { await MonitorGameTrafficLoopAsync(token); }
+                catch (OperationCanceledException) { }
+                catch (Exception ex)
+                {
+                    _isRunning = false;
+                    LogReceived?.Invoke($"Game launcher monitor stopped after an error: {ex.Message}");
+                }
+            });
 
-            LogReceived?.Invoke("🎮 Game Launcher Accelerator active. Monitoring Steam, Epic Games, Riot Client, Microsoft Store, Unity, EA, Xbox with Home Wi-Fi & Mobile 5G.");
+            LogReceived?.Invoke("Game launcher activity monitor started. Progress is available only when a launcher exposes reliable download counters.");
             return true;
         }
         catch (Exception ex)
         {
-            LogReceived?.Invoke($"✕ Failed to start Game Launcher Accelerator: {ex.Message}");
+            LogReceived?.Invoke($"✕ Failed to start Game Launcher Monitor: {ex.Message}");
             _isRunning = false;
             return false;
         }
@@ -129,7 +95,7 @@ public class GameBoostProxyServer : IDisposable
         }
         catch { }
 
-        LogReceived?.Invoke("🛑 Game Launcher Accelerator stopped.");
+        LogReceived?.Invoke("🛑 Game Launcher Monitor stopped.");
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -155,7 +121,7 @@ public class GameBoostProxyServer : IDisposable
         public double CurrentWriteSpeedBps { get; set; }
     }
 
-    private static (string ActiveLauncher, string SummaryLabel, int ActiveStreams) DetectLauncher(Process[] processes, double elapsedSec)
+    private static (string ActiveLauncher, string SummaryLabel) DetectLauncher(Process[] processes, double elapsedSec)
     {
         var candidates = new List<LauncherCandidate>();
 
@@ -245,7 +211,7 @@ public class GameBoostProxyServer : IDisposable
 
         if (candidates.Count == 0)
         {
-            return ("", "Ready", 0);
+            return ("", "Ready");
         }
 
         // Measure disk write throughput for each running launcher process
@@ -286,85 +252,43 @@ public class GameBoostProxyServer : IDisposable
 
         if (activeDownloading != null)
         {
-            return (activeDownloading.Name, activeDownloading.Name, activeDownloading.Processes.Count);
-        }
-
-        // If no launcher is writing at > 50 KB/s, check active install files
-        if (candidates.Any(c => c.Name == "Epic Games"))
-        {
-            var (eName, _) = DetectEpicDownloadSize();
-            if (!string.IsNullOrEmpty(eName))
-            {
-                var epicCandidate = candidates.First(c => c.Name == "Epic Games");
-                return ("Epic Games", "Epic Games", epicCandidate.Processes.Count);
-            }
+            return (activeDownloading.Name, activeDownloading.Name);
         }
 
         // In Standby (none actively downloading), report unified "Game Launcher Standby"
-        return ("Game Launcher", "Game Launcher Standby", candidates.Sum(c => c.Processes.Count));
+        return ("Game Launcher", "Game Launcher Standby");
     }
 
     private string _summaryLauncherLabel = "Ready";
 
-    private sealed class AdapterRollingTracker
-    {
-        private readonly Queue<(DateTime Time, long Bytes)> _samples = new();
-
-        public double Update(long currentBytes)
-        {
-            var now = DateTime.UtcNow;
-            _samples.Enqueue((now, currentBytes));
-
-            // Retain samples within a 1.25-second window to eliminate erratic spikes while matching Steam's 1-sec rolling counter
-            while (_samples.Count > 2 && (now - _samples.Peek().Time).TotalSeconds > 1.25)
-            {
-                _samples.Dequeue();
-            }
-
-            if (_samples.Count < 2) return 0;
-
-            var oldest = _samples.Peek();
-            double dt = (now - oldest.Time).TotalSeconds;
-            if (dt < 0.20) return 0;
-
-            long delta = Math.Max(0, currentBytes - oldest.Bytes);
-            return delta / dt; // Accurate rolling bytes/sec
-        }
-
-        public void Reset()
-        {
-            _samples.Clear();
-        }
-    }
-
     private async Task MonitorGameTrafficLoopAsync(CancellationToken token)
     {
-        var lastInterfaceBytes = new ConcurrentDictionary<string, long>();
-        var adapterRollingTrackers = new ConcurrentDictionary<string, AdapterRollingTracker>();
-        var lastCheckTime = Stopwatch.StartNew();
         var processCheckStopwatch = Stopwatch.StartNew();
-        var activeTrafficStopwatch = Stopwatch.StartNew();
         var sizeDetectionStopwatch = Stopwatch.StartNew();
-        activeTrafficStopwatch.Restart();
-        double smoothedSpeedBps = 0;
 
         bool isGameActive = false;
-        int activeStreamsCount = 0;
-
         while (!token.IsCancellationRequested && _isRunning)
         {
             await Task.Delay(250, token);
-
-            double loopElapsedSeconds = lastCheckTime.Elapsed.TotalSeconds;
+            if (token.IsCancellationRequested || !_isRunning) break;
 
             // 1. Check for active game launcher processes every 1.5 seconds to save CPU
             if (processCheckStopwatch.ElapsedMilliseconds >= 1500)
             {
+                double processSampleSeconds = Math.Max(0.1, processCheckStopwatch.Elapsed.TotalSeconds);
                 processCheckStopwatch.Restart();
                 try
                 {
                     var runningProcesses = Process.GetProcesses();
-                    var (activeLauncher, summaryLabel, count) = DetectLauncher(runningProcesses, Math.Max(0.5, loopElapsedSeconds));
+                    (string activeLauncher, string summaryLabel) = ("", "Ready");
+                    try
+                    {
+                        (activeLauncher, summaryLabel) = DetectLauncher(runningProcesses, processSampleSeconds);
+                    }
+                    finally
+                    {
+                        foreach (var process in runningProcesses) process.Dispose();
+                    }
 
                     if (!string.IsNullOrEmpty(activeLauncher))
                     {
@@ -372,27 +296,20 @@ public class GameBoostProxyServer : IDisposable
                         {
                             _detectedGameSizeBytes = 0;
                             _detectedGameName = "";
-                            Interlocked.Exchange(ref _steamCurrentDownloadBytes, 0);
-                            _lastSteamProgressBytes = -1;
-                            _steamDownloadSpeedBps = 0;
+                            _detectedGameProgressBytes = 0;
+                            _hasReliableGameProgress = false;
                         }
-                        // DetectLauncher uses "Game Launcher" when launchers are
-                        // open but no active download has been found.
-                        isGameActive = !string.Equals(activeLauncher, "Game Launcher", StringComparison.OrdinalIgnoreCase);
+                        isGameActive = !activeLauncher.Equals("Game Launcher", StringComparison.OrdinalIgnoreCase);
                         _detectedLauncher = activeLauncher;
                         _summaryLauncherLabel = summaryLabel;
-                        activeStreamsCount = count;
                     }
                     else
                     {
                         _detectedGameSizeBytes = 0;
                         _detectedGameName = "";
-                        Interlocked.Exchange(ref _steamCurrentDownloadBytes, 0);
-                        _lastSteamProgressBytes = -1;
-                        _steamDownloadSpeedBps = 0;
+                        _detectedGameProgressBytes = 0;
+                        _hasReliableGameProgress = false;
                         isGameActive = false;
-                        activeStreamsCount = 0;
-                        _activeConnections = 0;
                         _detectedLauncher = "Ready";
                         _summaryLauncherLabel = "Ready";
                     }
@@ -403,184 +320,50 @@ public class GameBoostProxyServer : IDisposable
             // Periodic License Validation
             if (_licenseManager != null && !_licenseManager.ValidateActiveSessionToken())
             {
-                LogReceived?.Invoke("🔒 Security: Active valid license required. Accelerator suspended.");
+                LogReceived?.Invoke("🔒 Security: Active valid license required. Launcher monitor stopped.");
                 Stop();
                 break;
             }
 
-            // 2. Measure actual hardware network throughput across physical adapters
-            double elapsedSeconds = lastCheckTime.Elapsed.TotalSeconds;
-            if (elapsedSeconds < 0.25) continue;
-            lastCheckTime.Restart();
+            // Read the independent physical-interface counters maintained by
+            // NetworkBondingManager. They include all apps' RX traffic, not
+            // only the launcher; never use this total as game-file progress.
+            double totalInstantBps = _bondingManager.Adapters
+                .Where(adapter => adapter.IsOnline)
+                .Sum(adapter => Math.Max(0, adapter.CurrentSpeedBps));
 
-            double totalInstantBps = 0;
-            var currentNics = NetworkInterface.GetAllNetworkInterfaces()
-                .Where(n => n.OperationalStatus == OperationalStatus.Up && n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
-                .ToList();
+            // NIC counters show real adapter traffic, but cannot prove which
+            // process owns it. Use them for truthful network rates only.
+            const double MinLauncherTrafficBps = 8 * 1024;
+            bool isLauncherTraffic = isGameActive && totalInstantBps >= MinLauncherTrafficBps;
 
-            var adapterSamples = new List<(NetworkAdapterInfo Adapter, long DeltaBytes, double SpeedBps)>();
-
-            foreach (var adapter in _bondingManager.Adapters)
+            // A launcher can be identified while idle. Only label it active
+            // when its process is writing and adapter traffic is present.
+            if (isGameActive && isLauncherTraffic)
             {
-                var nic = currentNics.FirstOrDefault(n => n.Id == adapter.Id || n.Name.Equals(adapter.Name, StringComparison.OrdinalIgnoreCase));
-                if (nic == null) continue;
+                const bool launcherActivityDetected = true;
+                double reportSpeed = totalInstantBps;
 
-                try
-                {
-                    var stats = nic.GetIPStatistics();
-                    long currentBytes = stats.BytesReceived;
-
-                    var tracker = adapterRollingTrackers.GetOrAdd(adapter.Id, _ => new AdapterRollingTracker());
-                    double rollingSpeedBps = tracker.Update(currentBytes);
-
-                    long previousBytes = lastInterfaceBytes.GetOrAdd(adapter.Id, currentBytes);
-                    long deltaBytes = Math.Max(0, currentBytes - previousBytes);
-                    lastInterfaceBytes[adapter.Id] = currentBytes;
-
-                    // Only assign speed if adapter is online and enabled
-                    if (adapter.IsEnabled && adapter.IsOnline)
-                    {
-                        // Clean noise below 5 KB/s
-                        adapter.CurrentSpeedBps = rollingSpeedBps < 5000 ? 0 : rollingSpeedBps;
-                        totalInstantBps += adapter.CurrentSpeedBps;
-                        adapterSamples.Add((adapter, deltaBytes, adapter.CurrentSpeedBps));
-                    }
-                }
-                catch { }
-            }
-
-            // 3. Genuine Game Download Threshold (100 KB/s = 800 Kbps)
-            const double MinActiveDownloadBps = 100 * 1024;
-            bool isGenuineDownload = isGameActive && totalInstantBps >= MinActiveDownloadBps;
-
-            if (isGenuineDownload)
-            {
-                activeTrafficStopwatch.Restart();
-                // 1-second rolling EMA to match Steam's 1-second counter and avoid erratic >300 spikes
-                smoothedSpeedBps = (smoothedSpeedBps <= 0) 
-                    ? totalInstantBps 
-                    : (smoothedSpeedBps * 0.75) + (totalInstantBps * 0.25);
-
-                // Add to per-adapter downloaded bytes and update UI metrics
-                foreach (var sample in adapterSamples)
-                {
-                    if (sample.DeltaBytes > 0)
-                    {
-                        sample.Adapter.AddDownloadedBytes(sample.DeltaBytes);
-                    }
-                    sample.Adapter.NotifyMetricsChanged();
-                }
-
-                long frameBytes = (long)(totalInstantBps * elapsedSeconds);
-                if (frameBytes > 0)
-                {
-                    Interlocked.Add(ref _totalBytesDownloaded, frameBytes);
-                }
-            }
-            else if (activeTrafficStopwatch.ElapsedMilliseconds < 3500)
-            {
-                // Smooth decay during momentary disk commit or TCP renegotiation
-                smoothedSpeedBps = Math.Max(0, smoothedSpeedBps * 0.80);
-                foreach (var sample in adapterSamples)
-                {
-                    sample.Adapter.NotifyMetricsChanged();
-                }
-            }
-
-            // If active game traffic occurred within the last 3.5 seconds, maintain active acceleration display
-            if (isGameActive && activeTrafficStopwatch.ElapsedMilliseconds < 3500 && (totalInstantBps >= MinActiveDownloadBps || smoothedSpeedBps >= MinActiveDownloadBps))
-            {
-                _activeConnections = Math.Max(4, Math.Min(16, activeStreamsCount * 2));
-                // Use smoothedSpeedBps so speed matches Steam's 1-second counter without spiking above 300 on tiny bursts
-                double reportSpeed = _detectedLauncher == "Steam" && _detectedGameSizeBytes > 0
-                    ? _steamDownloadSpeedBps
-                    : smoothedSpeedBps;
-
-                // Throttled detection: Check for auto-detected game download sizes from all launchers once every 3s
+                // Refresh Steam's verified transfer counters every three seconds.
                 if (_detectedGameSizeBytes <= 0 || sizeDetectionStopwatch.ElapsedMilliseconds >= 3000)
                 {
                     sizeDetectionStopwatch.Restart();
                     if (_detectedLauncher == "Steam")
                     {
-                        var (sName, sBytes, sCur) = DetectSteamDownloadSize();
-                        if (sBytes > 0)
-                        {
-                            _detectedGameSizeBytes = sBytes;
-                            _detectedGameName = sName;
-                            var sampleTime = DateTime.UtcNow;
-                            if (_lastSteamProgressBytes >= 0 && sCur >= _lastSteamProgressBytes)
-                            {
-                                var seconds = (sampleTime - _lastSteamProgressSampleUtc).TotalSeconds;
-                                _steamDownloadSpeedBps = seconds > 0.25 ? (sCur - _lastSteamProgressBytes) / seconds : 0;
-                            }
-                            else
-                            {
-                                _steamDownloadSpeedBps = 0;
-                            }
-                            _lastSteamProgressBytes = sCur;
-                            _lastSteamProgressSampleUtc = sampleTime;
-                        }
-                        Interlocked.Exchange(ref _steamCurrentDownloadBytes, sCur);
+                        var (steamName, steamBytes, steamProgress) = DetectSteamDownloadSize();
+                        _detectedGameSizeBytes = steamBytes;
+                        _detectedGameName = steamName;
+                        _detectedGameProgressBytes = steamProgress;
+                        _hasReliableGameProgress = steamBytes > 0 && !string.IsNullOrWhiteSpace(steamName);
                     }
-                    else if (_detectedLauncher == "Epic Games")
+                    else
                     {
-                        var (eName, eBytes) = DetectEpicDownloadSize();
-                        if (eBytes > 0) _detectedGameSizeBytes = eBytes;
-                        if (!string.IsNullOrEmpty(eName)) _detectedGameName = eName;
-                    }
-                    else if (_detectedLauncher == "Riot Client")
-                    {
-                        var (rName, rBytes) = DetectRiotDownloadSize();
-                        if (rBytes > 0) _detectedGameSizeBytes = rBytes;
-                        if (!string.IsNullOrEmpty(rName)) _detectedGameName = rName;
-                    }
-                    else if (_detectedLauncher == "Microsoft Store")
-                    {
-                        var (mName, mBytes) = DetectMsStoreDownloadSize();
-                        if (mBytes > 0) _detectedGameSizeBytes = mBytes;
-                        if (!string.IsNullOrEmpty(mName)) _detectedGameName = mName;
-                    }
-                    else if (_detectedLauncher == "Unity")
-                    {
-                        var (uName, uBytes) = DetectUnityDownloadSize();
-                        if (uBytes > 0) _detectedGameSizeBytes = uBytes;
-                        if (!string.IsNullOrEmpty(uName)) _detectedGameName = uName;
-                    }
-                    else if (_detectedLauncher == "EA App")
-                    {
-                        var (eaName, eaBytes) = DetectEaAppDownloadSize();
-                        if (eaBytes > 0) _detectedGameSizeBytes = eaBytes;
-                        if (!string.IsNullOrEmpty(eaName)) _detectedGameName = eaName;
-                    }
-                    else if (_detectedLauncher == "Battle.net")
-                    {
-                        var (bName, bBytes) = DetectBattleNetDownloadSize();
-                        if (bBytes > 0) _detectedGameSizeBytes = bBytes;
-                        if (!string.IsNullOrEmpty(bName)) _detectedGameName = bName;
-                    }
-                    else if (_detectedLauncher == "Rockstar Games")
-                    {
-                        var (rkName, rkBytes) = DetectRockstarDownloadSize();
-                        if (rkBytes > 0) _detectedGameSizeBytes = rkBytes;
-                        if (!string.IsNullOrEmpty(rkName)) _detectedGameName = rkName;
-                    }
-                    else if (_detectedLauncher == "Ubisoft Connect")
-                    {
-                        var (ubName, ubBytes) = DetectUbisoftDownloadSize();
-                        if (ubBytes > 0) _detectedGameSizeBytes = ubBytes;
-                        if (!string.IsNullOrEmpty(ubName)) _detectedGameName = ubName;
-                    }
-                    else if (_detectedLauncher == "Xbox App")
-                    {
-                        var (xbName, xbBytes) = DetectXboxDownloadSize();
-                        if (xbBytes > 0) _detectedGameSizeBytes = xbBytes;
-                        if (!string.IsNullOrEmpty(xbName)) _detectedGameName = xbName;
-                    }
-                    else if (_detectedLauncher == "GOG Galaxy")
-                    {
-                        var (ggName, ggBytes) = DetectGogDownloadSize();
-                        if (ggBytes > 0) _detectedGameSizeBytes = ggBytes;
-                        if (!string.IsNullOrEmpty(ggName)) _detectedGameName = ggName;
+                        // Other launcher processes do not expose a verified
+                        // active-game size/progress source to this monitor.
+                        _detectedGameSizeBytes = 0;
+                        _detectedGameProgressBytes = 0;
+                        _detectedGameName = "";
+                        _hasReliableGameProgress = false;
                     }
                 }
 
@@ -588,27 +371,21 @@ public class GameBoostProxyServer : IDisposable
                     ? $"{_detectedLauncher} - {_detectedGameName}" 
                     : _detectedLauncher;
 
-                long displayedBytes = _detectedLauncher == "Steam" && _detectedGameSizeBytes > 0
-                    ? Interlocked.Read(ref _steamCurrentDownloadBytes)
-                    : TotalBytesDownloaded;
-                ProxyMetricsUpdated?.Invoke(displayedBytes, reportSpeed, _activeConnections, displayLabel);
+                long displayedBytes = _hasReliableGameProgress ? _detectedGameProgressBytes : 0;
+                ProxyMetricsUpdated?.Invoke(displayedBytes, _detectedGameSizeBytes, reportSpeed, launcherActivityDetected, _hasReliableGameProgress, displayLabel);
             }
             else
             {
                 // Launcher is open but in idle standby (no active game download taking place)
-                smoothedSpeedBps = 0;
-                _activeConnections = 0;
                 _detectedGameName = "";
                 _detectedGameSizeBytes = 0;
-                Interlocked.Exchange(ref _steamCurrentDownloadBytes, 0);
-                _lastSteamProgressBytes = -1;
-                _steamDownloadSpeedBps = 0;
+                _detectedGameProgressBytes = 0;
+                _hasReliableGameProgress = false;
                 foreach (var adapter in _bondingManager.Adapters)
                 {
-                    adapter.CurrentSpeedBps = 0;
                     adapter.NotifyMetricsChanged();
                 }
-                ProxyMetricsUpdated?.Invoke(TotalBytesDownloaded, 0, 0, _summaryLauncherLabel);
+                ProxyMetricsUpdated?.Invoke(0, 0, totalInstantBps, false, false, _summaryLauncherLabel);
             }
         }
     }
@@ -714,57 +491,7 @@ public class GameBoostProxyServer : IDisposable
                 catch { }
             }
 
-            // Fallback: check content_log.txt for chunk stream & update started lines
-            string logPath = Path.Combine(steamRoot, "logs", "content_log.txt");
-            if (File.Exists(logPath))
-            {
-                using var fs = new FileStream(logPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                using var sr = new StreamReader(fs);
-                var lines = new List<string>();
-                while (!sr.EndOfStream)
-                {
-                    string line = sr.ReadLine() ?? "";
-                    lines.Add(line);
-                    if (lines.Count > 50) lines.RemoveAt(0);
-                }
-
-                for (int i = lines.Count - 1; i >= 0; i--)
-                {
-                    if (lines[i].Contains("Current download rate: 0.000 Mbps", StringComparison.OrdinalIgnoreCase) ||
-                        lines[i].Contains("Connection has been idle", StringComparison.OrdinalIgnoreCase))
-                    {
-                        return ("", 0, 0);
-                    }
-
-                    // Match: AppID 4080220 update started : download 0/62414650160, store 0/0, reuse 0/0, delta 0/0, stage 0/64678529714
-                    var startMatch = Regex.Match(lines[i], @"AppID\s+(\d+)\s+update started\s*:\s*download\s+(\d+)/(\d+).*?stage\s+(\d+)/(\d+)", RegexOptions.IgnoreCase);
-                    if (startMatch.Success)
-                    {
-                        string appid = startMatch.Groups[1].Value;
-                        if (appid == "228980") continue;
-                        long curDl = long.TryParse(startMatch.Groups[2].Value, out var cd) ? cd : 0;
-                        long totDl = long.TryParse(startMatch.Groups[3].Value, out var td) ? td : 0;
-                        long curSt = long.TryParse(startMatch.Groups[4].Value, out var cs) ? cs : 0;
-                        long totSt = long.TryParse(startMatch.Groups[5].Value, out var ts) ? ts : 0;
-
-                        // TotDl is the network download payload size (matches Steam's "Downloading data: X / Y GB" byte-for-byte)
-                        long effectiveSize = totDl > 0 ? totDl : (totSt > 0 ? totSt : 0);
-                        long currentProgress = curDl > 0 ? curDl : curSt;
-                        string gameTitle = "Steam Game";
-                        if (appid == "4080220")
-                        {
-                            gameTitle = "EA SPORTS FC™ 27";
-                        }
-                        return (gameTitle, effectiveSize, currentProgress);
-                    }
-
-                    if (lines[i].Contains("Downloading", StringComparison.OrdinalIgnoreCase) &&
-                        lines[i].Contains("chunks for depot", StringComparison.OrdinalIgnoreCase))
-                    {
-                        return ("Game Stream", 0, 0);
-                    }
-                }
-            }
+            // Steam content log entries do not expose authoritative current progress.
         }
         catch { }
         return ("", 0, 0);
@@ -782,10 +509,6 @@ public class GameBoostProxyServer : IDisposable
             var nameMatch = Regex.Match(content, @"""name""\s+""([^""]+)""");
             if (nameMatch.Success) name = nameMatch.Groups[1].Value;
 
-            long bytesStage = 0;
-            var stageMatch = Regex.Match(content, @"""BytesToStage""\s+""(\d+)""");
-            if (stageMatch.Success && long.TryParse(stageMatch.Groups[1].Value, out long s)) bytesStage = s;
-
             long bytesDownload = 0;
             var dlMatch = Regex.Match(content, @"""BytesToDownload""\s+""(\d+)""");
             if (dlMatch.Success && long.TryParse(dlMatch.Groups[1].Value, out long d)) bytesDownload = d;
@@ -793,10 +516,6 @@ public class GameBoostProxyServer : IDisposable
             long bytesDownloaded = 0;
             var curDlMatch = Regex.Match(content, @"""BytesDownloaded""\s+""(\d+)""");
             if (curDlMatch.Success && long.TryParse(curDlMatch.Groups[1].Value, out long cdl)) bytesDownloaded = cdl;
-
-            long bytesStaged = 0;
-            var curStMatch = Regex.Match(content, @"""BytesStaged""\s+""(\d+)""");
-            if (curStMatch.Success && long.TryParse(curStMatch.Groups[1].Value, out long cst)) bytesStaged = cst;
 
             int stateFlags = 0;
             var flagMatch = Regex.Match(content, @"""StateFlags""\s+""(\d+)""");
@@ -808,8 +527,8 @@ public class GameBoostProxyServer : IDisposable
             // never installed size/depot size, for download ETA.
             const int activeUpdateStates = 2 | 1024 | 2048 | 4096 | 8192 | 16384 | 32768 | 65536;
             bool updateIsActive = (stateFlags & activeUpdateStates) != 0;
-            long effectiveSize = bytesDownload > 0 ? bytesDownload : bytesStage;
-            long currentProgress = bytesDownload > 0 ? bytesDownloaded : bytesStaged;
+            long effectiveSize = bytesDownload;
+            long currentProgress = Math.Min(bytesDownloaded, bytesDownload);
 
             bool isSteamworksPrerequisite = name.Contains("Steamworks Common Redistributables", StringComparison.OrdinalIgnoreCase) ||
                                             name.Contains("Redistributable", StringComparison.OrdinalIgnoreCase);
@@ -822,297 +541,12 @@ public class GameBoostProxyServer : IDisposable
         return ("", 0, 0);
     }
 
-    private static (string GameName, long TotalBytes) DetectEpicDownloadSize()
-    {
-        try
-        {
-            // 1. Epic Games Launcher active manifests
-            string manifestsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                "Epic", "EpicGamesLauncher", "Data", "Manifests");
-
-            if (Directory.Exists(manifestsPath))
-            {
-                var files = new DirectoryInfo(manifestsPath).GetFiles("*.item")
-                    .OrderByDescending(f => f.LastWriteTimeUtc)
-                    .ToList();
-
-                foreach (var file in files)
-                {
-                    try
-                    {
-                        using var fs = new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                        using var sr = new StreamReader(fs);
-                        string content = sr.ReadToEnd();
-
-                        bool isIncomplete = content.Contains("\"bIsIncompleteInstall\": true", StringComparison.OrdinalIgnoreCase) ||
-                                            content.Contains("\"bIsIncompleteInstall\":true", StringComparison.OrdinalIgnoreCase);
-
-                        string name = "";
-                        var nameMatch = Regex.Match(content, @"""DisplayName""\s*:\s*""([^""]+)""");
-                        if (nameMatch.Success) name = nameMatch.Groups[1].Value;
-
-                        long installSize = 0;
-                        var instMatch = Regex.Match(content, @"""InstallSize""\s*:\s*(\d+)");
-                        if (instMatch.Success && long.TryParse(instMatch.Groups[1].Value, out long isz)) installSize = isz;
-
-                        long downloadSize = 0;
-                        var dlMatch = Regex.Match(content, @"""DownloadSize""\s*:\s*(\d+)");
-                        if (dlMatch.Success && long.TryParse(dlMatch.Groups[1].Value, out long dsz)) downloadSize = dsz;
-
-                        long targetSize = Math.Max(installSize, downloadSize);
-
-                        if (isIncomplete && (targetSize > 0 || !string.IsNullOrEmpty(name)))
-                        {
-                            return (string.IsNullOrEmpty(name) ? "Epic Game" : name, targetSize);
-                        }
-                    }
-                    catch { }
-                }
-            }
-
-            // 2. Secondary check: installations.jsonl
-            string jsonlPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "com.epicgames.eglv2", "installations.jsonl");
-
-            if (File.Exists(jsonlPath))
-            {
-                using var fs = new FileStream(jsonlPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                using var sr = new StreamReader(fs);
-                var activeInstalls = new Dictionary<string, string>();
-                while (!sr.EndOfStream)
-                {
-                    string line = sr.ReadLine() ?? "";
-                    var idMatch = Regex.Match(line, @"""installationId""\s*:\s*""([^""]+)""");
-                    if (!idMatch.Success) continue;
-                    string id = idMatch.Groups[1].Value;
-
-                    if (line.Contains("\"deleted\":true") || line.Contains("\"complete\":true"))
-                    {
-                        activeInstalls.Remove(id);
-                    }
-                    else if (line.Contains("\"complete\":false"))
-                    {
-                        var dirMatch = Regex.Match(line, @"""dir""\s*:\s*""([^""]+)""");
-                        if (dirMatch.Success)
-                        {
-                            string dir = dirMatch.Groups[1].Value.Replace(@"\\", @"\");
-                            activeInstalls[id] = Path.GetFileName(dir);
-                        }
-                    }
-                }
-
-                if (activeInstalls.Count > 0)
-                {
-                    return (activeInstalls.Values.Last(), 0);
-                }
-            }
-        }
-        catch { }
-        return ("", 0);
-    }
-
-    private static (string GameName, long TotalBytes) DetectRiotDownloadSize()
-    {
-        try
-        {
-            var processes = Process.GetProcesses();
-            if (processes.Any(p => p.ProcessName.Contains("VALORANT", StringComparison.OrdinalIgnoreCase)))
-            {
-                return ("VALORANT", 45L * 1024 * 1024 * 1024);
-            }
-            if (processes.Any(p => p.ProcessName.Contains("LeagueClient", StringComparison.OrdinalIgnoreCase)))
-            {
-                return ("League of Legends", 26L * 1024 * 1024 * 1024);
-            }
-            if (Directory.Exists(@"C:\Riot Games\VALORANT"))
-            {
-                return ("VALORANT", 45L * 1024 * 1024 * 1024);
-            }
-            if (Directory.Exists(@"C:\Riot Games\League of Legends"))
-            {
-                return ("League of Legends", 26L * 1024 * 1024 * 1024);
-            }
-        }
-        catch { }
-        return ("Riot Client Game", 0);
-    }
-
-    private static (string GameName, long TotalBytes) DetectMsStoreDownloadSize()
-    {
-        try
-        {
-            var psi = new ProcessStartInfo
-            {
-                FileName = "powershell.exe",
-                Arguments = "-NoProfile -Command \"Get-DeliveryOptimizationStatus -ErrorAction SilentlyContinue | Select-Object -First 1 | ForEach-Object { $_.DisplayName + '|' + $_.FileSizeInBytes }\"",
-                CreateNoWindow = true,
-                UseShellExecute = false,
-                RedirectStandardOutput = true
-            };
-            using var proc = Process.Start(psi);
-            if (proc != null)
-            {
-                string output = proc.StandardOutput.ReadToEnd().Trim();
-                proc.WaitForExit(800);
-                if (output.Contains('|'))
-                {
-                    var parts = output.Split('|');
-                    string name = parts[0].Trim();
-                    if (long.TryParse(parts[1].Trim(), out long size) && size > 0)
-                    {
-                        return (string.IsNullOrEmpty(name) ? "Microsoft Store App" : name, size);
-                    }
-                }
-            }
-        }
-        catch { }
-        return ("Microsoft Store App", 0);
-    }
-
-    private static (string GameName, long TotalBytes) DetectUnityDownloadSize()
-    {
-        try
-        {
-            // Standard Unity Editor download with core modules is ~7.0 GB
-            return ("Unity Editor", 7L * 1024 * 1024 * 1024);
-        }
-        catch { }
-        return ("Unity Editor", 7L * 1024 * 1024 * 1024);
-    }
-
-    private static (string GameName, long TotalBytes) DetectEaAppDownloadSize()
-    {
-        try
-        {
-            var processes = Process.GetProcesses();
-            if (processes.Any(p => p.ProcessName.Contains("FC27", StringComparison.OrdinalIgnoreCase) || 
-                                   p.ProcessName.Contains("FC26", StringComparison.OrdinalIgnoreCase) || 
-                                   p.ProcessName.Contains("FC25", StringComparison.OrdinalIgnoreCase)))
-            {
-                return ("EA SPORTS FC™ 27", 70L * 1024 * 1024 * 1024);
-            }
-            if (processes.Any(p => p.ProcessName.Contains("Apex", StringComparison.OrdinalIgnoreCase)))
-            {
-                return ("Apex Legends", 75L * 1024 * 1024 * 1024);
-            }
-            if (processes.Any(p => p.ProcessName.Contains("Battlefield", StringComparison.OrdinalIgnoreCase)))
-            {
-                return ("Battlefield", 80L * 1024 * 1024 * 1024);
-            }
-        }
-        catch { }
-        return ("EA Game", 70L * 1024 * 1024 * 1024);
-    }
-
-    private static (string GameName, long TotalBytes) DetectBattleNetDownloadSize()
-    {
-        try
-        {
-            var processes = Process.GetProcesses();
-            if (processes.Any(p => p.ProcessName.Contains("Overwatch", StringComparison.OrdinalIgnoreCase)))
-            {
-                return ("Overwatch 2", 50L * 1024 * 1024 * 1024);
-            }
-            if (processes.Any(p => p.ProcessName.Contains("Diablo", StringComparison.OrdinalIgnoreCase)))
-            {
-                return ("Diablo IV", 90L * 1024 * 1024 * 1024);
-            }
-            if (processes.Any(p => p.ProcessName.Contains("ModernWarfare", StringComparison.OrdinalIgnoreCase) || 
-                                   p.ProcessName.Contains("BlackOps", StringComparison.OrdinalIgnoreCase)))
-            {
-                return ("Call of Duty", 120L * 1024 * 1024 * 1024);
-            }
-        }
-        catch { }
-        return ("Battle.net Game", 50L * 1024 * 1024 * 1024);
-    }
-
-    private static (string GameName, long TotalBytes) DetectRockstarDownloadSize()
-    {
-        try
-        {
-            var processes = Process.GetProcesses();
-            if (processes.Any(p => p.ProcessName.Contains("GTA", StringComparison.OrdinalIgnoreCase)))
-            {
-                return ("Grand Theft Auto V", 110L * 1024 * 1024 * 1024);
-            }
-            if (processes.Any(p => p.ProcessName.Contains("RDR", StringComparison.OrdinalIgnoreCase)))
-            {
-                return ("Red Dead Redemption 2", 120L * 1024 * 1024 * 1024);
-            }
-        }
-        catch { }
-        return ("Rockstar Game", 110L * 1024 * 1024 * 1024);
-    }
-
-    private static (string GameName, long TotalBytes) DetectUbisoftDownloadSize()
-    {
-        try
-        {
-            var processes = Process.GetProcesses();
-            if (processes.Any(p => p.ProcessName.Contains("RainbowSix", StringComparison.OrdinalIgnoreCase) || 
-                                   p.ProcessName.Contains("Siege", StringComparison.OrdinalIgnoreCase)))
-            {
-                return ("Rainbow Six Siege", 70L * 1024 * 1024 * 1024);
-            }
-        }
-        catch { }
-        return ("Ubisoft Game", 70L * 1024 * 1024 * 1024);
-    }
-
-    private static (string GameName, long TotalBytes) DetectXboxDownloadSize()
-    {
-        try
-        {
-            var psi = new ProcessStartInfo
-            {
-                FileName = "powershell.exe",
-                Arguments = "-NoProfile -Command \"Get-DeliveryOptimizationStatus -ErrorAction SilentlyContinue | Select-Object -First 1 | ForEach-Object { $_.DisplayName + '|' + $_.FileSizeInBytes }\"",
-                CreateNoWindow = true,
-                UseShellExecute = false,
-                RedirectStandardOutput = true
-            };
-            using var proc = Process.Start(psi);
-            if (proc != null)
-            {
-                string output = proc.StandardOutput.ReadToEnd().Trim();
-                proc.WaitForExit(800);
-                if (output.Contains('|'))
-                {
-                    var parts = output.Split('|');
-                    string name = parts[0].Trim();
-                    if (long.TryParse(parts[1].Trim(), out long size) && size > 0)
-                    {
-                        return (string.IsNullOrEmpty(name) ? "Xbox App Game" : name, size);
-                    }
-                }
-            }
-        }
-        catch { }
-        return ("Xbox App Game", 0);
-    }
-
-    private static (string GameName, long TotalBytes) DetectGogDownloadSize()
-    {
-        try
-        {
-            var processes = Process.GetProcesses();
-            if (processes.Any(p => p.ProcessName.Contains("Cyberpunk", StringComparison.OrdinalIgnoreCase)))
-            {
-                return ("Cyberpunk 2077", 70L * 1024 * 1024 * 1024);
-            }
-            if (processes.Any(p => p.ProcessName.Contains("Witcher", StringComparison.OrdinalIgnoreCase)))
-            {
-                return ("The Witcher 3", 50L * 1024 * 1024 * 1024);
-            }
-        }
-        catch { }
-        return ("GOG Galaxy Game", 0);
-    }
-
     public void Dispose()
     {
         Stop();
+        try { _monitorTask?.Wait(TimeSpan.FromSeconds(2)); }
+        catch (AggregateException) { }
         _cts?.Dispose();
+        _cts = null;
     }
 }

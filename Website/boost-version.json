@@ -2,7 +2,7 @@
   "latestVersion": "1.0.5",
   "minRequiredVersion": "1.0.0",
   "releaseDate": "2026-11-22",
-  "releaseNotes": "Preserves Windows Wi-Fi routes and proxy settings. Improves Steam-specific size, progress, speed, and ETA reporting; other launchers are labeled as network activity when game-specific totals are unavailable.",
+  "releaseNotes": "Shows measured adapter receive rates, removes guessed launcher sizes, preserves Windows network routing, and improves download range validation and startup reliability.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
-  "fallbackUrl": "https://raw.githubusercontent.com/user-cariv/Donut/main/Website/Install%20Donut%20Boost.exe"
+  "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }

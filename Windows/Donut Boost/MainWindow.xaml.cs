@@ -39,6 +39,7 @@ public partial class MainWindow : Window
         _gameBoostProxy = new GameBoostProxyServer(_bondingManager, _licenseManager);
 
         _bondingManager.AdaptersChanged += OnAdaptersChanged;
+        _bondingManager.AdapterRatesUpdated += OnAdapterRatesUpdated;
         _downloader.ProgressUpdated += OnProgressUpdated;
         _downloader.StatusChanged += OnStatusChanged;
         _downloader.LogReceived += OnLogReceived;
@@ -110,6 +111,12 @@ public partial class MainWindow : Window
             };
             _autoUpdateTimer.Tick += async (_, _) => await CheckForAppUpdatesAsync(silent: true);
             _autoUpdateTimer.Start();
+        }
+        catch (Exception ex)
+        {
+            OnLogReceived($"Startup could not finish license setup: {ex.Message}");
+            ActivationStatusTextBlock.Text = "Donut Boost opened, but license setup needs attention. Try activating again.";
+            ActivationStatusTextBlock.Visibility = Visibility.Visible;
         }
         finally
         {
@@ -314,21 +321,21 @@ public partial class MainWindow : Window
     private void ModeCombineBoth_Click(object sender, RoutedEventArgs e)
     {
         _bondingManager.SetMode(BondingMode.CombineAll);
-        OnLogReceived("⚡ Switched to: Combine Both (Max Speed). Both Home Wi-Fi & Mobile Data are turned ON.");
+        OnLogReceived("Selected all available adapters for Donut's own direct downloads. Windows' default route is unchanged.");
         UpdateAdaptersUI();
     }
 
     private void ModeWifiOnly_Click(object sender, RoutedEventArgs e)
     {
         _bondingManager.SetMode(BondingMode.WifiOnly);
-        OnLogReceived("📶 Switched to: Home Wi-Fi Only. Mobile Data is turned OFF mid-download. Traffic routed 100% to Wi-Fi.");
+        OnLogReceived("Selected home adapters for Donut's own direct downloads. Other apps and Windows routing are unchanged.");
         UpdateAdaptersUI();
     }
 
     private void ModeMobileOnly_Click(object sender, RoutedEventArgs e)
     {
         _bondingManager.SetMode(BondingMode.MobileDataOnly);
-        OnLogReceived("📱 Switched to: Mobile Data Only. Home Wi-Fi is turned OFF mid-download. Traffic routed 100% to Phone 5G/4G.");
+        OnLogReceived("Selected mobile adapters for Donut's own direct downloads. Other apps and Windows routing are unchanged.");
         UpdateAdaptersUI();
     }
 
@@ -359,7 +366,7 @@ public partial class MainWindow : Window
     {
         _downloader.Throttler.SetLimitMbps(0);
         CustomSpeedLimitTextBox.Text = string.Empty;
-        OnLogReceived("⚡ Wi-Fi Speed Limit: Unlimited (Both Home Wi-Fi & Mobile 5G uncapped).");
+        OnLogReceived("⚡ Donut direct-download cap: Unlimited (Both Home Wi-Fi & Mobile 5G uncapped).");
         UpdateFooterSpeedLimitText();
     }
 
@@ -367,7 +374,7 @@ public partial class MainWindow : Window
     {
         _downloader.Throttler.SetLimitMbps(50);
         CustomSpeedLimitTextBox.Text = string.Empty;
-        OnLogReceived("⚡ Wi-Fi Speed Limit: Capped at 50 Mbps (Mobile 5G runs 100% full speed).");
+        OnLogReceived("⚡ Donut direct-download cap: Capped at 50 Mbps (mobile adapters are not capped by Donut).");
         UpdateFooterSpeedLimitText();
     }
 
@@ -375,7 +382,7 @@ public partial class MainWindow : Window
     {
         _downloader.Throttler.SetLimitMbps(100);
         CustomSpeedLimitTextBox.Text = string.Empty;
-        OnLogReceived("⚡ Wi-Fi Speed Limit: Capped at 100 Mbps (Mobile 5G runs 100% full speed).");
+        OnLogReceived("⚡ Donut direct-download cap: Capped at 100 Mbps (mobile adapters are not capped by Donut).");
         UpdateFooterSpeedLimitText();
     }
 
@@ -383,7 +390,7 @@ public partial class MainWindow : Window
     {
         _downloader.Throttler.SetLimitMbps(200);
         CustomSpeedLimitTextBox.Text = string.Empty;
-        OnLogReceived("⚡ Wi-Fi Speed Limit: Capped at 200 Mbps (Mobile 5G runs 100% full speed).");
+        OnLogReceived("⚡ Donut direct-download cap: Capped at 200 Mbps (mobile adapters are not capped by Donut).");
         UpdateFooterSpeedLimitText();
     }
 
@@ -397,7 +404,7 @@ public partial class MainWindow : Window
             SpeedLimit50Radio.IsChecked = false;
             SpeedLimit100Radio.IsChecked = false;
             SpeedLimit200Radio.IsChecked = false;
-            OnLogReceived($"⚡ Wi-Fi Speed Limit: Custom cap set to {mbps:F0} Mbps (Mobile 5G runs 100% uncapped).");
+            OnLogReceived($"⚡ Donut direct-download cap: Custom cap set to {mbps:F0} Mbps (mobile adapters are not capped by Donut).");
             UpdateFooterSpeedLimitText();
         }
         else
@@ -409,13 +416,13 @@ public partial class MainWindow : Window
     private void UpdateFooterSpeedLimitText()
     {
         double cap = _downloader.Throttler.CurrentLimitMbps;
-        string capText = cap > 0 ? $" • Wi-Fi Cap: {cap:F0} Mbps (5G Uncapped)" : "";
+        string capText = cap > 0 ? $" • Donut download cap: {cap:F0} Mbps (mobile adapters uncapped)" : "";
         FooterStatusModeText.Text = (_bondingManager.CurrentMode switch
         {
-            BondingMode.CombineAll => "⚡ Mode: Combine Both (Max Speed)",
-            BondingMode.WifiOnly => "📶 Mode: Home Wi-Fi Only",
-            BondingMode.MobileDataOnly => "📱 Mode: Mobile Data Only",
-            _ => "⚡ Mode: Custom Bonding"
+            BondingMode.CombineAll => "⚡ Donut downloads: all selected adapters",
+            BondingMode.WifiOnly => "📶 Donut downloads: home adapters",
+            BondingMode.MobileDataOnly => "📱 Donut downloads: mobile adapters",
+            _ => "⚡ Donut download adapter selection"
         }) + capText;
     }
 
@@ -424,7 +431,7 @@ public partial class MainWindow : Window
         if (sender is FrameworkElement element && element.DataContext is NetworkAdapterInfo adapter)
         {
             string state = adapter.IsEnabled ? "ON (Active)" : "OFF (Paused)";
-            OnLogReceived($"⚡ [{adapter.IconGlyph} {adapter.Name} ({adapter.TypeLabel})] Switched to {state} in between downloading.");
+            OnLogReceived($"[{adapter.IconGlyph} {adapter.Name} ({adapter.TypeLabel})] {state} for Donut's direct downloads. System routing was not changed.");
 
             SyncDownloadModeRadios();
             UpdateAdaptersUI();
@@ -453,11 +460,23 @@ public partial class MainWindow : Window
             _bondingManager.CurrentMode = BondingMode.MobileDataOnly;
         }
 
+        // Adapter selection is local to Donut's direct downloader. Never rewrite
+        // system routes or interface metrics; Windows keeps the user's default Wi-Fi.
     }
 
+    private void PostToUi(Action action)
+    {
+        try
+        {
+            if (Dispatcher.CheckAccess()) action();
+            else if (!Dispatcher.HasShutdownStarted && !Dispatcher.HasShutdownFinished)
+                Dispatcher.BeginInvoke(action);
+        }
+        catch (InvalidOperationException) { /* Ignore callbacks arriving during window shutdown. */ }
+    }
     private void OnAdaptersChanged()
     {
-        Dispatcher.Invoke(UpdateAdaptersUI);
+        PostToUi(UpdateAdaptersUI);
     }
 
     private void UpdateAdaptersUI()
@@ -469,7 +488,7 @@ public partial class MainWindow : Window
         AdapterCountTextBlock.Text = $"{activeCount} of {adapters.Count} Active";
 
         var activeNames = adapters.Where(a => a.IsEnabled && a.IsOnline).Select(a => $"{a.IconGlyph} {a.Name}");
-        FooterActiveConnectionsText.Text = $"{activeCount} Active ({string.Join(" + ", activeNames)})";
+        FooterActiveConnectionsText.Text = $"{activeCount} selected ({string.Join(" + ", activeNames)})";
         UpdateFooterSpeedLimitText();
 
         // Summary pills in left speedometer card (Green for ON, Gray for OFF)
@@ -508,7 +527,7 @@ public partial class MainWindow : Window
     {
         if (session.Status == DownloadStatus.Cancelled) return;
 
-        Dispatcher.BeginInvoke(() =>
+        PostToUi(() =>
         {
             if (_downloader.CurrentSession?.Status == DownloadStatus.Cancelled) return;
 
@@ -533,7 +552,7 @@ public partial class MainWindow : Window
 
     private void OnStatusChanged(DownloadSession session)
     {
-        Dispatcher.Invoke(() =>
+        PostToUi(() =>
         {
             StatusBadgeTextBlock.Text = session.Status switch
             {
@@ -617,7 +636,7 @@ public partial class MainWindow : Window
 
     private void OnLogReceived(string message)
     {
-        Dispatcher.Invoke(() =>
+        PostToUi(() =>
         {
             LogOutputTextBlock.Text = $"{message}\n{LogOutputTextBlock.Text}";
         });
@@ -730,7 +749,7 @@ public partial class MainWindow : Window
         {
             GameBoostToggle.IsChecked = false;
             ActivationOverlayGrid.Visibility = Visibility.Visible;
-            ActivationStatusTextBlock.Text = "Please enter a valid redeem code to use Game Launcher Accelerator.";
+            ActivationStatusTextBlock.Text = "Please enter a valid redeem code to use Game Launcher Monitor.";
             ActivationStatusTextBlock.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 69, 58));
             ActivationStatusTextBlock.Visibility = Visibility.Visible;
             return;
@@ -748,26 +767,24 @@ public partial class MainWindow : Window
 
     private void EnableGameBoost()
     {
-        WindowsProxyManager.DisableProxy(); // Always ensure Windows system proxy is clean and untouched
         if (_gameBoostProxy.Start(9090))
         {
             GameBoostToggle.IsChecked = true;
             GameBoostBadgeBorder.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 45, 27));
             GameBoostBadgeBorder.BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88));
-            GameBoostBadgeText.Text = "🟢 AUTO-ON (Active)";
+            GameBoostBadgeText.Text = "🟢 MONITORING";
             GameBoostBadgeText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88));
-            OnLogReceived("🎮 Game Launcher Accelerator active. Monitoring Steam, Epic, Riot Client, Xbox, Microsoft Store, Unity, EA App & Battle.net.");
+            OnLogReceived("Game launcher activity monitor active. Adapter rates are measured; launcher-specific progress is shown only when the launcher exposes it.");
         }
         else
         {
             GameBoostToggle.IsChecked = false;
-            OnLogReceived("✕ Failed to start Game Launcher Accelerator.");
+            OnLogReceived("✕ Failed to start Game Launcher Monitor.");
         }
     }
 
     private void DisableGameBoost()
     {
-        WindowsProxyManager.DisableProxy();
         _gameBoostProxy.Stop();
         GameBoostToggle.IsChecked = false;
         GameBoostBadgeBorder.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(35, 35, 45));
@@ -775,178 +792,158 @@ public partial class MainWindow : Window
         GameBoostBadgeText.Text = "⚪ OFF (Disabled)";
         GameBoostBadgeText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(161, 161, 170));
         GameBoostStreamsText.Text = "• 0 active game streams";
-        OnLogReceived("🛑 Game Launcher Accelerator turned OFF.");
+        OnLogReceived("🛑 Game Launcher Monitor turned OFF.");
     }
 
     private double _smoothedGameSpeedBps = 0;
-    private double _smoothedGameEtaSeconds = 0;
     private string _lastGameEstimateKey = "";
+    private long _lastGameProgressBytes = -1;
+    private DateTime _lastGameProgressAt = DateTime.MinValue;
 
-    private void OnGameProxyMetricsUpdated(long totalBytes, double instantSpeedBps, int activeConnections, string lastHost)
+    private void OnAdapterRatesUpdated(double combinedReceiveBps)
     {
-        Dispatcher.BeginInvoke(() =>
+        PostToUi(() =>
         {
-            double mbps = (instantSpeedBps * 8) / 1_000_000.0;
-            string speedText = mbps >= 1000 ? $"{(mbps / 1000):F2} Gbps" : $"{mbps:F1} Mbps";
-
-            // Update Game Launcher Accelerator Card Subtitle
-            if (activeConnections > 0)
-            {
-                GameBoostStreamsText.Text = $"• ⚡ Boosting {lastHost} ({speedText})";
-            }
-            else if (!string.IsNullOrEmpty(lastHost) && !lastHost.Equals("Ready", StringComparison.OrdinalIgnoreCase))
-            {
-                GameBoostStreamsText.Text = "• 🟢 Game Launcher Standby (Ready to Boost)";
-            }
-            else
-            {
-                GameBoostStreamsText.Text = "• 0 active game streams";
-            }
-
-            // Direct URL download takes 100% full priority over background game monitoring!
             bool isDirectDownloadActive = _downloader.CurrentSession != null &&
-                                          (_downloader.CurrentSession.Status == DownloadStatus.Downloading ||
-                                           _downloader.CurrentSession.Status == DownloadStatus.Probing ||
-                                           _downloader.CurrentSession.Status == DownloadStatus.Paused);
+                (_downloader.CurrentSession.Status == DownloadStatus.Downloading ||
+                 _downloader.CurrentSession.Status == DownloadStatus.Probing ||
+                 _downloader.CurrentSession.Status == DownloadStatus.Paused);
+            if (isDirectDownloadActive) return;
 
-            if (!isDirectDownloadActive)
-            {
-                if (activeConnections > 0)
-                {
-                    // 100% Automatic Game / Download Size Detection (Zero manual button pressing)
-                    // Steam's active appmanifest is the only source currently trusted for a package size.
-                    long targetBytes = _gameBoostProxy.HasAuthoritativeGameSize ? _gameBoostProxy.DetectedGameSizeBytes : 0;
-                    bool hasTargetSize = targetBytes > 0;
-
-                    // Reset ETA smoothing when a different launcher/game or
-                    // detected package size becomes active.
-                    string estimateKey = $"{lastHost}|{targetBytes}";
-                    if (!string.Equals(estimateKey, _lastGameEstimateKey, StringComparison.Ordinal))
-                    {
-                        _lastGameEstimateKey = estimateKey;
-                        _smoothedGameSpeedBps = 0;
-                        _smoothedGameEtaSeconds = 0;
-                    }
-
-                    long remainingBytes = hasTargetSize ? Math.Max(0, targetBytes - totalBytes) : 0;
-
-                    // Smooth speed and ETA for rock-solid real estimation without jumps
-                    if (instantSpeedBps > 1024)
-                    {
-                        _smoothedGameSpeedBps = (_smoothedGameSpeedBps <= 0)
-                            ? instantSpeedBps
-                            : (_smoothedGameSpeedBps * 0.85) + (instantSpeedBps * 0.15);
-                    }
-                    else
-                    {
-                        // Do not keep showing an old ETA after a download pauses
-                        // or Steam reports no new manifest progress.
-                        _smoothedGameSpeedBps = 0;
-                        _smoothedGameEtaSeconds = 0;
-                    }
-
-                    double effectiveSpeed = _smoothedGameSpeedBps > 1024 ? _smoothedGameSpeedBps : instantSpeedBps;
-                    double rawEta = (hasTargetSize && effectiveSpeed > 1024) ? ((double)remainingBytes / effectiveSpeed) : 0;
-
-                    if (rawEta > 0)
-                    {
-                        _smoothedGameEtaSeconds = (_smoothedGameEtaSeconds <= 0)
-                            ? rawEta
-                            : (_smoothedGameEtaSeconds * 0.80) + (rawEta * 0.20);
-                    }
-
-                    string etaText;
-                    if (!hasTargetSize)
-                    {
-                        etaText = "Unavailable for this launcher";
-                    }
-                    else if (remainingBytes == 0 && totalBytes >= targetBytes)
-                    {
-                        etaText = "Finished";
-                    }
-                    else if (_smoothedGameEtaSeconds > 86400 * 2)
-                    {
-                        etaText = "Calculating...";
-                    }
-                    else if (_smoothedGameEtaSeconds > 0)
-                    {
-                        etaText = DownloadSession.FormatETAFromSeconds(_smoothedGameEtaSeconds);
-                    }
-                    else
-                    {
-                        etaText = "--:--";
-                    }
-
-                    double percent = hasTargetSize ? Math.Clamp((double)totalBytes / targetBytes * 100.0, 0.0, 100.0) : 0;
-
-                    bool isSteamDownload = _gameBoostProxy.HasAuthoritativeGameSize;
-                    CombinedSpeedTextBlock.Text = speedText;
-                    StatusBadgeTextBlock.Text = isSteamDownload ? "STEAM DOWNLOAD" : "NETWORK ACTIVITY";
-                    FileNameTextBlock.Text = isSteamDownload ? $"Monitoring {lastHost}" : $"Network traffic while {lastHost} is active";
-                    FileSizeTextBlock.Text = hasTargetSize
-                        ? $"{DownloadSession.FormatBytes(totalBytes)} / {DownloadSession.FormatBytes(targetBytes)}"
-                        : "Game download size unavailable";
-
-                    // Real running progress bar + live ETA
-                    DownloadProgressBar.IsIndeterminate = false;
-                    DownloadProgressBar.Value = percent;
-                    ProgressPercentTextBlock.Text = hasTargetSize ? $"{percent:F1}%" : "";
-                    EtaTextBlock.Text = hasTargetSize ? $"ETA: {etaText}" : "ETA unavailable";
-
-                    TitleBarLiveStatusPanel.Visibility = Visibility.Visible;
-                    TitleBarSpeedTextBlock.Text = speedText;
-                    TitleBarStatusBadge.Text = isSteamDownload ? "STEAM DOWNLOAD" : "NETWORK ACTIVITY";
-                    TitleBarProgressText.Text = hasTargetSize
-                        ? $"{lastHost} ({percent:F1}%) • ETA: {etaText}"
-                        : $"{lastHost} • game size/ETA unavailable";
-
-                    FooterLiveSpeedText.Text = speedText;
-                    FooterProgressText.Text = hasTargetSize
-                        ? $"🎮 {lastHost} • {DownloadSession.FormatBytes(totalBytes)} / {DownloadSession.FormatBytes(targetBytes)} (ETA: {etaText})"
-                        : $"Network activity • {speedText}; game-specific size/ETA unavailable";
-                }
-                else
-                {
-                    // Standby mode: No active download occurring -> HIDE ETA AND PROGRESS BAR
-                    _smoothedGameSpeedBps = 0;
-                    _smoothedGameEtaSeconds = 0;
-                    TitleBarLiveStatusPanel.Visibility = Visibility.Collapsed;
-
-                    CombinedSpeedTextBlock.Text = "0.0 Mbps";
-                    DownloadProgressBar.IsIndeterminate = false;
-                    DownloadProgressBar.Value = 0;
-                    ProgressPercentTextBlock.Text = "";
-                    EtaTextBlock.Text = ""; // Completely hide ETA when not downloading!
-                    FileSizeTextBlock.Text = "-- / --";
-
-                    if (!string.IsNullOrEmpty(lastHost) && !lastHost.Equals("Ready", StringComparison.OrdinalIgnoreCase))
-                    {
-                        StatusBadgeTextBlock.Text = "Standby (Ready to Boost)";
-                        FileNameTextBlock.Text = "Game Launcher detected (Standby)";
-                        FooterLiveSpeedText.Text = "0.0 Mbps";
-                        FooterProgressText.Text = "🎮 Game Launcher Standby • Ready to boost downloads on Steam, Epic, Riot Client, Xbox, Microsoft Store, Unity, EA App & Battle.net...";
-                    }
-                    else
-                    {
-                        StatusBadgeTextBlock.Text = "Ready to Boost";
-                        FileNameTextBlock.Text = "No active download";
-                        FooterLiveSpeedText.Text = "0.0 Mbps";
-                        FooterProgressText.Text = "Ready to Boost";
-                    }
-                }
-            }
-            else
-            {
-            }
+            double mbps = combinedReceiveBps * 8 / 1_000_000.0;
+            string speedText = mbps >= 1000 ? $"{(mbps / 1000):F2} Gbps" : $"{mbps:F1} Mbps";
+            CombinedSpeedTextBlock.Text = speedText;
+            FooterLiveSpeedText.Text = speedText;
         });
     }
 
+    private void OnGameProxyMetricsUpdated(long gameBytes, long gameSizeBytes, double adapterReceiveBps, bool hasLauncherActivity, bool hasReliableProgress, string lastHost)
+    {
+        PostToUi(() =>
+        {
+            double mbps = adapterReceiveBps * 8 / 1_000_000.0;
+            string speedText = mbps >= 1000 ? $"{(mbps / 1000):F2} Gbps" : $"{mbps:F1} Mbps";
+            CombinedSpeedTextBlock.Text = speedText;
+            FooterLiveSpeedText.Text = speedText;
+
+            if (hasLauncherActivity)
+                GameBoostStreamsText.Text = $"• Monitoring {lastHost} activity";
+            else if (!string.IsNullOrEmpty(lastHost) && !lastHost.Equals("Ready", StringComparison.OrdinalIgnoreCase))
+                GameBoostStreamsText.Text = $"• {lastHost} detected · waiting for activity";
+            else
+                GameBoostStreamsText.Text = "• Waiting for game launcher activity";
+
+            bool isDirectDownloadActive = _downloader.CurrentSession != null &&
+                (_downloader.CurrentSession.Status == DownloadStatus.Downloading ||
+                 _downloader.CurrentSession.Status == DownloadStatus.Probing ||
+                 _downloader.CurrentSession.Status == DownloadStatus.Paused);
+
+            if (isDirectDownloadActive) return;
+
+                if (hasLauncherActivity)
+            {
+                bool hasSize = gameSizeBytes > 0;
+                bool canShowProgress = hasSize && hasReliableProgress;
+                string estimateKey = $"{lastHost}|{gameSizeBytes}";
+                if (!string.Equals(estimateKey, _lastGameEstimateKey, StringComparison.Ordinal))
+                {
+                    _lastGameEstimateKey = estimateKey;
+                    _smoothedGameSpeedBps = 0;
+                    _lastGameProgressBytes = -1;
+                    _lastGameProgressAt = DateTime.MinValue;
+                }
+
+                if (canShowProgress && gameBytes >= 0 && gameBytes != _lastGameProgressBytes)
+                {
+                    DateTime now = DateTime.UtcNow;
+                    if (_lastGameProgressBytes >= 0 && gameBytes > _lastGameProgressBytes && _lastGameProgressAt != DateTime.MinValue)
+                    {
+                        double elapsed = (now - _lastGameProgressAt).TotalSeconds;
+                        if (elapsed > 0)
+                        {
+                            double measuredRate = (gameBytes - _lastGameProgressBytes) / elapsed;
+                            _smoothedGameSpeedBps = _smoothedGameSpeedBps <= 0
+                                ? measuredRate
+                                : (_smoothedGameSpeedBps * 0.65) + (measuredRate * 0.35);
+                        }
+                    }
+                    else if (_lastGameProgressBytes >= 0 && gameBytes < _lastGameProgressBytes)
+                    {
+                        _smoothedGameSpeedBps = 0;
+                    }
+
+                    _lastGameProgressBytes = gameBytes;
+                    _lastGameProgressAt = now;
+                }
+
+                long remaining = canShowProgress ? Math.Max(0, gameSizeBytes - gameBytes) : 0;
+                bool hasFreshProgressRate = _lastGameProgressAt != DateTime.MinValue &&
+                    (DateTime.UtcNow - _lastGameProgressAt).TotalSeconds <= 5;
+                string eta = !canShowProgress
+                    ? "Unavailable from this launcher"
+                    : remaining == 0
+                        ? "Finished"
+                        : hasFreshProgressRate && _smoothedGameSpeedBps > 0
+                            ? DownloadSession.FormatETAFromSeconds(remaining / _smoothedGameSpeedBps)
+                            : "Waiting for progress";
+                double percent = canShowProgress ? Math.Clamp((double)gameBytes / gameSizeBytes * 100.0, 0.0, 100.0) : 0;
+
+                StatusBadgeTextBlock.Text = "LAUNCHER ACTIVITY";
+                FileNameTextBlock.Text = $"Detected: {lastHost}";
+                FileSizeTextBlock.Text = canShowProgress
+                    ? $"{DownloadSession.FormatBytes(gameBytes)} / {DownloadSession.FormatBytes(gameSizeBytes)}"
+                    : hasSize
+                        ? $"Size {DownloadSession.FormatBytes(gameSizeBytes)} · progress unavailable"
+                        : "Game size unavailable from this launcher";
+
+                DownloadProgressBar.IsIndeterminate = false;
+                DownloadProgressBar.Value = percent;
+                ProgressPercentTextBlock.Text = canShowProgress ? $"{percent:F1}%" : "Progress unavailable";
+                EtaTextBlock.Text = $"ETA: {eta}";
+
+                TitleBarLiveStatusPanel.Visibility = Visibility.Visible;
+                TitleBarSpeedTextBlock.Text = speedText;
+                TitleBarStatusBadge.Text = "MONITORING";
+                TitleBarProgressText.Text = canShowProgress
+                    ? $"{lastHost} · {percent:F1}% · ETA {eta}"
+                    : $"{lastHost} · adapter traffic {speedText} · progress unavailable";
+                FooterProgressText.Text = canShowProgress
+                    ? $"{lastHost} · {DownloadSession.FormatBytes(gameBytes)} / {DownloadSession.FormatBytes(gameSizeBytes)} · ETA {eta}"
+                    : $"{lastHost} · game progress/ETA not exposed; combined adapter receive rate {speedText}";
+            }
+            else
+            {
+                _smoothedGameSpeedBps = 0;
+                _lastGameProgressBytes = -1;
+                _lastGameProgressAt = DateTime.MinValue;
+                TitleBarLiveStatusPanel.Visibility = Visibility.Collapsed;
+                DownloadProgressBar.IsIndeterminate = false;
+                DownloadProgressBar.Value = 0;
+                ProgressPercentTextBlock.Text = "";
+                EtaTextBlock.Text = "";
+                FileSizeTextBlock.Text = "--";
+
+                if (!string.IsNullOrEmpty(lastHost) && !lastHost.Equals("Ready", StringComparison.OrdinalIgnoreCase))
+                {
+                    StatusBadgeTextBlock.Text = "READY";
+                    FileNameTextBlock.Text = $"Launcher detected: {lastHost}";
+                    FooterProgressText.Text = $"{lastHost} is idle · combined adapter receive rate {speedText}";
+                }
+                else
+                {
+                    StatusBadgeTextBlock.Text = "NETWORK MONITORING";
+                    FileNameTextBlock.Text = "No active launcher download detected";
+                    FooterProgressText.Text = $"Combined adapter receive rate {speedText}";
+                }
+            }
+        });
+    }
     private async Task CheckForAppUpdatesAsync(bool silent)
     {
         try
         {
             var (hasUpdate, manifest) = await UpdateManager.CheckForUpdatesAsync();
-            Dispatcher.Invoke(() =>
+            PostToUi(() =>
             {
                 if (hasUpdate && manifest != null)
                 {
@@ -955,7 +952,7 @@ public partial class MainWindow : Window
                     TitleBarUpdateBadge.Visibility = Visibility.Visible;
                     UpdateVersionTag.Text = $"v{manifest.LatestVersion}";
                     UpdateReleaseNotesText.Text = string.IsNullOrWhiteSpace(manifest.ReleaseNotes)
-                        ? "New update available with faster bonding and performance improvements."
+                        ? "New update available with download reliability and network measurement improvements."
                         : manifest.ReleaseNotes;
                     FooterUpdateCheckText.Text = $"🚀 v{manifest.LatestVersion} Available";
                     FooterUpdateCheckText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(168, 85, 247));
@@ -973,7 +970,7 @@ public partial class MainWindow : Window
         {
             if (!silent)
             {
-                Dispatcher.Invoke(() =>
+                PostToUi(() =>
                 {
                     FooterUpdateCheckText.Text = "Check for Updates";
                     OnLogReceived($"✕ Could not check for updates: {ex.Message}");
@@ -997,7 +994,7 @@ public partial class MainWindow : Window
                 _availableUpdate,
                 (percent, readBytes, totalBytes) =>
                 {
-                    Dispatcher.BeginInvoke(() =>
+                    PostToUi(() =>
                     {
                         UpdateProgressBar.Value = percent;
                         UpdateProgressPercentText.Text = totalBytes > 0
@@ -1008,7 +1005,7 @@ public partial class MainWindow : Window
 
             if (!success)
             {
-                Dispatcher.Invoke(() =>
+                PostToUi(() =>
                 {
                     UpdateNowButton.IsEnabled = true;
                     UpdateNowButtonText.Text = "Try Again";
@@ -1019,7 +1016,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            Dispatcher.Invoke(() =>
+            PostToUi(() =>
             {
                 UpdateNowButton.IsEnabled = true;
                 UpdateNowButtonText.Text = "Try Again";
@@ -1049,7 +1046,6 @@ public partial class MainWindow : Window
     {
         _autoUpdateTimer?.Stop();
         _licenseTimer?.Stop();
-        WindowsProxyManager.DisableProxy();
         _gameBoostProxy.Dispose();
         _downloader.Cancel();
         _bondingManager.Dispose();

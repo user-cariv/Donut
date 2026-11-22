@@ -3,25 +3,20 @@ setlocal
 cd /d "%~dp0"
 
 set "TARGET_EXE="
-if exist "%~dp0DonutBoost.exe" set "TARGET_EXE=%~dp0DonutBoost.exe"
-if not defined TARGET_EXE if exist "%~dp0publish\build-out\DonutBoost.exe" set "TARGET_EXE=%~dp0publish\build-out\DonutBoost.exe"
-if not defined TARGET_EXE if exist "%~dp0publish\win-x64\DonutBoost.exe" set "TARGET_EXE=%~dp0publish\win-x64\DonutBoost.exe"
-if not defined TARGET_EXE if exist "%~dp0bin\Release\net8.0-windows\DonutBoost.exe" set "TARGET_EXE=%~dp0bin\Release\net8.0-windows\DonutBoost.exe"
+if exist "%~dp0publish\current\DonutBoost.exe" set "TARGET_EXE=%~dp0publish\current\DonutBoost.exe"
 
 if defined TARGET_EXE (
-    powershell -NoProfile -Command "Start-Process '%TARGET_EXE%' -Verb RunAs"
+    start "" "%TARGET_EXE%"
     exit /b 0
 )
 
 set "TARGET_DLL="
-if exist "%~dp0DonutBoost.dll" set "TARGET_DLL=%~dp0DonutBoost.dll"
-if not defined TARGET_DLL if exist "%~dp0publish\build-out\DonutBoost.dll" set "TARGET_DLL=%~dp0publish\build-out\DonutBoost.dll"
-if not defined TARGET_DLL if exist "%~dp0publish\win-x64\DonutBoost.dll" set "TARGET_DLL=%~dp0publish\win-x64\DonutBoost.dll"
+if exist "%~dp0publish\current\DonutBoost.dll" set "TARGET_DLL=%~dp0publish\current\DonutBoost.dll"
 
 if defined TARGET_DLL (
-    powershell -NoProfile -Command "Start-Process 'dotnet' -ArgumentList '""%TARGET_DLL%""' -Verb RunAs"
+    start "" dotnet "%TARGET_DLL%"
     exit /b 0
 )
 
-echo [ERROR] Could not locate DonutBoost.exe or DonutBoost.dll
+echo [ERROR] Latest Donut Boost files are missing. Reinstall Donut Boost from the official website.
 pause

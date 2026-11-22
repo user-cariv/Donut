@@ -16,7 +16,7 @@ AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
 VersionInfoCompany={#MyAppPublisher}
-VersionInfoDescription=Donut Boost - Multi-Connection & Speed Bonding Downloader
+VersionInfoDescription=Donut Boost - Network Monitor and Direct Downloader
 VersionInfoProductName={#MyAppName}
 VersionInfoTextVersion={#MyAppVersion}
 SetupIconFile=Assets\Donut.ico
@@ -51,8 +51,8 @@ Name: "{autoprograms}\Donut Boost"; Filename: "{app}\{#MyAppExeName}"; IconFilen
 Name: "{autodesktop}\Donut Boost"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\Donut.ico"; Tasks: desktopicon
 
 [Run]
-; Launch Donut Boost upon setup completion using ShellExecute so elevation manifests succeed without code 740
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch Donut Boost"; Flags: shellexec nowait postinstall skipifsilent
+; Run the app with the signed-in user's normal privileges after setup.
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch Donut Boost"; Flags: shellexec runasoriginaluser nowait postinstall skipifsilent
 
 [UninstallDelete]
 ; Completely remove application directory on uninstall

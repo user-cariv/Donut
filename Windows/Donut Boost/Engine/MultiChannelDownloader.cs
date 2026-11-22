@@ -38,10 +38,7 @@ public class MultiChannelDownloader
             _isPaused = true;
             _currentSession.Status = DownloadStatus.Paused;
             _currentSession.CombinedSpeedBps = 0;
-            foreach (var adp in _bondingManager.Adapters)
-            {
-                adp.CurrentSpeedBps = 0;
-            }
+            // Physical adapter rates keep updating while the file transfer is paused.
             StatusChanged?.Invoke(_currentSession);
             ProgressUpdated?.Invoke(_currentSession);
             LogReceived?.Invoke("⏸ Download paused by user. Sockets suspended safely.");
@@ -104,7 +101,6 @@ public class MultiChannelDownloader
             foreach (var adp in allAdapters)
             {
                 adp.TotalBytesDownloaded = 0;
-                adp.CurrentSpeedBps = 0;
             }
 
             // Prefer enabled Wi-Fi or first active adapter for metadata probe
@@ -150,10 +146,7 @@ public class MultiChannelDownloader
             {
                 session.Status = DownloadStatus.Cancelled;
                 session.CombinedSpeedBps = 0;
-                foreach (var adp in _bondingManager.Adapters)
-                {
-                    adp.CurrentSpeedBps = 0;
-                }
+                // Do not overwrite live NIC counters when a download ends.
                 StatusChanged?.Invoke(session);
                 ProgressUpdated?.Invoke(session);
                 LogReceived?.Invoke("Download cancelled. Pipeline stopped.");
@@ -220,23 +213,19 @@ public class MultiChannelDownloader
         // Speed measurement trackers
         long lastDownloadedBytes = 0;
         var stopwatch = Stopwatch.StartNew();
-        var adapterSpeedTrackers = adapters.ToDictionary(a => a.Id, a => a.TotalBytesDownloaded);
 
         // Background monitor for live speed calculation
         var monitorTask = Task.Run(async () =>
         {
-            while (!token.IsCancellationRequested && session.Status != DownloadStatus.Completed && session.Status != DownloadStatus.Failed && session.Status != DownloadStatus.Cancelled)
+            while (!token.IsCancellationRequested && !chunks.All(c => c.IsCompleted) &&
+                   session.Status != DownloadStatus.Completed && session.Status != DownloadStatus.Failed && session.Status != DownloadStatus.Cancelled)
             {
-                await Task.Delay(250, token);
+                await Task.Delay(250);
+                if (token.IsCancellationRequested) break;
                 
                 if (_isPaused)
                 {
                     session.UpdateSpeed(0);
-                    foreach (var adp in adapters)
-                    {
-                        adp.CurrentSpeedBps = 0;
-                        adp.NotifyMetricsChanged();
-                    }
                     ProgressUpdated?.Invoke(session);
                     continue;
                 }
@@ -251,19 +240,6 @@ public class MultiChannelDownloader
 
                     double instantSpeed = bytesDelta / elapsedSeconds;
                     session.UpdateSpeed(instantSpeed);
-
-                    // Update real-time speed for each physical adapter smoothly
-                    foreach (var adapter in adapters)
-                    {
-                        if (adapterSpeedTrackers.TryGetValue(adapter.Id, out long lastCount))
-                        {
-                            long adapterBytes = adapter.TotalBytesDownloaded;
-                            long adapterDelta = Math.Max(0, adapterBytes - lastCount);
-                            adapterSpeedTrackers[adapter.Id] = adapterBytes;
-                            adapter.CurrentSpeedBps = (adapter.IsEnabled && adapter.IsOnline) ? (adapterDelta / elapsedSeconds) : 0;
-                            adapter.NotifyMetricsChanged();
-                        }
-                    }
 
                     ProgressUpdated?.Invoke(session);
                 }
@@ -297,7 +273,6 @@ public class MultiChannelDownloader
                             // If phone is unplugged or disabled mid-download, gracefully release chunks to remaining connections
                             if (!adp.IsEnabled || !adp.IsOnline)
                             {
-                                adp.CurrentSpeedBps = 0;
                                 await Task.Delay(300, token);
                                 if (chunks.All(c => c.IsCompleted)) break;
                                 continue;
@@ -400,10 +375,11 @@ public class MultiChannelDownloader
             _bondingManager.AdaptersChanged -= onAdaptersChanged;
         }
 
+        await monitorTask;
+
         session.UpdateSpeed(0);
         foreach (var adp in adapters)
         {
-            adp.CurrentSpeedBps = 0;
             adp.NotifyMetricsChanged();
         }
         ProgressUpdated?.Invoke(session);
@@ -425,9 +401,18 @@ public class MultiChannelDownloader
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
         response.EnsureSuccessStatusCode();
 
-        if (startFrom > 0 && response.StatusCode != System.Net.HttpStatusCode.PartialContent)
+        if (response.StatusCode != System.Net.HttpStatusCode.PartialContent)
         {
-            throw new InvalidOperationException($"Server returned status {response.StatusCode} instead of 206 Partial Content for byte-range slice.");
+            throw new InvalidOperationException($"Server returned status {response.StatusCode} instead of 206 Partial Content for byte-range download.");
+        }
+
+        var contentRange = response.Content.Headers.ContentRange;
+        if (contentRange?.From != startFrom || contentRange.To is null || contentRange.To > chunk.EndOffset ||
+            (session.TotalBytes > 0 && contentRange.Length != session.TotalBytes) ||
+            (response.Content.Headers.ContentLength.HasValue &&
+             response.Content.Headers.ContentLength.Value != contentRange.To.Value - contentRange.From.Value + 1))
+        {
+            throw new InvalidOperationException("Server returned a mismatched Content-Range; refusing to write potentially corrupt download data.");
         }
 
         using var contentStream = await response.Content.ReadAsStreamAsync(token);
@@ -497,6 +482,28 @@ public class MultiChannelDownloader
                 using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
                 response.EnsureSuccessStatusCode();
 
+                long requestedOffset = session.DownloadedBytes;
+                if (requestedOffset > 0)
+                {
+                    var contentRange = response.Content.Headers.ContentRange;
+                    if (response.StatusCode != System.Net.HttpStatusCode.PartialContent || contentRange?.From != requestedOffset)
+                    {
+                        throw new InvalidOperationException("This server cannot resume the interrupted single-stream download safely. The partial file was not extended.");
+                    }
+                    if (contentRange.Length.HasValue && session.TotalBytes > 0 && contentRange.Length.Value != session.TotalBytes)
+                    {
+                        throw new InvalidOperationException("Server returned a different file size while resuming; refusing to corrupt the partial file.");
+                    }
+                }
+                else if (response.StatusCode == System.Net.HttpStatusCode.PartialContent && response.Content.Headers.ContentRange?.Length is long rangedLength)
+                {
+                    session.TotalBytes = rangedLength;
+                }
+                else if (response.Content.Headers.ContentLength is long responseLength)
+                {
+                    session.TotalBytes = responseLength;
+                }
+
                 using var contentStream = await response.Content.ReadAsStreamAsync(token);
                 byte[] buffer = new byte[256 * 1024]; // 256 KB high-throughput buffer for 300+ Mbps 5G & gigabit streams
                 int bytesRead;
@@ -529,7 +536,6 @@ public class MultiChannelDownloader
                         double sec = stopwatch.Elapsed.TotalSeconds;
                         double instant = (session.DownloadedBytes - lastBytes) / sec;
                         session.UpdateSpeed(instant);
-                        adapter.CurrentSpeedBps = instant;
                         lastBytes = session.DownloadedBytes;
                         stopwatch.Restart();
                         ProgressUpdated?.Invoke(session);
@@ -541,9 +547,16 @@ public class MultiChannelDownloader
                         break;
                     }
                 }
+
+                if (_isPaused) continue;
+                // When the server does not provide a length, end at EOF instead
+                // of issuing another GET forever after the first full response.
+                if (session.TotalBytes <= 0) break;
             }
             catch (Exception ex)
             {
+                if (ex is InvalidOperationException && ex.Message.StartsWith("This server cannot resume", StringComparison.Ordinal))
+                    throw;
                 if (!_isPaused && !token.IsCancellationRequested)
                 {
                     LogReceived?.Invoke($"Stream notice ({adapter.Name}): {ex.Message}. Retrying...");
@@ -601,10 +614,9 @@ public class MultiChannelDownloader
                 {
                     totalSize = rangeRes.Content.Headers.ContentLength.Value;
                 }
-                if (rangeRes.Headers.AcceptRanges.Contains("bytes") || rangeRes.Content.Headers.ContentRange != null)
-                {
-                    supportsRanges = true;
-                }
+                // The server ignored the actual range request (200 OK). Do not
+                // infer support from Accept-Ranges; this can corrupt chunks.
+                supportsRanges = false;
                 if (rangeRes.Content.Headers.ContentDisposition?.FileName != null)
                 {
                     fileName = SanitizeFileName(rangeRes.Content.Headers.ContentDisposition.FileName.Trim('"', '\''));
@@ -629,10 +641,8 @@ public class MultiChannelDownloader
                     {
                         totalSize = headRes.Content.Headers.ContentLength.Value;
                     }
-                    if (headRes.Headers.AcceptRanges.Contains("bytes") || headRes.Content.Headers.ContentRange != null)
-                    {
-                        supportsRanges = true;
-                    }
+                    // HEAD may reveal total size, but only a ranged GET returning
+                    // 206 proves byte-range support.
                     if (headRes.Content.Headers.ContentDisposition?.FileName != null)
                     {
                         fileName = SanitizeFileName(headRes.Content.Headers.ContentDisposition.FileName.Trim('"', '\''));
@@ -640,13 +650,6 @@ public class MultiChannelDownloader
                 }
             }
             catch { }
-        }
-
-        // Auto-enable range slicing for large files (> 5MB)
-        // Google Drive, Hdhub4u, CDNs, and media hosts support 206 Partial Content on actual chunk requests!
-        if (!supportsRanges && totalSize > 5 * 1024 * 1024)
-        {
-            supportsRanges = true;
         }
 
         return (fileName, totalSize, supportsRanges);
@@ -666,10 +669,7 @@ public class MultiChannelDownloader
         {
             _currentSession.Status = DownloadStatus.Cancelled;
             _currentSession.CombinedSpeedBps = 0;
-            foreach (var adp in _bondingManager.Adapters)
-            {
-                adp.CurrentSpeedBps = 0;
-            }
+            // Physical adapter rates are independent of the file transfer.
             StatusChanged?.Invoke(_currentSession);
             ProgressUpdated?.Invoke(_currentSession);
             LogReceived?.Invoke("🛑 Download cancelled by user.");

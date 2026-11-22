@@ -1,5 +1,6 @@
 @echo off
-echo This legacy network-priority script has been retired.
-echo Donut Boost no longer changes Windows routes, adapter priorities, or proxy settings.
-echo Please do not use an older copy to troubleshoot Wi-Fi or mobile data.
+title Donut Boost Network Settings
+echo Donut Boost no longer changes Windows routes, adapter priority, or proxy settings.
+echo Your normal Windows network configuration is left untouched.
+echo Use Windows Settings to inspect or repair network adapters.
 pause

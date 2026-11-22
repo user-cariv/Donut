@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
-using DonutBoost.Engine;
 
 namespace DonutBoost;
 
@@ -15,9 +14,8 @@ public partial class App : Application
         _singleInstanceMutex = new Mutex(true, "DonutBoost_SingleInstance_AppMutex", out bool isNewInstance);
         if (!isNewInstance)
         {
-            // Focus an already visible instance. A previous crash can leave an
-            // elevated, windowless process holding the mutex; don't let that
-            // orphan prevent this launch from opening a usable window.
+            // Focus an already visible instance. A windowless process left
+            // behind by a previous crash must not block a fresh launch.
             if (ActivateVisibleInstance())
             {
                 Shutdown();
@@ -27,23 +25,10 @@ public partial class App : Application
 
         base.OnStartup(e);
 
-        // Immediately clean up any stale proxy from an earlier crash or unexpected termination
-        WindowsProxyManager.EnsureCleanSystemProxy();
-
-        AppDomain.CurrentDomain.UnhandledException += (_, _) =>
-        {
-            WindowsProxyManager.DisableProxy();
-        };
-
-        DispatcherUnhandledException += (_, _) =>
-        {
-            WindowsProxyManager.DisableProxy();
-        };
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
-        WindowsProxyManager.DisableProxy();
         _singleInstanceMutex?.Dispose();
         base.OnExit(e);
     }
@@ -61,12 +46,8 @@ public partial class App : Application
                 SetForegroundWindow(window);
                 return true;
             }
-            catch
-            {
-                // Ignore processes that exit or cannot be inspected.
-            }
+            catch { }
         }
-
         return false;
     }
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Donut Boost uses your Windows PC's Wi-Fi and USB-tethered phone connections together for supported large downloads.">
+  <meta name="description" content="Donut Boost shows live Windows adapter receive rates and can split supported direct downloads across Wi-Fi and USB-tethered phone connections.">
   <title>Donut Boost — More connections. Faster downloads.</title>
   <link rel="stylesheet" href="hub.css?v=donut-boost-3">
   <link rel="stylesheet" href="boost.css?v=2">
@@ -34,7 +34,7 @@
       <div class="boost-hero-copy">
         <p class="hub-eyebrow"><span class="hub-status-dot"></span> Windows · Android &amp; iPhone tethering</p>
         <h1>More connections.<br><em>Faster downloads.</em></h1>
-        <p class="hub-lead">Connect your home Wi-Fi and Android or iPhone mobile data to your Windows PC. Donut Boost sends parts of supported downloads over those connections and saves them together as one file.</p>
+        <p class="hub-lead">See live receive rates for your Wi-Fi and tethered phone adapters. Donut Boost can split direct file downloads across selected connections when the server supports byte ranges.</p>
         <a class="hub-button" href="#download">Get Donut Boost <span>↓</span></a>
         <p class="boost-platform-note">For Windows PCs · Android USB tethering · iPhone Personal Hotspot over USB</p>
       </div>
@@ -45,28 +45,28 @@
       <div class="boost-section-heading">
         <p class="hub-eyebrow">How it works</p>
         <h2>Bring your connections<br><em>to the same PC.</em></h2>
-        <p>Connect the PC to Wi-Fi, then connect phones by USB. Turn on USB tethering on Android, or Personal Hotspot on iPhone and tap “Trust” if prompted. Windows needs Apple Devices or iTunes installed for iPhone USB tethering. Boost detects active network adapters and can split downloads across them when the download server supports byte ranges.</p>
+        <p>Connect the PC to Wi-Fi, then connect phones by USB. Turn on USB tethering on Android, or Personal Hotspot on iPhone and tap “Trust” if prompted. Windows needs Apple Devices or iTunes installed for iPhone USB tethering. Boost measures each adapter’s receive rate and can split direct downloads across them when the server supports byte ranges.</p>
       </div>
       <div class="boost-steps">
         <article><span>01</span><h3>Connect</h3><p>Use home Wi-Fi plus USB-tethered Android phones or iPhones on one Windows PC.</p></article>
         <article><span>02</span><h3>Paste a link</h3><p>Enter a direct file download URL in Donut Boost and choose where to save the file.</p></article>
-        <article><span>03</span><h3>Download together</h3><p>Watch per-connection activity and combined download progress in one window.</p></article>
+        <article><span>03</span><h3>Download together</h3><p>For eligible direct file links, view file progress and transfer speed while selected adapters fetch separate byte ranges.</p></article>
       </div>
       <p class="boost-note"><strong>In the app:</strong> choose Combine Both, Home Wi-Fi Only, or Mobile Data Only; set custom download speed limits (or uncapped); toggle individual connections; pause, resume, or cancel a download; and choose its save folder.</p>
-      <p class="boost-note">Adapters refresh automatically while the app is open. Donut Boost can recover active download chunks if a phone disconnects, and periodically checks tethered mobile connections to help keep them available.</p>
+      <p class="boost-note">Adapter rates are measured from Windows network counters and include all traffic on each adapter, not only Donut Boost. The app does not change Windows routes or force game launchers to use multiple adapters.</p>
       <p class="boost-note">Setup help: <a href="https://support.google.com/android/answer/9059108" target="_blank" rel="noopener">Android USB tethering</a> · <a href="https://support.apple.com/en-gb/111785" target="_blank" rel="noopener">iPhone Personal Hotspot on Windows</a>. Multi-connection speed depends on the server supporting byte-range downloads. Links without that support may not benefit from combined connections and can fail.</p>
       <article class="boost-game-card">
         <div class="boost-game-copy">
           <p class="hub-eyebrow"><span class="boost-kicker-dot"></span> Included in Donut Boost for Windows</p>
           <div class="boost-game-heading">
-            <h3>Game downloads,<br><em>on another level.</em></h3>
-            <span class="boost-live-status"><i></i> Auto-on</span>
+            <h3>Launcher activity,<br><em>clearly shown.</em></h3>
+            <span class="boost-live-status"><i></i> Monitor</span>
           </div>
-          <p class="boost-game-intro">Donut Boost can spot activity in supported launchers and show live network activity. Its built-in downloader can bind downloads to selected adapters; game launchers keep using Windows’ normal network routing.</p>
+          <p class="boost-game-intro">Donut Boost can detect activity from supported launcher processes and show live receive rates measured on your adapters. Launcher downloads continue to use Windows networking.</p>
           <div class="boost-launcher-list" aria-label="Supported game launchers">
             <span>Steam</span><span>Epic Games</span><span>Riot Client</span><span>Microsoft Store</span><span>Unity</span><span>Xbox</span><span>EA App</span><span>Rockstar</span><span>Battle.net</span><span>Ubisoft Connect</span><span>GOG Galaxy</span>
           </div>
-          <p class="boost-game-footnote"><strong>Accurate download details.</strong> Steam size, progress, speed, and ETA are shown from Steam’s active download manifest. Other launcher activity is shown as overall network traffic when a reliable game-specific size is unavailable.</p>
+          <p class="boost-game-footnote"><strong>Honest download status.</strong> The app reports exact game progress and ETA only when it can read reliable launcher counters (currently Steam). Other launchers may show activity and adapter receive rates without a verified game size, progress bar, or ETA. Game launchers are not routed or bonded by Donut Boost.</p>
         </div>
         <div class="boost-game-visual" aria-hidden="true">
           <svg viewBox="0 0 260 220" fill="none">
@@ -90,9 +90,9 @@
     <section class="boost-pricing" id="pricing">
       <div class="boost-pricing-heading">
         <div>
-          <p class="hub-eyebrow">Straightforward passes</p>
-          <h2 id="boost-pricing-title">More speed.<br><em>One simple price.</em></h2>
-          <p>Choose a pass that fits your next download. An activation code is required to unlock each specific timeline inside Donut Boost.</p>
+          <p class="hub-eyebrow">Pick your Boost pass</p>
+          <h2 id="boost-pricing-title">Your next download,<br><em>with a little more Boost.</em></h2>
+          <p>Start with a free 24-hour trial, then choose a one-time pass. Each paid pass is activated with a code for its specific duration.</p>
         </div>
         <div class="boost-currency-control">
           <label for="boost-currency">Display currency</label>
@@ -119,8 +119,8 @@
       <div class="boost-trial-banner">
         <div class="boost-trial-badge">✨ 24-HOUR FREE TRIAL</div>
         <div class="boost-trial-content">
-          <strong>First time using Donut Boost? Your first 24 hours are 100% free!</strong>
-          <p>First-time users automatically receive a 24-hour full access free trial on initial app launch — no payment, account, or activation code required. Start accelerating immediately!</p>
+          <strong>First time using Donut Boost? Your first 24 hours are free.</strong>
+          <p>First-time users receive a 24-hour trial on initial app launch. No payment or activation code is needed to start the trial.</p>
         </div>
       </div>
 
@@ -130,17 +130,17 @@
           <div class="boost-plan-header">
             <div class="boost-plan-duration">1 Day</div>
             <h3 class="boost-plan-title">Quickboost</h3>
-            <p class="boost-plan-desc">A full day of multi-connection speed bonding on big downloads.</p>
+            <p class="boost-plan-desc">A one-day pass for your next big download.</p>
           </div>
           <div class="boost-plan-price-wrap">
             <span class="boost-price-amount" data-inr="10">₹10</span>
             <span class="boost-price-cycle">/ one-time pass</span>
           </div>
           <ul class="boost-plan-features">
-            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> 24 hours unlimited speed bonding</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Accelerate all 9 game launchers</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Home Wi-Fi + Mobile 5G concurrent</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Unlocks with 1-Day Activation Code</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Donut Boost access for 24 hours</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Game launcher activity detection</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> See Wi-Fi and mobile adapter speeds</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> One-device activation code</li>
           </ul>
           <a class="hub-button boost-plan-action outline" href="index.html#support">Buy Activation Code <span>→</span></a>
         </article>
@@ -158,10 +158,10 @@
             <span class="boost-price-cycle">/ one-time pass</span>
           </div>
           <ul class="boost-plan-features">
-            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> 7 days unlimited speed bonding</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Accelerate all 9 game launchers</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Multi-channel download engine</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Unlocks with 7-Day Activation Code</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Donut Boost access for 7 days</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Game launcher activity detection</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Live speed for each adapter</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> One-device activation code</li>
           </ul>
           <a class="hub-button boost-plan-action popular-btn" href="index.html#support">Buy Activation Code <span>→</span></a>
         </article>
@@ -178,10 +178,10 @@
             <span class="boost-price-cycle">/ one-time pass</span>
           </div>
           <ul class="boost-plan-features">
-            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> 30 days unlimited speed bonding</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Game Launcher Accelerator auto-on</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Dedicated 5G boost pipelines</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Unlocks with 1-Month Activation Code</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Donut Boost access for 30 days</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Game launcher activity detection</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Live speed for each adapter</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> One-device activation code</li>
           </ul>
           <a class="hub-button boost-plan-action outline" href="index.html#support">Buy Activation Code <span>→</span></a>
         </article>
@@ -199,10 +199,10 @@
             <span class="boost-price-cycle">/ lifetime payment</span>
           </div>
           <ul class="boost-plan-features">
-            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Lifetime unlimited speed bonding</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Lifetime Game Launcher Accelerator</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> All future updates &amp; new launchers</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Unlocks with Lifetime Activation Code</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Donut Boost lifetime access</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Game launcher activity detection</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Future Donut Boost updates</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> One-device activation code</li>
           </ul>
           <a class="hub-button boost-plan-action value-btn" href="index.html#support">Buy Activation Code <span>→</span></a>
         </article>
@@ -213,35 +213,35 @@
         <div class="boost-activation-header">
           <div class="boost-activation-tag">STEP-BY-STEP ACTIVATION</div>
           <h3>How to Buy &amp; Receive Your Activation Code</h3>
-          <p>An activation code is required to activate each specific pass timeline in Donut Boost. Here is how easy the process is:</p>
+          <p>Need a paid pass? Send one Support request and we’ll guide you from choosing a duration to activating your code.</p>
         </div>
 
         <div class="boost-activation-steps">
           <div class="boost-step-card">
             <div class="boost-step-num">01</div>
-            <h4>Go to Support &amp; Request Pass</h4>
-            <p>Visit our <a href="index.html#support" style="color:var(--hub-orange);text-decoration:underline;">Support page</a> and send a message mentioning the pass timeline you want (1 Day, 7 Days, 1 Month, or Lifetime).</p>
+            <h4>Tell us which pass you want</h4>
+            <p>Open <a href="index.html#support" style="color:var(--hub-orange);text-decoration:underline;">Support</a> and include your name, reply email, and preferred duration: 1 Day, 7 Days, 1 Month, or Lifetime.</p>
           </div>
 
           <div class="boost-step-card">
             <div class="boost-step-num">02</div>
-            <h4>Receive Payment Details</h4>
-            <p>Donut Support will reply back directly with convenient, secure payment instructions for your selected currency.</p>
+            <h4>Get payment instructions</h4>
+            <p>Donut Support will reply to your email with the payment details and amount for your chosen pass.</p>
           </div>
 
           <div class="boost-step-card">
             <div class="boost-step-num">03</div>
-            <h4>Get Code via Email</h4>
-            <p>Once payment is confirmed, Donut will email you your unique timeline activation code. Enter it inside Donut Boost to immediately unlock maximum speed!</p>
+            <h4>Activate with your code</h4>
+            <p>After payment is confirmed, we’ll email your duration-specific code. Enter it in Donut Boost; the code activates on one device.</p>
           </div>
         </div>
 
         <div class="boost-activation-cta">
           <a class="hub-button boost-cta-btn" href="index.html#support">
-            <span>Go to Support to Buy Activation Code</span>
+            <span>Request a pass through Support</span>
             <span style="font-size:16px;">→</span>
           </a>
-          <span class="boost-activation-note">⚡ Delivered directly to your email · Codes never expire until redeemed in the app</span>
+          <span class="boost-activation-note">Codes are emailed after payment confirmation and activate on one device.</span>
         </div>
       </div>
     </section>
@@ -254,11 +254,9 @@
           <div class="boost-download-copy">
             <p class="hub-eyebrow">Windows · x64 · Official Installer</p>
             <h3>Donut Boost for Windows</h3>
-            <p>Download the official Windows Setup installer for full installation, desktop shortcuts, Wi-Fi priority optimization, and clean uninstallation in Windows Settings. Requires .NET 8 Desktop Runtime.</p>
-            <p class="boost-license-note">Speed bonding and Game Launcher Accelerator require an active pass. A 24-hour free pass is available once per device; redeem codes cover 1 day, 7 days, 1 month, or lifetime access.</p>
+            <p>Download the self-contained Windows installer for full installation, desktop shortcuts, and clean uninstallation from Windows Settings. It measures network adapters without changing Windows routing.</p>
+            <p class="boost-license-note">Direct-download acceleration and launcher activity monitoring require an active pass. A 24-hour free pass is available once per device; redeem codes cover 1 day, 7 days, 1 month, or lifetime access.</p>
             <a class="hub-button" href="Install%20Donut%20Boost.exe" download style="margin-top:16px;">Download Windows Installer (Setup.exe) <span>↓</span></a>
-            <p style="margin-top:10px;font-size:12px;opacity:0.8;"><a href="Donut-Boost-Windows-x64-current.zip" download>Download portable ZIP version</a></p>
-            <p class="boost-runtime-note">Need the runtime? <a href="https://dotnet.microsoft.com/en-us/download/dotnet/8.0" target="_blank" rel="noopener">Get .NET 8 Desktop Runtime from Microsoft</a>.</p>
           </div>
         </article>
         <article class="boost-download-card boost-macos-card" aria-label="Donut Boost for macOS, coming soon">

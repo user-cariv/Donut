@@ -4,7 +4,6 @@ using System.Net;
 using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using Microsoft.Win32;
 using DonutBoost.Models;
 
 namespace DonutBoost.Engine;
@@ -15,7 +14,11 @@ public class NetworkBondingManager : IDisposable
     private readonly List<NetworkAdapterInfo> _adapters = new();
     private readonly object _lock = new();
     private readonly Timer? _pollTimer;
-    private readonly Timer? _heartbeatTimer;
+    private readonly Timer? _speedTimer;
+    private readonly object _trafficLock = new();
+    private readonly Dictionary<string, (long Bytes, long Timestamp)> _trafficCounters = new();
+    private readonly NetworkAddressChangedEventHandler _addressChangedHandler;
+    private readonly NetworkAvailabilityChangedEventHandler _availabilityChangedHandler;
 
     public BondingMode CurrentMode { get; set; } = BondingMode.CombineAll;
 
@@ -31,40 +34,72 @@ public class NetworkBondingManager : IDisposable
     }
 
     public event Action? AdaptersChanged;
+    public event Action<double>? AdapterRatesUpdated;
 
     public NetworkBondingManager()
     {
-        NetworkChange.NetworkAddressChanged += (_, _) => RefreshAdapters();
-        NetworkChange.NetworkAvailabilityChanged += (_, _) => RefreshAdapters();
+        _addressChangedHandler = (_, _) => SafeRefreshAdapters();
+        _availabilityChangedHandler = (_, _) => SafeRefreshAdapters();
+        NetworkChange.NetworkAddressChanged += _addressChangedHandler;
+        NetworkChange.NetworkAvailabilityChanged += _availabilityChangedHandler;
         RefreshAdapters();
 
         // Automatically poll every 2 seconds to immediately detect phones when plugged in or tethered
-        _pollTimer = new Timer(_ => RefreshAdapters(), null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+        _pollTimer = new Timer(_ => SafeRefreshAdapters(), null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+        _speedTimer = new Timer(_ => RefreshAdapterRates(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(500));
 
-        // Heartbeat probe every 10 seconds to keep iPhone/Android USB Personal Hotspot active 24/7
-        _heartbeatTimer = new Timer(_ => KeepMobileConnectionAlive(), null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(10));
     }
 
-    private void KeepMobileConnectionAlive()
+    private void SafeRefreshAdapters()
+    {
+        try { RefreshAdapters(); }
+        catch { /* Network metadata may disappear while USB tethering changes. */ }
+    }
+
+    private void RefreshAdapterRates()
     {
         try
         {
-            List<NetworkAdapterInfo> phones;
-            lock (_lock)
+            var nics = NetworkInterface.GetAllNetworkInterfaces()
+                .Where(n => n.OperationalStatus == OperationalStatus.Up &&
+                            n.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
+                            n.NetworkInterfaceType != NetworkInterfaceType.Tunnel &&
+                            !IsVirtualOrOverlayAdapter(n))
+                .ToDictionary(n => n.Id, StringComparer.OrdinalIgnoreCase);
+
+            double combinedBytesPerSecond = 0;
+            long now = Stopwatch.GetTimestamp();
+            lock (_trafficLock)
             {
-                phones = _adapters.Where(a => a.IsMobilePhone && a.IsEnabled && a.IsOnline && a.LocalIp != null).ToList();
+                foreach (var adapter in Adapters)
+                {
+                    double rate = 0;
+                    if (adapter.IsOnline && nics.TryGetValue(adapter.Id, out var nic))
+                    {
+                        try
+                        {
+                            // Windows exposes a per-adapter receive counter via
+                            // GetIPStatistics. One unsupported adapter must not
+                            // stop measurements for the others.
+                            long current = nic.GetIPStatistics().BytesReceived;
+                            if (_trafficCounters.TryGetValue(adapter.Id, out var previous))
+                            {
+                                double elapsed = (now - previous.Timestamp) / (double)Stopwatch.Frequency;
+                                if (elapsed > 0 && current >= previous.Bytes)
+                                    rate = (current - previous.Bytes) / elapsed;
+                            }
+                            _trafficCounters[adapter.Id] = (current, now);
+                        }
+                        catch (NetworkInformationException) { _trafficCounters.Remove(adapter.Id); }
+                    }
+
+                    adapter.CurrentSpeedBps = rate;
+                    adapter.NotifyMetricsChanged();
+                    combinedBytesPerSecond += rate;
+                }
             }
 
-            foreach (var phone in phones)
-            {
-                try
-                {
-                    var client = GetOrCreateClient(phone);
-                    // Apple's official captive portal test URL - keeps iPhone tethering alive with ~100 bytes of traffic
-                    _ = client.GetStringAsync("http://www.apple.com/library/test/success.html");
-                }
-                catch { }
-            }
+            AdapterRatesUpdated?.Invoke(combinedBytesPerSecond);
         }
         catch { }
     }
@@ -89,6 +124,8 @@ public class NetworkBondingManager : IDisposable
                         break;
                 }
             }
+            // Modes only control which adapters Donut's own downloader uses.
+            // Leave Windows routes and interface metrics under Windows/user control.
         }
         AdaptersChanged?.Invoke();
     }
@@ -105,6 +142,7 @@ public class NetworkBondingManager : IDisposable
                 if (nic.OperationalStatus != OperationalStatus.Up) continue;
                 if (nic.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
                 if (nic.NetworkInterfaceType == NetworkInterfaceType.Tunnel) continue;
+                if (IsVirtualOrOverlayAdapter(nic)) continue;
 
                 var ipProps = nic.GetIPProperties();
                 var ipv4 = ipProps.UnicastAddresses
@@ -115,20 +153,6 @@ public class NetworkBondingManager : IDisposable
 
                 var gateway = ipProps.GatewayAddresses
                     .FirstOrDefault(g => g.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.Any.Equals(g.Address))?.Address;
-
-                bool isPhone = nic.Description.Contains("Apple", StringComparison.OrdinalIgnoreCase) ||
-                               nic.Description.Contains("NDIS", StringComparison.OrdinalIgnoreCase) ||
-                               nic.Description.Contains("RNDIS", StringComparison.OrdinalIgnoreCase) ||
-                               nic.Description.Contains("USB", StringComparison.OrdinalIgnoreCase) ||
-                               nic.Name.Contains("Cellular", StringComparison.OrdinalIgnoreCase) ||
-                               nic.Name.Contains("Mobile", StringComparison.OrdinalIgnoreCase);
-
-                if (gateway == null && ipv4 != null && isPhone)
-                {
-                    var b = ipv4.Address.GetAddressBytes();
-                    b[3] = 1; // Apple & Android hotspot gateway default is .1
-                    gateway = new IPAddress(b);
-                }
 
                 int ifIndex = 0;
                 try
@@ -214,6 +238,18 @@ public class NetworkBondingManager : IDisposable
                 AdaptersChanged?.Invoke();
             }
         }
+    }
+
+    private static bool IsVirtualOrOverlayAdapter(NetworkInterface nic)
+    {
+        string identity = $"{nic.Name} {nic.Description}";
+        string[] virtualMarkers =
+        {
+            "vEthernet", "Hyper-V", "VMware", "VirtualBox", "Host-Only",
+            "WSL", "Docker", "Container", "TAP-Windows", "Wintun",
+            "WireGuard", "ZeroTier", "OpenVPN", "VPN", "Wi-Fi Direct Virtual"
+        };
+        return virtualMarkers.Any(marker => identity.Contains(marker, StringComparison.OrdinalIgnoreCase));
     }
 
     public HttpClient GetOrCreateClient(NetworkAdapterInfo adapter)
@@ -307,7 +343,9 @@ public class NetworkBondingManager : IDisposable
     public void Dispose()
     {
         _pollTimer?.Dispose();
-        _heartbeatTimer?.Dispose();
+        _speedTimer?.Dispose();
+        NetworkChange.NetworkAddressChanged -= _addressChangedHandler;
+        NetworkChange.NetworkAvailabilityChanged -= _availabilityChangedHandler;
         foreach (var client in _clientPool.Values)
         {
             client.Dispose();

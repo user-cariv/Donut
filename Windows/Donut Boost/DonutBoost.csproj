@@ -10,7 +10,7 @@
     <Product>Donut Boost</Product>
     <Company>Donut</Company>
     <Authors>Donut</Authors>
-    <Description>Donut Boost - Multi-Connection &amp; Speed Bonding Downloader</Description>
+    <Description>Donut Boost - Network Monitor and Direct Downloader</Description>
     <Version>1.0.5</Version>
     <ApplicationIcon>Assets\Donut.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
