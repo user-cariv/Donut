@@ -128,25 +128,33 @@ async function sendEmail(
   html: string,
   replyTo?: string,
 ): Promise<boolean> {
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from,
-      to: [to],
-      subject,
-      html,
-      ...(replyTo ? { reply_to: replyTo } : {}),
-    }),
-  });
-  if (!response.ok) console.error("Resend delivery failed", response.status, await response.text());
-  return response.ok;
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        subject,
+        html,
+        ...(replyTo ? { reply_to: replyTo } : {}),
+      }),
+    });
+    if (!response.ok) console.error("Resend delivery failed", response.status, await response.text());
+    return response.ok;
+  } catch (error) {
+    // Email is a notification side effect. A mail-provider outage must not
+    // make a successfully stored support ticket look as if it was lost.
+    console.error("Resend request failed", error);
+    return false;
+  }
 }
 
 Deno.serve(async (request) => {
+  let failureStage = "request validation";
   const origin = request.headers.get("origin");
   const cors = corsHeaders(origin);
   if (!origin || !configuredOrigins.includes(origin)) {
@@ -206,6 +214,7 @@ Deno.serve(async (request) => {
     if (!forwardedFor || forwardedFor.length > 64) {
       return jsonResponse({ error: "We couldn’t verify this request. Please try again later." }, 503, cors);
     }
+    failureStage = "rate limit check";
     const { data: withinRateLimit, error: rateError } = await admin
       .rpc("consume_support_submission_rate_limit", { p_email: email, p_ip: forwardedFor });
     if (rateError) throw rateError;
@@ -216,6 +225,7 @@ Deno.serve(async (request) => {
     const ticketId = crypto.randomUUID();
     const uploadedPaths: string[] = [];
     const attachments: Array<{ path: string; filename: string; contentType: string; size: number }> = [];
+    failureStage = "ticket insert";
     const { error: ticketError } = await admin.from("support_tickets").insert({
       id: ticketId,
       name,
@@ -227,6 +237,7 @@ Deno.serve(async (request) => {
     if (ticketError) throw ticketError;
 
     try {
+      failureStage = "attachment validation or upload";
       for (const file of files) {
         const bytes = new Uint8Array(await file.arrayBuffer());
         if (!hasValidSignature(file.type, bytes)) {
@@ -260,6 +271,7 @@ Deno.serve(async (request) => {
     const mailFrom = Deno.env.get("SUPPORT_FROM");
     let notificationStatus: "sent" | "failed" | "not_configured" = "not_configured";
     if (resendKey && supportInbox && mailFrom) {
+      failureStage = "email notification";
       const attachmentLinks = await Promise.all(attachments.map(async (attachment) => {
         const { data } = await admin.storage.from("support-attachments")
           .createSignedUrl(attachment.path, 60 * 60 * 24 * 7);
@@ -296,7 +308,7 @@ Deno.serve(async (request) => {
       notificationStatus,
     }, 201, cors);
   } catch (error) {
-    console.error("Support submission failed", error);
+    console.error(`Support submission failed during ${failureStage}`, error);
     return jsonResponse({ error: "We couldn’t save your request. Please try again later." }, 500, cors);
   }
 });
