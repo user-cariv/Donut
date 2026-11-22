@@ -1,6 +1,6 @@
 <div align="center">
 
-<a href="https://user-cariv.github.io/Donut/"><img src="assets/hero-v2.svg" width="100%" alt="Donut. Small apps. Big relief." /></a>
+<a href="https://user-cariv.github.io/Donut/"><img src="assets/hero.svg?v=3" width="100%" alt="Donut. Small apps. Big relief." /></a>
 
 <br/>
 
