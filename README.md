@@ -1,178 +1,257 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=12,14,18,24&height=200&section=header&text=DONUT&fontSize=80&fontColor=ffffff&animation=fadeIn&fontAlignY=38&desc=Small%20apps.%20Big%20relief.&descAlignY=60&descSize=22" width="100%" alt="Donut banner" />
-
-<img src="https://user-cariv.github.io/Donut/donut-hero-logo.png" width="140" alt="Donut logo" />
+<img src="assets/hero.svg" width="100%" alt="Donut. Small apps. Big relief." />
 
 <br/>
 
-<a href="https://github.com/user-cariv/Donut">
-  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=22&pause=1000&color=FF8A3D&center=true&vCenter=true&width=600&lines=Make+room+for+what+matters.;Useful+should+feel+beautiful.;Drag%2C+drop%2C+done.;Less+noise.+More+flow." alt="Typing animation" />
-</a>
+<a href="https://user-cariv.github.io/Donut/"><b>Website</b></a> &nbsp;·&nbsp;
+<a href="#-the-lineup"><b>Apps</b></a> &nbsp;·&nbsp;
+<a href="#-compare"><b>Compare</b></a> &nbsp;·&nbsp;
+<a href="#-tech-specs"><b>Tech Specs</b></a> &nbsp;·&nbsp;
+<a href="https://user-cariv.github.io/Donut/#support"><b>Support</b></a> &nbsp;·&nbsp;
+<a href="https://www.youtube.com/@Meet_Donut"><b>YouTube</b></a>
 
 <br/><br/>
 
-[![Website](https://img.shields.io/badge/Website-Visit-FF8A3D?style=for-the-badge&logo=githubpages&logoColor=white)](https://user-cariv.github.io/Donut/)
-[![YouTube](https://img.shields.io/badge/YouTube-Meet__Donut-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/@Meet_Donut)
-[![License](https://img.shields.io/badge/License-View-8A5CF6?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](LICENSE)
-
-![Stars](https://img.shields.io/github/stars/user-cariv/Donut?style=flat-square&color=FF8A3D&logo=github)
-![Forks](https://img.shields.io/github/forks/user-cariv/Donut?style=flat-square&color=8A5CF6)
-![Last commit](https://img.shields.io/github/last-commit/user-cariv/Donut?style=flat-square&color=2EA043)
-![Repo size](https://img.shields.io/github/repo-size/user-cariv/Donut?style=flat-square&color=3178C6)
+![Last commit](https://img.shields.io/github/last-commit/user-cariv/Donut?style=flat-square&color=ff8a3d&labelColor=111)
+![Stars](https://img.shields.io/github/stars/user-cariv/Donut?style=flat-square&color=ff5e8a&labelColor=111)
+![Repo size](https://img.shields.io/github/repo-size/user-cariv/Donut?style=flat-square&color=8a5cf6&labelColor=111)
+![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS-2997ff?style=flat-square&labelColor=111)
 
 </div>
 
+<br/>
+
+<div align="center">
+
+# Make room for<br/>what matters.
+
+### Donut makes focused apps that take care of the little things,<br/>so you can get back to the work and life that matters.
+
+<br/>
+
+<sub>◐ &nbsp; LESS NOISE &nbsp;·&nbsp; MORE FLOW &nbsp; ◑</sub>
+
+</div>
+
+<br/><br/>
+
 ---
 
-## 🍩 What is Donut?
+<br/>
 
-**Donut** is a small studio making focused apps that take care of the little things, so you can get back to the work and life that matters.
+<div align="center">
 
-We believe the best tools **respect your attention**. Donut apps are simple, private, and built to fit naturally into your day.
+## 🍩 The Lineup
 
-> *"Useful should feel beautiful."*
+<sub>Pick a Donut app and make your everyday workflow a little lighter.</sub>
+
+<br/><br/>
+
+<a href="https://user-cariv.github.io/Donut/convert.html"><img src="assets/convert.svg" width="100%" alt="Donut Convert" /></a>
+
+<a href="https://user-cariv.github.io/Donut/island.html"><img src="assets/island.svg" width="100%" alt="Donut Island" /></a>
+
+<a href="https://user-cariv.github.io/Donut/boost.html"><img src="assets/boost.svg" width="100%" alt="Donut Boost" /></a>
+
+</div>
+
+<br/>
 
 ---
 
-## ✨ The Donut Collection
+<br/>
+
+<div align="center">
+
+## ⚖️ Compare
+
+<sub>Find the Donut that fits your day.</sub>
+
+<br/>
 
 <table>
 <tr>
-<td width="33%" valign="top">
+<th></th>
+<th align="center">🔄<br/><b>Convert</b></th>
+<th align="center">🏝️<br/><b>Island</b></th>
+<th align="center">🚀<br/><b>Boost</b></th>
+</tr>
+<tr>
+<td><b>What it does</b></td>
+<td align="center">Converts images and documents</td>
+<td align="center">Notifications, calls, events</td>
+<td align="center">Faster downloads</td>
+</tr>
+<tr>
+<td><b>Windows</b></td>
+<td align="center">✅</td>
+<td align="center">—</td>
+<td align="center">✅</td>
+</tr>
+<tr>
+<td><b>macOS</b></td>
+<td align="center">✅</td>
+<td align="center">✅</td>
+<td align="center"><sub>Coming soon</sub></td>
+</tr>
+<tr>
+<td><b>Works locally</b></td>
+<td align="center">✅</td>
+<td align="center">✅</td>
+<td align="center">✅</td>
+</tr>
+<tr>
+<td><b>Status</b></td>
+<td align="center"><b>Available now</b></td>
+<td align="center">For macOS</td>
+<td align="center">Windows available</td>
+</tr>
+</table>
 
-### 🔄 Donut Convert
-**`Available now`**
+</div>
 
-A calm, **local** file converter for images and documents.
+<br/>
 
-**Drag. Drop. Done.**
+---
 
-🪟 Windows · 🍎 macOS
+<br/>
 
-[**Learn more →**](https://user-cariv.github.io/Donut/convert.html)
+<div align="center">
+
+## ✦ Why Donut
+
+<br/>
+
+<table>
+<tr>
+<td width="25%" align="center" valign="top">
+
+### 🎯
+**Focused**<br/>
+<sub>One app.<br/>One job.<br/>Done well.</sub>
 
 </td>
-<td width="33%" valign="top">
+<td width="25%" align="center" valign="top">
 
-### 🏝️ Donut Island
-**`macOS`**
-
-A dynamic island for your Mac that keeps notifications, calls, and events close by.
-
-**Your Mac, with a little more life.**
-
-🍎 macOS
-
-[**Learn more →**](https://user-cariv.github.io/Donut/island.html)
+### 🔒
+**Private**<br/>
+<sub>Local-first.<br/>Your files<br/>stay yours.</sub>
 
 </td>
-<td width="33%" valign="top">
+<td width="25%" align="center" valign="top">
 
-### 🚀 Donut Boost
-**`Windows available`**
+### 🧘
+**Calm**<br/>
+<sub>No clutter.<br/>No nagging.<br/>Just flow.</sub>
 
-Combine home Wi-Fi and phone tethering for faster downloads, plus an accelerator for compatible game launchers.
+</td>
+<td width="25%" align="center" valign="top">
 
-**More connections. Faster downloads.**
-
-🪟 Windows · 🍎 *macOS coming soon*
-
-[**Learn more →**](https://user-cariv.github.io/Donut/boost.html)
+### ✨
+**Beautiful**<br/>
+<sub>Useful should<br/>feel beautiful.</sub>
 
 </td>
 </tr>
 </table>
 
----
+</div>
 
-## 🧠 Principles
-
-| | |
-|---|---|
-| 🎯 **Focused** | One app, one job, done really well. |
-| 🔒 **Private** | Your files and data stay yours. Local-first wherever possible. |
-| 🧘 **Calm** | Less noise, more flow. No clutter, no nagging. |
-| 🎨 **Beautiful** | Good tools should feel good to use. |
+<br/>
 
 ---
 
-## 🛠️ Built With
+<br/>
 
 <div align="center">
 
-![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
-![C#](https://img.shields.io/badge/C%23-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)
-![Swift](https://img.shields.io/badge/Swift-F05138?style=for-the-badge&logo=swift&logoColor=white)
-![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
-![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
-![Shell](https://img.shields.io/badge/Shell-4EAA25?style=for-the-badge&logo=gnubash&logoColor=white)
-![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white)
+## 🔬 Tech Specs
+
+<sub>Under the hood.</sub>
+
+<br/>
+
+![TypeScript](https://img.shields.io/badge/TypeScript-52.1%25-3178C6?style=for-the-badge&logo=typescript&logoColor=white&labelColor=111)
+![C#](https://img.shields.io/badge/C%23-20.6%25-512BD4?style=for-the-badge&logo=dotnet&logoColor=white&labelColor=111)
+![Swift](https://img.shields.io/badge/Swift-8.8%25-F05138?style=for-the-badge&logo=swift&logoColor=white&labelColor=111)
+![HTML](https://img.shields.io/badge/HTML-8.1%25-E34F26?style=for-the-badge&logo=html5&logoColor=white&labelColor=111)
+![JavaScript](https://img.shields.io/badge/JavaScript-4.9%25-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black&labelColor=111)
+![Shell](https://img.shields.io/badge/Shell-3%25-4EAA25?style=for-the-badge&logo=gnubash&logoColor=white&labelColor=111)
+![Supabase](https://img.shields.io/badge/Supabase-Backend-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white&labelColor=111)
 
 </div>
 
----
+<br/>
 
-## 📁 Repository Layout
+<details>
+<summary><b>📁 &nbsp;Repository layout</b></summary>
+
+<br/>
 
 ```text
 Donut/
-├── 🌐 website/          # The Donut website (GitHub Pages)
-├── 🗄️ supabase/         # Support ticket backend
-├── 📄 .env.example      # Environment variable template
-├── 🔏 CODE_SIGNING_POLICY.md
-├── 📜 THIRD-PARTY-NOTICES.md
-└── ⚖️ LICENSE
+├── supabase/                 # Support ticket backend
+├── .env.example              # Environment template
+├── CODE_SIGNING_POLICY.md    # How releases are signed
+├── THIRD-PARTY-NOTICES.md    # Open-source attributions
+└── LICENSE
 ```
 
-> 💡 Adjust the folder names above to match your actual structure.
+</details>
 
----
+<details>
+<summary><b>🛠️ &nbsp;Run it yourself</b></summary>
 
-## 🚀 Getting Started
+<br/>
 
 ```bash
-# Clone the repo
 git clone https://github.com/user-cariv/Donut.git
 cd Donut
-
-# Set up your environment
 cp .env.example .env
-
-# Install dependencies
 npm install
 ```
 
----
+</details>
 
-## 💬 Support
+<details>
+<summary><b>💬 &nbsp;Get help</b></summary>
 
-Need help? Head to the [support section on the website](https://user-cariv.github.io/Donut/#support) or [open an issue](https://github.com/user-cariv/Donut/issues).
+<br/>
 
----
+Head to the [support page](https://user-cariv.github.io/Donut/#support) or [open an issue](https://github.com/user-cariv/Donut/issues). Tell us what happened and the best email to reach you.
 
-## 👥 Contributors
+</details>
 
-<a href="https://github.com/user-cariv/Donut/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=user-cariv/Donut" alt="Contributors" />
-</a>
+<details>
+<summary><b>⚖️ &nbsp;Legal</b></summary>
 
----
-
-## 📜 Legal
+<br/>
 
 - [License](LICENSE)
 - [Code Signing Policy](CODE_SIGNING_POLICY.md)
 - [Third-Party Notices](THIRD-PARTY-NOTICES.md)
 
+</details>
+
+<br/>
+
 ---
+
+<br/>
 
 <div align="center">
 
-### Made with 🍩 by [Ariv R Choudhary](https://github.com/user-cariv)
+<img src="https://user-cariv.github.io/Donut/donut-hero-logo.png" width="72" alt="Donut" />
 
-**[Website](https://user-cariv.github.io/Donut/)** · **[YouTube](https://www.youtube.com/@Meet_Donut)** · **[Support](https://user-cariv.github.io/Donut/#support)**
+### Small apps. Big relief.
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=12,14,18,24&height=120&section=footer" width="100%" alt="footer" />
+<sub>Designed and built by <a href="https://github.com/user-cariv">Ariv R Choudhary</a> &nbsp;·&nbsp; © 2026 Donut</sub>
+
+<br/>
+
+<a href="https://user-cariv.github.io/Donut/">Website</a> &nbsp;·&nbsp;
+<a href="https://www.youtube.com/@Meet_Donut">YouTube</a> &nbsp;·&nbsp;
+<a href="https://user-cariv.github.io/Donut/#support">Support</a>
 
 </div>
