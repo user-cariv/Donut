@@ -1,9 +1,16 @@
+Set WshShell = CreateObject("WScript.Shell")
+
+' 1. If Donut Boost is already running, immediately bring it to the foreground
+If WshShell.AppActivate("Donut Boost") Then
+    WScript.Quit
+End If
+
 Set fso = CreateObject("Scripting.FileSystemObject")
 Set shellApp = CreateObject("Shell.Application")
 
 scriptDir = Left(WScript.ScriptFullName, InStrRev(WScript.ScriptFullName, "\"))
 
-' 1. Check all possible locations for DonutBoost.exe
+' 2. Check all possible locations for DonutBoost.exe
 Dim candidates(4)
 candidates(0) = scriptDir & "DonutBoost.exe"
 candidates(1) = scriptDir & "publish\build-out\DonutBoost.exe"
@@ -23,7 +30,7 @@ If targetExe <> "" Then
     ' Use ShellExecute with "runas" so Windows UAC elevation succeeds cleanly without error 740
     shellApp.ShellExecute targetExe, "", scriptDir, "runas", 1
 Else
-    ' 2. Fallback: Check for DonutBoost.dll
+    ' 3. Fallback: Check for DonutBoost.dll
     Dim dllCandidates(3)
     dllCandidates(0) = scriptDir & "DonutBoost.dll"
     dllCandidates(1) = scriptDir & "publish\build-out\DonutBoost.dll"
