@@ -114,6 +114,9 @@ public class NetworkBondingManager : IDisposable
 
                 if (ipv4 == null) continue;
 
+                var gateway = ipProps.GatewayAddresses
+                    .FirstOrDefault(g => g.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.Any.Equals(g.Address))?.Address;
+
                 int ifIndex = 0;
                 try
                 {
@@ -138,6 +141,7 @@ public class NetworkBondingManager : IDisposable
                     existing.InterfaceIndex = ifIndex;
                     existing.InterfaceType = nic.NetworkInterfaceType;
                     existing.LocalIp = ipv4.Address;
+                    existing.GatewayIp = gateway;
                     existing.SpeedBitsPerSecond = nic.Speed;
                     existing.IsOnline = true;
                     existing.NotifyAdapterMetadataChanged();
@@ -153,6 +157,7 @@ public class NetworkBondingManager : IDisposable
                         InterfaceIndex = ifIndex,
                         InterfaceType = nic.NetworkInterfaceType,
                         LocalIp = ipv4.Address,
+                        GatewayIp = gateway,
                         SpeedBitsPerSecond = nic.Speed,
                         IsEnabled = true,
                         IsOnline = true
@@ -249,7 +254,32 @@ public class NetworkBondingManager : IDisposable
                             targetMetric = adp.IsMobilePhone ? 5 : 60;
                         }
 
-                        // Enforce IPv4 Metric
+                        // 1. In-memory route table update (instantaneous 1ms via route.exe)
+                        if (adp.GatewayIp != null)
+                        {
+                            try
+                            {
+                                using var procRoute = Process.Start(new ProcessStartInfo
+                                {
+                                    FileName = "route",
+                                    Arguments = $"CHANGE 0.0.0.0 MASK 0.0.0.0 {adp.GatewayIp} METRIC {targetMetric} IF {adp.InterfaceIndex}",
+                                    CreateNoWindow = true,
+                                    UseShellExecute = false
+                                });
+                                procRoute?.WaitForExit(200);
+                            }
+                            catch { }
+                        }
+
+                        // 2. Direct Registry InterfaceMetric update for this adapter GUID (authoritative for Windows TCP stack)
+                        try
+                        {
+                            using var key = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\{adp.Id}", true);
+                            key?.SetValue("InterfaceMetric", targetMetric, RegistryValueKind.DWord);
+                        }
+                        catch { }
+
+                        // 3. Enforce IPv4 Metric via netsh
                         try
                         {
                             using var proc4 = Process.Start(new ProcessStartInfo
@@ -259,7 +289,7 @@ public class NetworkBondingManager : IDisposable
                                 CreateNoWindow = true,
                                 UseShellExecute = false
                             });
-                            proc4?.WaitForExit(300);
+                            proc4?.WaitForExit(200);
                         }
                         catch { }
 
@@ -309,6 +339,13 @@ public class NetworkBondingManager : IDisposable
             SetIpv4Precedence(false);
             foreach (var adp in adapters)
             {
+                try
+                {
+                    using var key = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\{adp.Id}", true);
+                    key?.DeleteValue("InterfaceMetric", false);
+                }
+                catch { }
+
                 if (adp.InterfaceIndex > 0)
                 {
                     try

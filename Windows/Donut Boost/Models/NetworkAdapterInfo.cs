@@ -19,6 +19,7 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
     public string Description { get; set; } = string.Empty;
     public int InterfaceIndex { get; set; }
     public IPAddress? LocalIp { get; set; }
+    public IPAddress? GatewayIp { get; set; }
     public NetworkInterfaceType InterfaceType { get; set; }
     public long SpeedBitsPerSecond { get; set; }
 
@@ -85,6 +86,8 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
     public void AddDownloadedBytes(long bytes)
     {
         Interlocked.Add(ref _totalBytesDownloaded, bytes);
+        OnPropertyChanged(nameof(TotalBytesDownloaded));
+        OnPropertyChanged(nameof(FormattedTotalBytes));
     }
 
     public void NotifyMetricsChanged()
@@ -194,6 +197,21 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
     protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        var handler = PropertyChanged;
+        if (handler != null)
+        {
+            var app = System.Windows.Application.Current;
+            if (app != null && app.Dispatcher != null && !app.Dispatcher.CheckAccess())
+            {
+                app.Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    handler(this, new PropertyChangedEventArgs(propertyName));
+                }));
+            }
+            else
+            {
+                handler(this, new PropertyChangedEventArgs(propertyName));
+            }
+        }
     }
 }

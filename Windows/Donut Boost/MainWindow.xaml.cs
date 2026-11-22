@@ -757,20 +757,27 @@ public partial class MainWindow : Window
     }
 
     private long _selectedGameSizeTarget = 0; // 0 = Auto-detect
+    private double _smoothedGameSpeedBps = 0;
+    private double _smoothedGameEtaSeconds = 0;
 
     private void GameSizeButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is Button btn && long.TryParse(btn.Tag?.ToString(), out long gb))
         {
             _selectedGameSizeTarget = gb > 0 ? (gb * 1024L * 1024L * 1024L) : 0;
+            _smoothedGameEtaSeconds = 0; // Reset ETA smoothing for instant recalculation with new target
             UpdateGameSizeButtonsUI();
 
             if (_gameBoostProxy.ActiveConnections > 0)
             {
+                string title = !string.IsNullOrEmpty(_gameBoostProxy.DetectedGameName) 
+                    ? $"{_gameBoostProxy.DetectedGameName}" 
+                    : "Active Game";
+
                 OnGameProxyMetricsUpdated(_gameBoostProxy.TotalBytesDownloaded, 
                     _bondingManager.Adapters.Sum(a => a.CurrentSpeedBps), 
                     _gameBoostProxy.ActiveConnections, 
-                    "Active Game");
+                    title);
             }
         }
     }
@@ -784,13 +791,18 @@ public partial class MainWindow : Window
         }
 
         _selectedGameSizeTarget = gb * 1024L * 1024L * 1024L;
+        _smoothedGameEtaSeconds = 0;
         UpdateGameSizeButtonsUI();
         if (_gameBoostProxy.ActiveConnections > 0)
         {
+            string title = !string.IsNullOrEmpty(_gameBoostProxy.DetectedGameName) 
+                ? $"{_gameBoostProxy.DetectedGameName}" 
+                : "Active Game";
+
             OnGameProxyMetricsUpdated(_gameBoostProxy.TotalBytesDownloaded,
                 _bondingManager.Adapters.Sum(a => a.CurrentSpeedBps),
                 _gameBoostProxy.ActiveConnections,
-                "Active Game");
+                title);
         }
     }
 
@@ -862,12 +874,46 @@ public partial class MainWindow : Window
                     bool hasTargetSize = targetBytes > 0;
 
                     long remainingBytes = hasTargetSize ? Math.Max(0, targetBytes - totalBytes) : 0;
-                    double etaSeconds = instantSpeedBps > 1024 ? ((double)remainingBytes / instantSpeedBps) : 0;
-                    
-                    // Without a trustworthy launcher size, do not show a fabricated progress percentage or ETA.
-                    string etaText = !hasTargetSize ? "Set target size" : (etaSeconds > 86400 * 2
-                        ? "Calculating..."
-                        : (etaSeconds > 0 ? DownloadSession.FormatETAFromSeconds(etaSeconds) : "--:--"));
+
+                    // Smooth speed and ETA for rock-solid real estimation without jumps
+                    if (instantSpeedBps > 1024)
+                    {
+                        _smoothedGameSpeedBps = (_smoothedGameSpeedBps <= 0)
+                            ? instantSpeedBps
+                            : (_smoothedGameSpeedBps * 0.85) + (instantSpeedBps * 0.15);
+                    }
+
+                    double effectiveSpeed = _smoothedGameSpeedBps > 1024 ? _smoothedGameSpeedBps : instantSpeedBps;
+                    double rawEta = (hasTargetSize && effectiveSpeed > 1024) ? ((double)remainingBytes / effectiveSpeed) : 0;
+
+                    if (rawEta > 0)
+                    {
+                        _smoothedGameEtaSeconds = (_smoothedGameEtaSeconds <= 0)
+                            ? rawEta
+                            : (_smoothedGameEtaSeconds * 0.80) + (rawEta * 0.20);
+                    }
+
+                    string etaText;
+                    if (!hasTargetSize)
+                    {
+                        etaText = "Set target size";
+                    }
+                    else if (remainingBytes == 0 && totalBytes >= targetBytes)
+                    {
+                        etaText = "Finished";
+                    }
+                    else if (_smoothedGameEtaSeconds > 86400 * 2)
+                    {
+                        etaText = "Calculating...";
+                    }
+                    else if (_smoothedGameEtaSeconds > 0)
+                    {
+                        etaText = DownloadSession.FormatETAFromSeconds(_smoothedGameEtaSeconds);
+                    }
+                    else
+                    {
+                        etaText = "--:--";
+                    }
 
                     double percent = hasTargetSize ? Math.Clamp((double)totalBytes / targetBytes * 100.0, 0.0, 100.0) : 0;
 
@@ -895,6 +941,8 @@ public partial class MainWindow : Window
                 else
                 {
                     // Standby mode: No active download occurring -> HIDE ETA AND PROGRESS BAR
+                    _smoothedGameSpeedBps = 0;
+                    _smoothedGameEtaSeconds = 0;
                     GameSizeSelectorPanel.Visibility = Visibility.Collapsed;
                     TitleBarLiveStatusPanel.Visibility = Visibility.Collapsed;
 
