@@ -1,5 +1,5 @@
 #define MyAppName "Donut Boost"
-#define MyAppVersion "1.0.4"
+#define MyAppVersion "1.0.5"
 #define MyAppPublisher "Donut"
 #define MyAppURL "https://user-cariv.github.io/Donut/boost.html"
 #define MyAppExeName "DonutBoost.exe"
@@ -53,10 +53,6 @@ Name: "{autodesktop}\Donut Boost"; Filename: "{app}\{#MyAppExeName}"; IconFilena
 [Run]
 ; Launch Donut Boost upon setup completion using ShellExecute so elevation manifests succeed without code 740
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch Donut Boost"; Flags: shellexec nowait postinstall skipifsilent
-
-[UninstallRun]
-; Cleanly reset proxy and any registry modifications
-Filename: "{cmd}"; Parameters: "/c ""powershell -NoProfile -Command Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name ProxyEnable -Value 0 -ErrorAction SilentlyContinue"""; Flags: runhidden waituntilterminated; RunOnceId: "ResetProxy"
 
 [UninstallDelete]
 ; Completely remove application directory on uninstall

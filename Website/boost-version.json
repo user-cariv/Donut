@@ -1,8 +1,8 @@
 {
-  "latestVersion": "1.0.4",
+  "latestVersion": "1.0.5",
   "minRequiredVersion": "1.0.0",
   "releaseDate": "2026-11-22",
-  "releaseNotes": "Fixes Mobile Data Only routing, prevents disabled adapters from receiving download chunks, and improves Steam game size detection and ETA accuracy.",
+  "releaseNotes": "Preserves Windows Wi-Fi routes and proxy settings. Improves Steam-specific size, progress, speed, and ETA reporting; other launchers are labeled as network activity when game-specific totals are unavailable.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://raw.githubusercontent.com/user-cariv/Donut/main/Website/Install%20Donut%20Boost.exe"
 }

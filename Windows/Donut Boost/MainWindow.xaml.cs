@@ -453,7 +453,6 @@ public partial class MainWindow : Window
             _bondingManager.CurrentMode = BondingMode.MobileDataOnly;
         }
 
-        NetworkBondingManager.ApplyBondingModeMetrics(adapters.Where(a => a.IsEnabled && a.IsOnline), _bondingManager.CurrentMode);
     }
 
     private void OnAdaptersChanged()
@@ -815,7 +814,8 @@ public partial class MainWindow : Window
                 if (activeConnections > 0)
                 {
                     // 100% Automatic Game / Download Size Detection (Zero manual button pressing)
-                    long targetBytes = _gameBoostProxy.DetectedGameSizeBytes;
+                    // Steam's active appmanifest is the only source currently trusted for a package size.
+                    long targetBytes = _gameBoostProxy.HasAuthoritativeGameSize ? _gameBoostProxy.DetectedGameSizeBytes : 0;
                     bool hasTargetSize = targetBytes > 0;
 
                     // Reset ETA smoothing when a different launcher/game or
@@ -837,6 +837,13 @@ public partial class MainWindow : Window
                             ? instantSpeedBps
                             : (_smoothedGameSpeedBps * 0.85) + (instantSpeedBps * 0.15);
                     }
+                    else
+                    {
+                        // Do not keep showing an old ETA after a download pauses
+                        // or Steam reports no new manifest progress.
+                        _smoothedGameSpeedBps = 0;
+                        _smoothedGameEtaSeconds = 0;
+                    }
 
                     double effectiveSpeed = _smoothedGameSpeedBps > 1024 ? _smoothedGameSpeedBps : instantSpeedBps;
                     double rawEta = (hasTargetSize && effectiveSpeed > 1024) ? ((double)remainingBytes / effectiveSpeed) : 0;
@@ -851,7 +858,7 @@ public partial class MainWindow : Window
                     string etaText;
                     if (!hasTargetSize)
                     {
-                        etaText = "Estimating...";
+                        etaText = "Unavailable for this launcher";
                     }
                     else if (remainingBytes == 0 && totalBytes >= targetBytes)
                     {
@@ -872,26 +879,31 @@ public partial class MainWindow : Window
 
                     double percent = hasTargetSize ? Math.Clamp((double)totalBytes / targetBytes * 100.0, 0.0, 100.0) : 0;
 
+                    bool isSteamDownload = _gameBoostProxy.HasAuthoritativeGameSize;
                     CombinedSpeedTextBlock.Text = speedText;
-                    StatusBadgeTextBlock.Text = "🎮 BOOSTING GAMES";
-                    FileNameTextBlock.Text = $"Accelerating {lastHost}";
-                    FileSizeTextBlock.Text = $"{DownloadSession.FormatBytes(totalBytes)} / {(hasTargetSize ? DownloadSession.FormatBytes(targetBytes) : "Auto-detecting...")}";
+                    StatusBadgeTextBlock.Text = isSteamDownload ? "STEAM DOWNLOAD" : "NETWORK ACTIVITY";
+                    FileNameTextBlock.Text = isSteamDownload ? $"Monitoring {lastHost}" : $"Network traffic while {lastHost} is active";
+                    FileSizeTextBlock.Text = hasTargetSize
+                        ? $"{DownloadSession.FormatBytes(totalBytes)} / {DownloadSession.FormatBytes(targetBytes)}"
+                        : "Game download size unavailable";
 
                     // Real running progress bar + live ETA
-                    DownloadProgressBar.IsIndeterminate = !hasTargetSize;
+                    DownloadProgressBar.IsIndeterminate = false;
                     DownloadProgressBar.Value = percent;
                     ProgressPercentTextBlock.Text = hasTargetSize ? $"{percent:F1}%" : "";
-                    EtaTextBlock.Text = $"ETA: {etaText}";
+                    EtaTextBlock.Text = hasTargetSize ? $"ETA: {etaText}" : "ETA unavailable";
 
                     TitleBarLiveStatusPanel.Visibility = Visibility.Visible;
                     TitleBarSpeedTextBlock.Text = speedText;
-                    TitleBarStatusBadge.Text = "🎮 BOOSTING GAMES";
-                    TitleBarProgressText.Text = hasTargetSize ? $"{lastHost} ({percent:F1}%) • ETA: {etaText}" : $"{lastHost} • Auto-detecting...";
+                    TitleBarStatusBadge.Text = isSteamDownload ? "STEAM DOWNLOAD" : "NETWORK ACTIVITY";
+                    TitleBarProgressText.Text = hasTargetSize
+                        ? $"{lastHost} ({percent:F1}%) • ETA: {etaText}"
+                        : $"{lastHost} • game size/ETA unavailable";
 
                     FooterLiveSpeedText.Text = speedText;
                     FooterProgressText.Text = hasTargetSize
                         ? $"🎮 {lastHost} • {DownloadSession.FormatBytes(totalBytes)} / {DownloadSession.FormatBytes(targetBytes)} (ETA: {etaText})"
-                        : $"🎮 {lastHost} • {DownloadSession.FormatBytes(totalBytes)} transferred";
+                        : $"Network activity • {speedText}; game-specific size/ETA unavailable";
                 }
                 else
                 {

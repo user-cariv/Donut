@@ -29,6 +29,9 @@ public class GameBoostProxyServer : IDisposable
 
     private long _totalBytesDownloaded = 0;
     private long _steamCurrentDownloadBytes = 0;
+    private long _lastSteamProgressBytes = -1;
+    private DateTime _lastSteamProgressSampleUtc;
+    private double _steamDownloadSpeedBps;
     private int _activeConnections = 0;
     private string _detectedLauncher = "Game Launcher";
     private long _detectedGameSizeBytes = 0;
@@ -39,6 +42,7 @@ public class GameBoostProxyServer : IDisposable
     public long TotalBytesDownloaded => Interlocked.Read(ref _totalBytesDownloaded);
     public int ActiveConnections => _activeConnections;
     public long DetectedGameSizeBytes => _detectedGameSizeBytes;
+    public bool HasAuthoritativeGameSize => _detectedLauncher == "Steam" && _detectedGameSizeBytes > 0;
     public string DetectedGameName => _detectedGameName;
 
     public event Action<long, double, int, string>? ProxyMetricsUpdated;
@@ -369,8 +373,12 @@ public class GameBoostProxyServer : IDisposable
                             _detectedGameSizeBytes = 0;
                             _detectedGameName = "";
                             Interlocked.Exchange(ref _steamCurrentDownloadBytes, 0);
+                            _lastSteamProgressBytes = -1;
+                            _steamDownloadSpeedBps = 0;
                         }
-                        isGameActive = true;
+                        // DetectLauncher uses "Game Launcher" when launchers are
+                        // open but no active download has been found.
+                        isGameActive = !string.Equals(activeLauncher, "Game Launcher", StringComparison.OrdinalIgnoreCase);
                         _detectedLauncher = activeLauncher;
                         _summaryLauncherLabel = summaryLabel;
                         activeStreamsCount = count;
@@ -380,6 +388,8 @@ public class GameBoostProxyServer : IDisposable
                         _detectedGameSizeBytes = 0;
                         _detectedGameName = "";
                         Interlocked.Exchange(ref _steamCurrentDownloadBytes, 0);
+                        _lastSteamProgressBytes = -1;
+                        _steamDownloadSpeedBps = 0;
                         isGameActive = false;
                         activeStreamsCount = 0;
                         _activeConnections = 0;
@@ -482,7 +492,9 @@ public class GameBoostProxyServer : IDisposable
             {
                 _activeConnections = Math.Max(4, Math.Min(16, activeStreamsCount * 2));
                 // Use smoothedSpeedBps so speed matches Steam's 1-second counter without spiking above 300 on tiny bursts
-                double reportSpeed = smoothedSpeedBps;
+                double reportSpeed = _detectedLauncher == "Steam" && _detectedGameSizeBytes > 0
+                    ? _steamDownloadSpeedBps
+                    : smoothedSpeedBps;
 
                 // Throttled detection: Check for auto-detected game download sizes from all launchers once every 3s
                 if (_detectedGameSizeBytes <= 0 || sizeDetectionStopwatch.ElapsedMilliseconds >= 3000)
@@ -491,8 +503,23 @@ public class GameBoostProxyServer : IDisposable
                     if (_detectedLauncher == "Steam")
                     {
                         var (sName, sBytes, sCur) = DetectSteamDownloadSize();
-                        _detectedGameSizeBytes = sBytes;
-                        _detectedGameName = sName;
+                        if (sBytes > 0)
+                        {
+                            _detectedGameSizeBytes = sBytes;
+                            _detectedGameName = sName;
+                            var sampleTime = DateTime.UtcNow;
+                            if (_lastSteamProgressBytes >= 0 && sCur >= _lastSteamProgressBytes)
+                            {
+                                var seconds = (sampleTime - _lastSteamProgressSampleUtc).TotalSeconds;
+                                _steamDownloadSpeedBps = seconds > 0.25 ? (sCur - _lastSteamProgressBytes) / seconds : 0;
+                            }
+                            else
+                            {
+                                _steamDownloadSpeedBps = 0;
+                            }
+                            _lastSteamProgressBytes = sCur;
+                            _lastSteamProgressSampleUtc = sampleTime;
+                        }
                         Interlocked.Exchange(ref _steamCurrentDownloadBytes, sCur);
                     }
                     else if (_detectedLauncher == "Epic Games")
@@ -574,6 +601,8 @@ public class GameBoostProxyServer : IDisposable
                 _detectedGameName = "";
                 _detectedGameSizeBytes = 0;
                 Interlocked.Exchange(ref _steamCurrentDownloadBytes, 0);
+                _lastSteamProgressBytes = -1;
+                _steamDownloadSpeedBps = 0;
                 foreach (var adapter in _bondingManager.Adapters)
                 {
                     adapter.CurrentSpeedBps = 0;
