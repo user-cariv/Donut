@@ -1,8 +1,8 @@
 {
-  "latestVersion": "1.0.1",
+  "latestVersion": "1.0.2",
   "minRequiredVersion": "1.0.0",
   "releaseDate": "2026-11-22",
-  "releaseNotes": "In-app updates, 100% automatic game size detection across all 11 launchers, and 300+ Mbps Mobile 5G priority bonding.",
+  "releaseNotes": "Fixes a startup crash in the update banner and includes the latest Donut Boost launch fixes.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://raw.githubusercontent.com/user-cariv/Donut/main/Website/Install%20Donut%20Boost.exe"
 }

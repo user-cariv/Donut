@@ -1,5 +1,5 @@
 #define MyAppName "Donut Boost"
-#define MyAppVersion "1.0.1"
+#define MyAppVersion "1.0.2"
 #define MyAppPublisher "Donut"
 #define MyAppURL "https://user-cariv.github.io/Donut/boost.html"
 #define MyAppExeName "DonutBoost.exe"
@@ -19,7 +19,7 @@ VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription=Donut Boost - Multi-Connection & Speed Bonding Downloader
 VersionInfoProductName={#MyAppName}
 VersionInfoTextVersion={#MyAppVersion}
-SetupIconFile=publish\{#Runtime}\Donut.ico
+SetupIconFile=Assets\Donut.ico
 DefaultDirName={autopf}\Donut Boost
 DefaultGroupName=Donut Boost
 DisableProgramGroupPage=yes
@@ -44,7 +44,7 @@ UninstallDisplayIcon={app}\{#MyAppExeName}
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"
 
 [Files]
-Source: "publish\{#Runtime}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.old,*.old.*"
+Source: "publish\{#Runtime}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.old,*.old.*,*.pdb"
 
 [Icons]
 Name: "{autoprograms}\Donut Boost"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\Donut.ico"
