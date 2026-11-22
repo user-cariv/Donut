@@ -1,6 +1,6 @@
 <div align="center">
 
-<a href="https://user-cariv.github.io/Donut/"><img src="assets/hero.svg?v=2" width="100%" alt="Donut. Small apps. Big relief." /></a>
+<a href="https://user-cariv.github.io/Donut/"><img src="assets/hero-v2.svg" width="100%" alt="Donut. Small apps. Big relief." /></a>
 
 <br/>
 
@@ -252,7 +252,7 @@ Head to the [support page](https://user-cariv.github.io/Donut/#support) or [open
 
 <div align="center">
 
-<img src="https://user-cariv.github.io/Donut/donut-hero-logo.png" width="72" alt="Donut" />
+<img src="assets/footer-logo.svg" width="130" alt="Donut" />
 
 ### Small apps. Big relief.
 
