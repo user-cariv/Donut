@@ -1,15 +1,3 @@
-const themeToggle = document.querySelector(".hub-theme-toggle");
-let storedTheme = null;
-try { storedTheme = localStorage.getItem("donut-theme"); } catch (_) {}
-if (storedTheme === "dark") document.body.classList.add("dark-mode");
-
-if (themeToggle) {
-  themeToggle.addEventListener("click", () => {
-    document.body.classList.toggle("dark-mode");
-    try { localStorage.setItem("donut-theme", document.body.classList.contains("dark-mode") ? "dark" : "light"); } catch (_) {}
-  });
-}
-
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 if (!reduceMotion) {
   const heroArt = document.querySelector(".hub-hero-art");

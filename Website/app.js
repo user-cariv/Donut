@@ -22,15 +22,6 @@ document.querySelectorAll('a[href^="#"]:not([data-open-download])').forEach((lin
   });
 });
 
-const themeToggle = document.querySelector(".theme-toggle");
-let storedTheme = null;
-try { storedTheme = localStorage.getItem("donut-theme"); } catch (_) {}
-if (storedTheme === "dark") document.body.classList.add("dark-mode");
-themeToggle?.addEventListener("click", () => {
-  document.body.classList.toggle("dark-mode");
-  try { localStorage.setItem("donut-theme", document.body.classList.contains("dark-mode") ? "dark" : "light"); } catch (_) {}
-});
-
 const downloadModal = document.querySelector("#download-modal");
 const platformName = /Mac|iPhone|iPad/.test(navigator.platform) ? "macOS" : "Windows";
 document.querySelector(".modal-intro").textContent = `${platformName} detected. Pick your platform to get started — or choose the other build anytime.`;

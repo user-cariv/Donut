@@ -1,19 +1,8 @@
 (() => {
   const root = document.documentElement;
   const themeToggle = document.getElementById('theme');
-  try {
-    const savedTheme = localStorage.getItem('di_theme');
-    if (savedTheme === 'dark' || savedTheme === 'light') root.setAttribute('data-theme', savedTheme);
-  } catch (_) {}
-
   const isDark = () => root.getAttribute('data-theme') === 'dark';
   const paintThemeLabel = () => themeToggle?.setAttribute('aria-label', isDark() ? 'Switch to light mode' : 'Switch to dark mode');
-  themeToggle?.addEventListener('click', () => {
-    const nextTheme = isDark() ? 'light' : 'dark';
-    root.setAttribute('data-theme', nextTheme);
-    try { localStorage.setItem('di_theme', nextTheme); } catch (_) {}
-    paintThemeLabel();
-  });
   paintThemeLabel();
 
   const island = document.getElementById('island');

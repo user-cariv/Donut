@@ -387,6 +387,7 @@
     });
   };
   updateThemeLabels();
+  window.addEventListener("donut-theme-change", updateThemeLabels);
   document.addEventListener("click", (event) => {
     if (event.target.closest(".hub-theme-toggle, .theme-toggle, #theme")) window.setTimeout(updateThemeLabels, 0);
   });
