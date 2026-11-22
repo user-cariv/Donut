@@ -734,7 +734,7 @@ public partial class MainWindow : Window
             GameBoostBadgeBorder.BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88));
             GameBoostBadgeText.Text = "🟢 AUTO-ON (Active)";
             GameBoostBadgeText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88));
-            OnLogReceived("🎮 Game Launcher Accelerator active. Monitoring Steam, Epic Games, EA, Rockstar.");
+            OnLogReceived("🎮 Game Launcher Accelerator active. Monitoring Steam, Epic, Riot Client, Xbox, Microsoft Store, Unity, EA App & Battle.net.");
         }
         else
         {
@@ -958,7 +958,7 @@ public partial class MainWindow : Window
                         StatusBadgeTextBlock.Text = "Standby (Ready to Boost)";
                         FileNameTextBlock.Text = "Game Launcher detected (Standby)";
                         FooterLiveSpeedText.Text = "0.0 Mbps";
-                        FooterProgressText.Text = "🎮 Game Launcher Standby • Ready to boost downloads on Steam, Epic, Rockstar, EA, Ubisoft, Battle.net, Riot, Xbox...";
+                        FooterProgressText.Text = "🎮 Game Launcher Standby • Ready to boost downloads on Steam, Epic, Riot Client, Xbox, Microsoft Store, Unity, EA App & Battle.net...";
                     }
                     else
                     {

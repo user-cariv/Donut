@@ -325,35 +325,41 @@
                                     <TextBlock x:Name="GameBoostBadgeText" Text="🟢 AUTO-ON (Active)" FontSize="10" FontWeight="SemiBold" Foreground="#30D158"/>
                                 </Border>
                             </StackPanel>
-                            <TextBlock Text="Bonds Wi-Fi + Mobile 5G automatically for Steam, Epic Games, EA App, Rockstar, Ubisoft, Battle.net, Riot &amp; Xbox (No URL paste needed)" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+                            <TextBlock Text="Bonds Wi-Fi + Mobile 5G automatically for Steam, Epic, Riot Client, Xbox, Microsoft Store, Unity, EA App &amp; Battle.net (No URL paste needed)" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
 
-                            <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
-                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,0">
+                            <WrapPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,3">
                                     <TextBlock Text="🎮 Steam" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
                                 </Border>
-                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,0">
+                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,3">
                                     <TextBlock Text="⚡ Epic Games" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
                                 </Border>
-                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,0">
-                                    <TextBlock Text="🏎️ Rockstar" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
+                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,3">
+                                    <TextBlock Text="⚔️ Riot Client" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
                                 </Border>
-                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,0">
-                                    <TextBlock Text="⚽ EA App" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
+                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,3">
+                                    <TextBlock Text="🛍️ MS Store" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
                                 </Border>
-                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,0">
-                                    <TextBlock Text="🦅 Ubisoft" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
+                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,3">
+                                    <TextBlock Text="🛠️ Unity" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
                                 </Border>
-                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,0">
-                                    <TextBlock Text="🛡️ Battle.net" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
-                                </Border>
-                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,0">
-                                    <TextBlock Text="⚔️ Riot" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
-                                </Border>
-                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,0">
+                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,3">
                                     <TextBlock Text="🟩 Xbox" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
                                 </Border>
-                                <TextBlock x:Name="GameBoostStreamsText" Text="• Game Launcher Standby" FontSize="10" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"/>
-                            </StackPanel>
+                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,3">
+                                    <TextBlock Text="⚽ EA App" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
+                                </Border>
+                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,3">
+                                    <TextBlock Text="🛡️ Battle.net" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
+                                </Border>
+                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,3">
+                                    <TextBlock Text="🏎️ Rockstar" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
+                                </Border>
+                                <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,3">
+                                    <TextBlock Text="🦅 Ubisoft" FontSize="9" FontWeight="Medium" Foreground="#CBD5E1"/>
+                                </Border>
+                                <TextBlock x:Name="GameBoostStreamsText" Text="• Game Launcher Standby" FontSize="10" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="3,0,0,3"/>
+                            </WrapPanel>
                         </StackPanel>
 
                         <!-- Right: Authentic iOS/macOS Toggle Switch -->

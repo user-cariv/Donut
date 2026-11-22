@@ -65,7 +65,19 @@ public class GameBoostProxyServer : IDisposable
         "GamingServices",
         "GOG Galaxy",
         "GalaxyClient",
-        "RiotClientServices"
+        "RiotClientServices",
+        "RiotClientUx",
+        "RiotClientCrashHandler",
+        "LeagueClient",
+        "VALORANT",
+        "UnityHub",
+        "Unity",
+        "UnityPackageInstaller",
+        "WinStore.App",
+        "Microsoft.Store",
+        "DeliveryOptimization",
+        "InstallAgent",
+        "wsappx"
     };
 
     public GameBoostProxyServer(NetworkBondingManager bondingManager, LicenseManager? licenseManager = null)
@@ -90,7 +102,7 @@ public class GameBoostProxyServer : IDisposable
             _cts = new CancellationTokenSource();
             _ = MonitorGameTrafficLoopAsync(_cts.Token);
 
-            LogReceived?.Invoke("🎮 Game Launcher Accelerator active. Monitoring Steam, Epic Games, EA, Rockstar with Home Wi-Fi & Mobile 5G.");
+            LogReceived?.Invoke("🎮 Game Launcher Accelerator active. Monitoring Steam, Epic Games, Riot Client, Microsoft Store, Unity, EA, Xbox with Home Wi-Fi & Mobile 5G.");
             return true;
         }
         catch (Exception ex)
@@ -184,12 +196,14 @@ public class GameBoostProxyServer : IDisposable
         }).ToList();
         if (ubi.Count > 0) candidates.Add(new LauncherCandidate { Name = "Ubisoft Connect", Processes = ubi });
 
-        // 7. Riot Games
+        // 7. Riot Client
         var riot = processes.Where(p => {
-            try { return p.ProcessName.Contains("Riot", StringComparison.OrdinalIgnoreCase) || p.ProcessName.Contains("LeagueClient", StringComparison.OrdinalIgnoreCase); }
+            try { return p.ProcessName.Contains("Riot", StringComparison.OrdinalIgnoreCase) || 
+                         p.ProcessName.Contains("LeagueClient", StringComparison.OrdinalIgnoreCase) ||
+                         p.ProcessName.Contains("VALORANT", StringComparison.OrdinalIgnoreCase); }
             catch { return false; }
         }).ToList();
-        if (riot.Count > 0) candidates.Add(new LauncherCandidate { Name = "Riot Games", Processes = riot });
+        if (riot.Count > 0) candidates.Add(new LauncherCandidate { Name = "Riot Client", Processes = riot });
 
         // 8. Xbox App
         var xbox = processes.Where(p => {
@@ -204,6 +218,25 @@ public class GameBoostProxyServer : IDisposable
             catch { return false; }
         }).ToList();
         if (gog.Count > 0) candidates.Add(new LauncherCandidate { Name = "GOG Galaxy", Processes = gog });
+
+        // 10. Microsoft Store
+        var msStore = processes.Where(p => {
+            try { return p.ProcessName.Contains("WinStore", StringComparison.OrdinalIgnoreCase) || 
+                         p.ProcessName.Contains("DeliveryOptimization", StringComparison.OrdinalIgnoreCase) ||
+                         p.ProcessName.Contains("InstallAgent", StringComparison.OrdinalIgnoreCase) ||
+                         p.ProcessName.Contains("wsappx", StringComparison.OrdinalIgnoreCase); }
+            catch { return false; }
+        }).ToList();
+        if (msStore.Count > 0) candidates.Add(new LauncherCandidate { Name = "Microsoft Store", Processes = msStore });
+
+        // 11. Unity / Unity Hub
+        var unity = processes.Where(p => {
+            try { return p.ProcessName.Contains("UnityHub", StringComparison.OrdinalIgnoreCase) || 
+                         p.ProcessName.Equals("Unity", StringComparison.OrdinalIgnoreCase) ||
+                         p.ProcessName.Contains("UnityPackage", StringComparison.OrdinalIgnoreCase); }
+            catch { return false; }
+        }).ToList();
+        if (unity.Count > 0) candidates.Add(new LauncherCandidate { Name = "Unity", Processes = unity });
 
         if (candidates.Count == 0)
         {
@@ -430,6 +463,24 @@ public class GameBoostProxyServer : IDisposable
                         var (eName, eBytes) = DetectEpicDownloadSize();
                         if (eBytes > 0) _detectedGameSizeBytes = eBytes;
                         if (!string.IsNullOrEmpty(eName)) _detectedGameName = eName;
+                    }
+                    else if (_detectedLauncher == "Riot Client")
+                    {
+                        var (rName, rBytes) = DetectRiotDownloadSize();
+                        if (rBytes > 0) _detectedGameSizeBytes = rBytes;
+                        if (!string.IsNullOrEmpty(rName)) _detectedGameName = rName;
+                    }
+                    else if (_detectedLauncher == "Microsoft Store")
+                    {
+                        var (mName, mBytes) = DetectMsStoreDownloadSize();
+                        if (mBytes > 0) _detectedGameSizeBytes = mBytes;
+                        if (!string.IsNullOrEmpty(mName)) _detectedGameName = mName;
+                    }
+                    else if (_detectedLauncher == "Unity")
+                    {
+                        var (uName, uBytes) = DetectUnityDownloadSize();
+                        if (uBytes > 0) _detectedGameSizeBytes = uBytes;
+                        if (!string.IsNullOrEmpty(uName)) _detectedGameName = uName;
                     }
                 }
 
@@ -748,6 +799,48 @@ public class GameBoostProxyServer : IDisposable
         }
         catch { }
         return ("", 0);
+    }
+
+    private static (string GameName, long TotalBytes) DetectRiotDownloadSize()
+    {
+        try
+        {
+            var processes = Process.GetProcesses();
+            if (processes.Any(p => p.ProcessName.Contains("VALORANT", StringComparison.OrdinalIgnoreCase)))
+            {
+                return ("VALORANT", 45L * 1024 * 1024 * 1024);
+            }
+            if (processes.Any(p => p.ProcessName.Contains("LeagueClient", StringComparison.OrdinalIgnoreCase)))
+            {
+                return ("League of Legends", 26L * 1024 * 1024 * 1024);
+            }
+            if (Directory.Exists(@"C:\Riot Games\VALORANT"))
+            {
+                return ("VALORANT", 45L * 1024 * 1024 * 1024);
+            }
+            if (Directory.Exists(@"C:\Riot Games\League of Legends"))
+            {
+                return ("League of Legends", 26L * 1024 * 1024 * 1024);
+            }
+        }
+        catch { }
+        return ("Riot Client Game", 0);
+    }
+
+    private static (string GameName, long TotalBytes) DetectMsStoreDownloadSize()
+    {
+        return ("Microsoft Store App", 0);
+    }
+
+    private static (string GameName, long TotalBytes) DetectUnityDownloadSize()
+    {
+        try
+        {
+            // Unity Editor download via Unity Hub is typically ~5 GB
+            return ("Unity Editor / Package", 5L * 1024 * 1024 * 1024);
+        }
+        catch { }
+        return ("Unity Package", 0);
     }
 
     public void Dispose()
