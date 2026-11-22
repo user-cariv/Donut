@@ -31,7 +31,6 @@
 .boost-launcher-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
 .boost-launcher-list span { padding: 8px 11px; border: 1px solid #ffffff18; border-radius: 100px; color: #e4e1ef; background: #ffffff0b; font-size: 11px; font-weight: 600; transition: transform .2s ease, border-color .2s ease, background .2s ease; }
 .boost-launcher-list span:hover { transform: translateY(-2px); border-color: #b69aff80; background: #b69aff1c; }
-.boost-launcher-list span:first-child { border-color: #7d68ff66; background: #7660ff20; }
 .boost-game-card .boost-game-footnote { max-width: 700px; margin: 18px 0 0; padding-top: 15px; border-top: 1px solid #ffffff16; color: #a9a5ba; font-size: 12px; line-height: 1.65; }
 .boost-game-footnote strong { color: #f5f2ff; }
 .boost-game-visual { position: relative; width: 260px; height: 220px; justify-self: center; }
