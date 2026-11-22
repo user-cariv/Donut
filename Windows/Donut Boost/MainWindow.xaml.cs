@@ -98,6 +98,18 @@ public partial class MainWindow : Window
                 GameBoostToggle.IsChecked = false;
 
             _licenseTimer.Start();
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2500);
+                await CheckForAppUpdatesAsync(silent: true);
+            });
+
+            _autoUpdateTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromHours(4)
+            };
+            _autoUpdateTimer.Tick += async (_, _) => await CheckForAppUpdatesAsync(silent: true);
+            _autoUpdateTimer.Start();
         }
         finally
         {
