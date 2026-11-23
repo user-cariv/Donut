@@ -430,6 +430,8 @@
           message.textContent = shortId
             ? `Your support request was sent successfully. Reference ${shortId}.`
             : "Your support request was sent successfully.";
+          form.elements.name.value = "";
+          form.elements.email.value = "";
           form.elements.issue.value = "";
           if (fileInput) fileInput.value = "";
           renderFiles();
