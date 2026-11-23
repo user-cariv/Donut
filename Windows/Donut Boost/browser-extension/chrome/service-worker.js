@@ -17,9 +17,19 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
-chrome.contextMenus.onClicked.addListener((info) => {
-  const value = info.menuItemId === MENU_LINK ? info.linkUrl : info.pageUrl;
+chrome.contextMenus.onClicked.addListener(async (info) => {
+  const value = info.menuItemId === MENU_LINK ? info.linkUrl
+    : info.menuItemId === MENU_PAGE ? info.pageUrl : null;
   if (!value || !/^(https?:\/\/|magnet:)/i.test(value)) return;
-  const handoff = `donutboost://download?url=${encodeURIComponent(value)}`;
-  chrome.tabs.create({ url: handoff, active: false });
+
+  try {
+    const handoff = `donutboost://download?url=${encodeURIComponent(value)}`;
+    if (handoff.length > 8192) {
+      console.warn("The link is too long to send to Donut Boost.");
+      return;
+    }
+    await chrome.tabs.create({ url: handoff, active: false });
+  } catch {
+    console.warn("Could not open Donut Boost. Check that the Windows app is installed.");
+  }
 });

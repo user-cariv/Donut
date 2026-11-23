@@ -13,6 +13,7 @@ namespace DonutBoost.Engine;
 
 public class MultiChannelDownloader
 {
+    private const int MaxTorrentMetadataBytes = 10 * 1024 * 1024;
     private readonly NetworkBondingManager _bondingManager;
     private readonly LicenseManager? _licenseManager;
     private readonly BandwidthThrottler _throttler = new();
@@ -323,21 +324,14 @@ public class MultiChannelDownloader
                 if (File.Exists(input))
                 {
                     var torrentPath = Path.GetFullPath(input);
-                    if (new FileInfo(torrentPath).Length > 10_485_760)
+                    if (new FileInfo(torrentPath).Length > MaxTorrentMetadataBytes)
                         throw new InvalidDataException("Torrent metadata is larger than the 10 MB safety limit.");
                     torrent = await Torrent.LoadAsync(torrentPath);
                 }
                 else if (Uri.TryCreate(input, UriKind.Absolute, out var metadataUri) &&
                          (metadataUri.Scheme == Uri.UriSchemeHttp || metadataUri.Scheme == Uri.UriSchemeHttps))
                 {
-                    using var metadataClient = new HttpClient { Timeout = TimeSpan.FromSeconds(45) };
-                    using var response = await metadataClient.GetAsync(metadataUri, HttpCompletionOption.ResponseHeadersRead, token);
-                    response.EnsureSuccessStatusCode();
-                    if (response.Content.Headers.ContentLength is > 10_485_760)
-                        throw new InvalidDataException("Torrent metadata is larger than the 10 MB safety limit.");
-                    var metadata = await response.Content.ReadAsByteArrayAsync(token);
-                    if (metadata.Length == 0 || metadata.Length > 10_485_760)
-                        throw new InvalidDataException("Torrent metadata is empty or larger than the 10 MB safety limit.");
+                    var metadata = await DownloadTorrentMetadataAsync(metadataUri, token);
                     torrent = await Torrent.LoadAsync(new Memory<byte>(metadata));
                 }
                 else
@@ -408,6 +402,37 @@ public class MultiChannelDownloader
             _torrentManager = null;
             _torrentEngine?.Dispose();
             _torrentEngine = null;
+        }
+    }
+
+    private static async Task<byte[]> DownloadTorrentMetadataAsync(Uri uri, CancellationToken token)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        timeout.CancelAfter(TimeSpan.FromSeconds(45));
+        using var client = new HttpClient();
+        try
+        {
+            using var response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+            response.EnsureSuccessStatusCode();
+            if (response.Content.Headers.ContentLength > MaxTorrentMetadataBytes)
+                throw new InvalidDataException("Torrent metadata is larger than 10 MB.");
+
+            using var input = await response.Content.ReadAsStreamAsync(timeout.Token);
+            using var output = new MemoryStream();
+            byte[] buffer = new byte[32 * 1024];
+            int count;
+            while ((count = await input.ReadAsync(buffer.AsMemory(), timeout.Token)) > 0)
+            {
+                if (output.Length + count > MaxTorrentMetadataBytes)
+                    throw new InvalidDataException("Torrent metadata is larger than 10 MB.");
+                output.Write(buffer, 0, count);
+            }
+            if (output.Length == 0) throw new InvalidDataException("The torrent metadata file is empty.");
+            return output.ToArray();
+        }
+        catch (OperationCanceledException ex) when (!token.IsCancellationRequested)
+        {
+            throw new TimeoutException("The server took too long to send the torrent metadata.", ex);
         }
     }
 

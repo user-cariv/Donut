@@ -55,12 +55,12 @@ begin
   else
     if p_activated_at > v_now + interval '5 minutes'
        or p_expires_at <= p_activated_at
-       or p_expires_at > p_activated_at + case p_tier
+       or p_expires_at > p_activated_at + (case p_tier
          when 1 then interval '1 day 5 minutes'
          when 2 then interval '7 days 5 minutes'
          when 3 then interval '30 days 5 minutes'
          when 4 then interval '100 years 5 minutes'
-       end then
+       end) then
       return pg_catalog.jsonb_build_object('status', 'REJECTED', 'message', 'Invalid activation period.');
     end if;
     v_activated_at := p_activated_at;

@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private string _outputFolder;
     private bool _checkingStartupLicense;
     private bool _windowClosed;
+    private CancellationTokenSource? _updateCancellation;
 
     public MainWindow()
     {
@@ -127,7 +128,7 @@ public partial class MainWindow : Window
 
             _autoUpdateTimer = new System.Windows.Threading.DispatcherTimer
             {
-                Interval = TimeSpan.FromHours(4)
+                Interval = TimeSpan.FromMinutes(30)
             };
             _autoUpdateTimer.Tick += async (_, _) => await CheckForAppUpdatesAsync(silent: true);
             _autoUpdateTimer.Start();
@@ -142,7 +143,7 @@ public partial class MainWindow : Window
         finally
         {
             _checkingStartupLicense = false;
-            StartBoostButton.IsEnabled = true;
+            StartBoostButton.IsEnabled = _updateCancellation == null;
             RedeemCodeButton.IsEnabled = true;
             ActivateTrialButton.IsEnabled = true;
             GameBoostToggle.IsEnabled = true;
@@ -494,6 +495,7 @@ public partial class MainWindow : Window
 
     private void PostToUi(Action action)
     {
+        if (_windowClosed) return;
         try
         {
             if (Dispatcher.CheckAccess()) action();
@@ -672,7 +674,7 @@ public partial class MainWindow : Window
 
     private async void StartBoostButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_checkingStartupLicense) return;
+        if (_checkingStartupLicense || _updateCancellation != null) return;
         if (!_licenseManager.CurrentLicense.IsActive)
         {
             ActivationOverlayGrid.Visibility = Visibility.Visible;
@@ -1049,24 +1051,37 @@ public partial class MainWindow : Window
             var (hasUpdate, manifest) = await UpdateManager.CheckForUpdatesAsync();
             PostToUi(() =>
             {
-                if (hasUpdate && manifest != null)
+                if (_windowClosed || _updateCancellation != null) return;
+                if (manifest == null)
                 {
+                    if (!silent) FooterUpdateCheckText.Text = "Update check unavailable. Retry";
+                    return;
+                }
+
+                if (hasUpdate)
+                {
+                    bool newVersion = _availableUpdate?.LatestVersion != manifest.LatestVersion;
                     _availableUpdate = manifest;
-                    AppUpdateBanner.Visibility = Visibility.Visible;
+                    if (newVersion || !silent) AppUpdateBanner.Visibility = Visibility.Visible;
                     TitleBarUpdateBadge.Visibility = Visibility.Visible;
                     UpdateVersionTag.Text = $"v{manifest.LatestVersion}";
                     UpdateReleaseNotesText.Text = string.IsNullOrWhiteSpace(manifest.ReleaseNotes)
-                        ? "New update available with download reliability and network measurement improvements."
+                        ? "A new version of Donut Boost is available."
                         : manifest.ReleaseNotes;
-                    FooterUpdateCheckText.Text = $"🚀 v{manifest.LatestVersion} Available";
+                    FooterUpdateCheckText.Text = $"Update available · v{manifest.LatestVersion}";
                     FooterUpdateCheckText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(168, 85, 247));
-                    OnLogReceived($"🚀 [UPDATE] Donut Boost v{manifest.LatestVersion} is available! Click 'Update Now' in the banner to update.");
+                    if (newVersion) OnLogReceived($"Donut Boost v{manifest.LatestVersion} is available. Select Update Now to install it.");
                 }
-                else if (!silent)
+                else
                 {
-                    FooterUpdateCheckText.Text = $"✓ Latest (v{UpdateManager.CurrentVersion})";
-                    FooterUpdateCheckText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88));
-                    OnLogReceived($"✓ You are running the latest version of Donut Boost (v{UpdateManager.CurrentVersion}).");
+                    _availableUpdate = null;
+                    AppUpdateBanner.Visibility = Visibility.Collapsed;
+                    TitleBarUpdateBadge.Visibility = Visibility.Collapsed;
+                    if (!silent)
+                    {
+                        FooterUpdateCheckText.Text = $"Latest · v{UpdateManager.CurrentVersion}";
+                        FooterUpdateCheckText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88));
+                    }
                 }
             });
         }
@@ -1076,8 +1091,8 @@ public partial class MainWindow : Window
             {
                 PostToUi(() =>
                 {
-                    FooterUpdateCheckText.Text = "Check for Updates";
-                    OnLogReceived($"✕ Could not check for updates: {ex.Message}");
+                    FooterUpdateCheckText.Text = "Update check unavailable. Retry";
+                    OnLogReceived($"Could not check for updates: {ex.Message}");
                 });
             }
         }
@@ -1085,64 +1100,80 @@ public partial class MainWindow : Window
 
     private async void UpdateNowButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_availableUpdate == null) return;
+        if (_availableUpdate == null || _updateCancellation != null) return;
 
-        UpdateNowButton.IsEnabled = false;
         UpdateProgressPanel.Visibility = Visibility.Visible;
+        if (_downloader.CurrentSession?.Status is DownloadStatus.Probing or DownloadStatus.Downloading or DownloadStatus.Paused)
+        {
+            UpdateProgressPercentText.Text = "Finish or cancel the active download before updating.";
+            return;
+        }
+
+        using var cancellation = new CancellationTokenSource();
+        _updateCancellation = cancellation;
+        StartBoostButton.IsEnabled = false;
+        UpdateNowButton.IsEnabled = false;
         UpdateNowButtonText.Text = "Updating...";
         UpdateProgressBar.Value = 0;
         UpdateProgressPercentText.Text = "Checking for the latest installer...";
 
         try
         {
-            var (hasUpdate, manifest) = await UpdateManager.CheckForUpdatesAsync();
+            var (hasUpdate, manifest) = await UpdateManager.CheckForUpdatesAsync(cancellation.Token);
             if (!hasUpdate || manifest == null)
-                throw new InvalidOperationException("No newer installer could be verified. Check for updates again in a moment.");
+                throw new InvalidOperationException("No newer installer could be verified. Select Try Again in a moment.");
 
             _availableUpdate = manifest;
             UpdateVersionTag.Text = $"v{manifest.LatestVersion}";
             UpdateProgressPercentText.Text = "Downloading update...";
-            OnLogReceived($"⬇ [UPDATE] Downloading update v{manifest.LatestVersion}...");
+            OnLogReceived($"Downloading Donut Boost v{manifest.LatestVersion}...");
             bool success = await UpdateManager.DownloadAndInstallUpdateAsync(
                 manifest,
-                (percent, readBytes, totalBytes) =>
+                (percent, readBytes, totalBytes) => PostToUi(() =>
                 {
-                    PostToUi(() =>
-                    {
-                        UpdateProgressBar.Value = percent;
-                        UpdateProgressPercentText.Text = totalBytes > 0
-                            ? $"Downloading update... {percent}% ({DownloadSession.FormatBytes(readBytes)} / {DownloadSession.FormatBytes(totalBytes)})"
-                            : $"Downloading update... {DownloadSession.FormatBytes(readBytes)}";
-                    });
-                },
+                    UpdateProgressBar.Value = percent;
+                    UpdateProgressPercentText.Text = totalBytes > 0
+                        ? $"Downloading update... {percent}% ({DownloadSession.FormatBytes(readBytes)} / {DownloadSession.FormatBytes(totalBytes)})"
+                        : $"Downloading update... {DownloadSession.FormatBytes(readBytes)}";
+                }),
                 status => PostToUi(() =>
                 {
                     UpdateProgressBar.Value = 100;
                     UpdateProgressPercentText.Text = status;
-                }));
+                }),
+                cancellation.Token);
 
             if (!success)
+                throw new InvalidOperationException("The update did not finish. Select Try Again.");
+
+            if (!_windowClosed)
             {
-                PostToUi(() =>
-                {
-                    UpdateNowButton.IsEnabled = true;
-                    UpdateNowButtonText.Text = "Try Again";
-                    UpdateProgressPercentText.Text = "✕ Update did not finish. Click 'Try Again' or download from the website.";
-                    OnLogReceived("✕ In-app update did not finish. You can download the installer from the website.");
-                });
+                UpdateProgressPercentText.Text = "Update installed. Open Donut Boost from Start if it hasn’t reopened.";
+                UpdateNowButtonText.Text = "Installed";
+                _availableUpdate = null;
             }
         }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         catch (Exception ex)
         {
             PostToUi(() =>
             {
-                UpdateNowButton.IsEnabled = true;
                 UpdateNowButtonText.Text = "Try Again";
-                UpdateProgressPercentText.Text = $"✕ Error: {ex.Message}";
-                OnLogReceived($"✕ Update error: {ex.Message}");
+                UpdateProgressPercentText.Text = ex.Message;
+                OnLogReceived($"Update error: {ex.Message}");
             });
         }
+        finally
+        {
+            _updateCancellation = null;
+            if (!_windowClosed)
+            {
+                UpdateNowButton.IsEnabled = _availableUpdate != null;
+                StartBoostButton.IsEnabled = !_checkingStartupLicense;
+            }
+        }
     }
+
 
     private void DismissUpdateBanner_Click(object sender, RoutedEventArgs e)
     {
@@ -1163,6 +1194,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _windowClosed = true;
+        _updateCancellation?.Cancel();
         _autoUpdateTimer?.Stop();
         _licenseTimer?.Stop();
         _gameBoostProxy.Dispose();

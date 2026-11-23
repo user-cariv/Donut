@@ -59,17 +59,29 @@ public class GameBoostProxyServer : IDisposable
         try
         {
             _isRunning = true;
-            _cts = new CancellationTokenSource();
-            var token = _cts.Token;
+            var previousMonitor = _monitorTask;
+            var cancellation = new CancellationTokenSource();
+            _cts = cancellation;
+            var token = cancellation.Token;
             _monitorTask = Task.Run(async () =>
             {
-                try { await MonitorGameTrafficLoopAsync(token); }
-                catch (OperationCanceledException) { }
+                try
+                {
+                    // A rapid off/on switch must not let both loops update the same counters.
+                    if (previousMonitor != null) await previousMonitor;
+                    token.ThrowIfCancellationRequested();
+                    await MonitorGameTrafficLoopAsync(token);
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested) { }
                 catch (Exception ex)
                 {
-                    _isRunning = false;
-                    LogReceived?.Invoke($"Game launcher monitor stopped after an error: {ex.Message}");
+                    if (!token.IsCancellationRequested)
+                    {
+                        _isRunning = false;
+                        LogReceived?.Invoke($"Game launcher monitor stopped after an error: {ex.Message}");
+                    }
                 }
+                finally { cancellation.Dispose(); }
             });
 
             LogReceived?.Invoke("Game launcher activity monitor started. Progress is available only when a launcher exposes reliable download counters.");
@@ -568,9 +580,6 @@ public class GameBoostProxyServer : IDisposable
     public void Dispose()
     {
         Stop();
-        try { _monitorTask?.Wait(TimeSpan.FromSeconds(2)); }
-        catch (AggregateException) { }
-        _cts?.Dispose();
         _cts = null;
     }
 }

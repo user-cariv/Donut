@@ -22,20 +22,47 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Assign a unique Donut Boost build version
+      - name: Select the Donut Boost build
+        id: boost
         shell: pwsh
         run: |
           [xml]$project = Get-Content "Windows/Donut Boost/DonutBoost.csproj" -Raw
           $baseVersion = [string]$project.Project.PropertyGroup.Version
           if ($baseVersion -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid Donut Boost base version: $baseVersion" }
+          $source = git rev-parse "HEAD:Windows/Donut Boost" "HEAD:.github/workflows/deploy-pages.yml"
+          if ($LASTEXITCODE -ne 0 -or @($source).Count -ne 2) { throw "Could not identify Donut Boost build inputs" }
+          $buildSource = $source -join '.'
+          "DONUT_BOOST_BUILD_SOURCE=$buildSource" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+          $baseUrl = 'https://user-cariv.github.io/Donut'
+          $cachedInstaller = Join-Path $env:RUNNER_TEMP 'DonutBoost-live-installer.exe'
           $buildVersion = "$baseVersion.$env:GITHUB_RUN_NUMBER"
+          $reuse = $false
+          try {
+            $live = Invoke-RestMethod "$baseUrl/boost-version.json?run=$env:GITHUB_RUN_ID" -TimeoutSec 15
+            $versionPattern = '^' + [regex]::Escape($baseVersion) + '\.\d+$'
+            if ($live.buildSource -eq $buildSource -and $live.latestVersion -match $versionPattern -and
+                $live.installerSha256 -match '^[a-fA-F0-9]{64}$') {
+              $expectedUrl = "$baseUrl/updates/$($live.latestVersion)/Install%20Donut%20Boost.exe"
+              if ($live.downloadUrl -eq $expectedUrl) {
+                Invoke-WebRequest $expectedUrl -OutFile $cachedInstaller -TimeoutSec 90
+                $hash = (Get-FileHash $cachedInstaller -Algorithm SHA256).Hash
+                $version = (Get-Item $cachedInstaller).VersionInfo.FileVersion.Trim()
+                if ($hash -eq $live.installerSha256 -and $version -eq $live.latestVersion) {
+                  $buildVersion = $version
+                  $reuse = $true
+                }
+              }
+            }
+          } catch {
+            Write-Warning 'The published installer could not be reused. Building a fresh installer.'
+          }
+          "reuse=$($reuse.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "DONUT_BOOST_CACHED_INSTALLER=$cachedInstaller" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "DONUT_BOOST_BUILD_VERSION=$buildVersion" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          $manifestPath = "Website/boost-version.json"
-          $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
-          $manifest.latestVersion = $buildVersion
-          $manifest | ConvertTo-Json -Depth 10 | Set-Content $manifestPath -Encoding utf8
 
       - name: Publish Donut Boost for Windows
+        if: steps.boost.outputs.reuse != 'true'
         shell: pwsh
         run: |
           dotnet publish "Windows/Donut Boost/DonutBoost.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:PublishTrimmed=false "-p:Version=$env:DONUT_BOOST_BUILD_VERSION" "-p:AssemblyVersion=$env:DONUT_BOOST_BUILD_VERSION" "-p:FileVersion=$env:DONUT_BOOST_BUILD_VERSION" "-p:InformationalVersion=$env:DONUT_BOOST_BUILD_VERSION" -o "Windows/Donut Boost/publish/win-x64"
@@ -44,6 +71,7 @@ jobs:
           if ($appVersion -ne $env:DONUT_BOOST_BUILD_VERSION) { throw "App version $appVersion does not match $env:DONUT_BOOST_BUILD_VERSION" }
 
       - name: Install Inno Setup compiler
+        if: steps.boost.outputs.reuse != 'true'
         shell: pwsh
         run: |
           $compiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
@@ -53,11 +81,10 @@ jobs:
           }
           if (-not (Test-Path $compiler)) { throw "Inno Setup compiler was not found" }
 
-      - name: Build installer and prepare website
+      - name: Build Donut Boost installer
+        if: steps.boost.outputs.reuse != 'true'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path _site -Force | Out-Null
-          Copy-Item -Path "Website\*" -Destination _site -Recurse -Force
           $compiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           Push-Location "Windows/Donut Boost"
           try {
@@ -66,7 +93,18 @@ jobs:
           } finally {
             Pop-Location
           }
-          $installer = "Windows/Donut Boost/installer/Install Donut Boost.exe"
+      - name: Prepare website and update manifest
+        shell: pwsh
+        env:
+          REUSE_BOOST_INSTALLER: ${{ steps.boost.outputs.reuse }}
+        run: |
+          New-Item -ItemType Directory -Path _site -Force | Out-Null
+          Copy-Item -Path "Website\*" -Destination _site -Recurse -Force
+          $installer = if ($env:REUSE_BOOST_INSTALLER -eq 'true') {
+            $env:DONUT_BOOST_CACHED_INSTALLER
+          } else {
+            "Windows/Donut Boost/installer/Install Donut Boost.exe"
+          }
           if (-not (Test-Path $installer)) { throw "Donut Boost installer output is missing" }
           $installerVersion = (Get-Item $installer).VersionInfo.FileVersion.Trim()
           if ($installerVersion -ne $env:DONUT_BOOST_BUILD_VERSION) { throw "Installer version $installerVersion does not match $env:DONUT_BOOST_BUILD_VERSION" }
@@ -76,8 +114,10 @@ jobs:
           Copy-Item $installer "_site/$updatePath/Install Donut Boost.exe" -Force
           $manifestPath = "_site/boost-version.json"
           $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+          $manifest.latestVersion = $env:DONUT_BOOST_BUILD_VERSION
           $manifest.downloadUrl = "https://user-cariv.github.io/Donut/$updatePath/Install%20Donut%20Boost.exe"
           $manifest.fallbackUrl = $manifest.downloadUrl
+          $manifest | Add-Member -NotePropertyName buildSource -NotePropertyValue $env:DONUT_BOOST_BUILD_SOURCE -Force
           $manifest | Add-Member -NotePropertyName installerSha256 -NotePropertyValue (Get-FileHash "_site/$updatePath/Install Donut Boost.exe" -Algorithm SHA256).Hash -Force
           $manifest | ConvertTo-Json -Depth 10 | Set-Content $manifestPath -Encoding utf8
 
