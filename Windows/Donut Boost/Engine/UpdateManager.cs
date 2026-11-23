@@ -39,9 +39,12 @@ public class UpdateManifest
 /// </summary>
 public class UpdateManager
 {
-    private static readonly HttpClient _httpClient = new HttpClient
+    private const string ReleaseBaseUrl = "https://user-cariv.github.io/Donut";
+    private const long MaxInstallerBytes = 128L * 1024 * 1024;
+    private static readonly HttpClient _httpClient = new(new SocketsHttpHandler { AllowAutoRedirect = false })
     {
-        Timeout = TimeSpan.FromSeconds(30)
+        Timeout = TimeSpan.FromSeconds(30),
+        MaxResponseContentBufferSize = 64 * 1024
     };
 
     static UpdateManager()
@@ -58,7 +61,7 @@ public class UpdateManager
         }
     }
 
-    private const string ManifestUrl = "https://user-cariv.github.io/Donut/boost-version.json";
+    private const string ManifestUrl = ReleaseBaseUrl + "/boost-version.json";
 
     public static async Task<(bool HasUpdate, UpdateManifest? Manifest)> CheckForUpdatesAsync(
         CancellationToken cancellationToken = default)
@@ -75,7 +78,7 @@ public class UpdateManager
             if (manifest != null && manifest.LatestVersion is { } latest &&
                 Version.TryParse(NormalizeVersion(latest), out _) &&
                 IsValidSha256(manifest.InstallerSha256) &&
-                IsHttpsUrl(manifest.DownloadUrl))
+                IsTrustedInstallerUrl(manifest.DownloadUrl, latest))
             {
                 return (IsVersionNewer(latest, CurrentVersion), manifest);
             }
@@ -107,8 +110,13 @@ public class UpdateManager
     private static bool IsValidSha256(string? value) =>
         value != null && value.Length == 64 && value.All(Uri.IsHexDigit);
 
-    private static bool IsHttpsUrl(string? value) =>
-        Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps;
+    private static bool IsTrustedInstallerUrl(string? value, string? version)
+    {
+        if (string.IsNullOrWhiteSpace(version) || !Version.TryParse(NormalizeVersion(version), out var parsed))
+            return false;
+        string versioned = $"{ReleaseBaseUrl}/updates/{parsed}/Install%20Donut%20Boost.exe";
+        return value == versioned || value == ReleaseBaseUrl + "/Install%20Donut%20Boost.exe";
+    }
 
     public static async Task<bool> DownloadAndInstallUpdateAsync(
         UpdateManifest manifest, 
@@ -117,7 +125,7 @@ public class UpdateManager
         CancellationToken cancellationToken = default)
     {
         var downloadCandidates = new[] { manifest.DownloadUrl, manifest.FallbackUrl }
-            .Where(IsHttpsUrl)
+            .Where(url => IsTrustedInstallerUrl(url, manifest.LatestVersion))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 
@@ -189,6 +197,8 @@ public class UpdateManager
             using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
             response.EnsureSuccessStatusCode();
             long totalBytes = response.Content.Headers.ContentLength ?? 0;
+            if (totalBytes > MaxInstallerBytes)
+                throw new InvalidDataException("The installer is larger than expected.");
             using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
             using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
             long totalRead = 0;
@@ -202,6 +212,8 @@ public class UpdateManager
                     timeout.CancelAfter(TimeSpan.FromSeconds(30));
                     int bytesRead = await stream.ReadAsync(buffer.AsMemory(), timeout.Token);
                     if (bytesRead == 0) break;
+                    if (totalRead + bytesRead > MaxInstallerBytes)
+                        throw new InvalidDataException("The installer is larger than expected.");
                     await file.WriteAsync(buffer.AsMemory(0, bytesRead), timeout.Token);
                     hash.AppendData(buffer, 0, bytesRead);
                     totalRead += bytesRead;

@@ -200,6 +200,7 @@ public class MultiChannelDownloader
                 {
                     if (totalSize > 0)
                         _fileStream.SetLength(totalSize);
+                    MarkInternetDownload(destinationPath);
                 }
                 catch
                 {
@@ -398,6 +399,11 @@ public class MultiChannelDownloader
             session.DownloadedBytes = session.TotalBytes;
             session.UpdateSpeed(0);
             await _torrentManager.StopAsync(TimeSpan.FromSeconds(2));
+            foreach (var file in managerReady.Files)
+            {
+                string path = file.DownloadCompleteFullPath;
+                if (File.Exists(path)) MarkInternetDownload(path);
+            }
             session.Status = DownloadStatus.Completed;
             StatusChanged?.Invoke(session);
             ProgressUpdated?.Invoke(session);
@@ -490,6 +496,16 @@ public class MultiChannelDownloader
                 // Another download or process created this name after our check; try the next suffix.
             }
         }
+    }
+
+    private static void MarkInternetDownload(string path)
+    {
+        // Preserve Windows' Internet-zone handling for files saved by Donut.
+        // Some filesystems and destinations do not support alternate streams.
+        try { File.WriteAllText(path + ":Zone.Identifier", "[ZoneTransfer]\r\nZoneId=3\r\n", Encoding.ASCII); }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+        catch (NotSupportedException) { }
     }
 
     private async Task DownloadMultiChannelAsync(DownloadSession session, List<NetworkAdapterInfo> adapters,
@@ -1115,8 +1131,13 @@ public class MultiChannelDownloader
     private static string SanitizeFileName(string name)
     {
         var invalid = Path.GetInvalidFileNameChars();
-        var clean = string.Concat(name.Split(invalid, StringSplitOptions.RemoveEmptyEntries));
-        return string.IsNullOrWhiteSpace(clean) ? "downloaded_file.bin" : clean;
+        var clean = string.Concat(name.Split(invalid, StringSplitOptions.RemoveEmptyEntries)).TrimEnd(' ', '.');
+        if (string.IsNullOrWhiteSpace(clean)) return "downloaded_file.bin";
+        string stem = clean.Split('.', 2)[0].TrimEnd().ToUpperInvariant();
+        bool reservedPort = stem.Length == 4 && (stem.StartsWith("COM") || stem.StartsWith("LPT")) &&
+            "123456789¹²³".Contains(stem[3]);
+        return reservedPort || stem is "CON" or "PRN" or "AUX" or "NUL" or "CONIN$" or "CONOUT$"
+            ? "_" + clean : clean;
     }
 
     private static bool IsPermanentHttpFailure(Exception exception) =>

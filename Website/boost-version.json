@@ -2,7 +2,7 @@
   "latestVersion": "1.0.10",
   "minRequiredVersion": "1.0.0",
   "releaseDate": "2026-11-23",
-  "releaseNotes": "Keeps the Chrome and Edge extension bundled with every app update. Adds a toolbar panel for sending links and improves the browser handoff.",
+  "releaseNotes": "Hardens installer verification and Windows handling of downloaded files. The bundled Chrome and Edge extension stays up to date with in-app releases.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }

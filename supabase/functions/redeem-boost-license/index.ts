@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2.119.2";
+import { LicenseRequestError, readLicenseRequest } from "../_shared/read-license-request.ts";
 
 const CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 const PUBLIC_KEY_NAMES = ["SUPABASE_PUBLISHABLE_KEYS", "SUPABASE_ANON_KEY"] as const;
@@ -67,7 +68,7 @@ Deno.serve(async (request) => {
   }
 
   try {
-    const body = await request.json();
+    const body = await readLicenseRequest(request);
     const operation = body?.operation;
     if (operation !== "trial" && operation !== "redeem" && operation !== "restore") {
       return Response.json({ error: "Activation could not be verified." }, { status: 400 });
@@ -137,6 +138,7 @@ Deno.serve(async (request) => {
     });
     return Response.json({ entitlement, tier, activatedAt: new Date(activatedMs).toISOString(), expiresAt: new Date(expiresMs).toISOString() });
   } catch (error) {
+    if (error instanceof LicenseRequestError) return Response.json({ error: error.message }, { status: error.status });
     // Log only a stage label, not client data, codes, hardware IDs, or database details.
     console.error("Boost license redemption failed", error instanceof Error ? error.name : "UnknownError");
     return Response.json({ error: "Licensing service is temporarily unavailable." }, { status: 503 });

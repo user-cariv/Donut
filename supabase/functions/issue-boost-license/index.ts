@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2.119.2";
+import { LicenseRequestError, readLicenseRequest } from "../_shared/read-license-request.ts";
 
 const ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 
@@ -55,7 +56,7 @@ Deno.serve(async (request) => {
   if (!url || !secretKey) return Response.json({ error: "Issuance service is unavailable." }, { status: 503 });
 
   try {
-    const body = await request.json();
+    const body = await readLicenseRequest(request);
     const action = body?.action === "revoke" ? "revoke" : "issue";
     if (action === "revoke") {
       const code = normalizeCode(body?.code);
@@ -87,6 +88,7 @@ Deno.serve(async (request) => {
     }
     return Response.json({ error: "Could not issue a unique activation code." }, { status: 503 });
   } catch (error) {
+    if (error instanceof LicenseRequestError) return Response.json({ error: error.message }, { status: error.status });
     console.error("Boost license issuance failed", error instanceof Error ? error.name : "UnknownError");
     return Response.json({ error: "Issuance service is unavailable." }, { status: 503 });
   }

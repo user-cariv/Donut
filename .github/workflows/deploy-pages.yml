@@ -61,11 +61,17 @@ jobs:
           "DONUT_BOOST_CACHED_INSTALLER=$cachedInstaller" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "DONUT_BOOST_BUILD_VERSION=$buildVersion" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
+      - name: Install the current .NET 8 servicing SDK
+        if: steps.boost.outputs.reuse != 'true'
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.6.2
+        with:
+          dotnet-version: "8.0.x"
+
       - name: Publish Donut Boost for Windows
         if: steps.boost.outputs.reuse != 'true'
         shell: pwsh
         run: |
-          dotnet publish "Windows/Donut Boost/DonutBoost.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:PublishTrimmed=false "-p:Version=$env:DONUT_BOOST_BUILD_VERSION" "-p:AssemblyVersion=$env:DONUT_BOOST_BUILD_VERSION" "-p:FileVersion=$env:DONUT_BOOST_BUILD_VERSION" "-p:InformationalVersion=$env:DONUT_BOOST_BUILD_VERSION" -o "Windows/Donut Boost/publish/win-x64"
+          dotnet publish "Windows/Donut Boost/DonutBoost.csproj" -c Release -r win-x64 --self-contained true -p:TargetLatestRuntimePatch=true -p:PublishSingleFile=false -p:PublishTrimmed=false "-p:Version=$env:DONUT_BOOST_BUILD_VERSION" "-p:AssemblyVersion=$env:DONUT_BOOST_BUILD_VERSION" "-p:FileVersion=$env:DONUT_BOOST_BUILD_VERSION" "-p:InformationalVersion=$env:DONUT_BOOST_BUILD_VERSION" -o "Windows/Donut Boost/publish/win-x64"
           if ($LASTEXITCODE -ne 0) { throw "Donut Boost publish failed" }
           $appVersion = (Get-Item "Windows/Donut Boost/publish/win-x64/DonutBoost.exe").VersionInfo.FileVersion
           if ($appVersion -ne $env:DONUT_BOOST_BUILD_VERSION) { throw "App version $appVersion does not match $env:DONUT_BOOST_BUILD_VERSION" }
