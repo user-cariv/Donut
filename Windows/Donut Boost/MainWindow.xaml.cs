@@ -18,6 +18,8 @@ public partial class MainWindow : Window
     private UpdateManifest? _availableUpdate;
     private System.Windows.Threading.DispatcherTimer? _autoUpdateTimer;
     private string _outputFolder;
+    private bool _checkingStartupLicense;
+    private bool _windowClosed;
 
     public MainWindow()
     {
@@ -85,13 +87,19 @@ public partial class MainWindow : Window
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        IsEnabled = false;
+        Loaded -= MainWindow_Loaded;
+        _checkingStartupLicense = true;
+        StartBoostButton.IsEnabled = false;
+        RedeemCodeButton.IsEnabled = false;
+        ActivateTrialButton.IsEnabled = false;
+        GameBoostToggle.IsEnabled = false;
         try
         {
             if (_licenseManager.CurrentLicense.IsActive)
             {
                 ActivationStatusTextBlock.Text = "Verifying this device activation...";
                 var verification = await _licenseManager.VerifyStoredLicenseCloudAsync();
+                if (_windowClosed) return;
                 if (!verification.Success)
                     OnLogReceived($"[LICENSE] {verification.Message}");
             }
@@ -99,6 +107,7 @@ public partial class MainWindow : Window
             if (!_licenseManager.CurrentLicense.IsActive)
             {
                 var trialResult = await _licenseManager.ActivateTrialAsync();
+                if (_windowClosed) return;
                 if (trialResult.Success)
                     OnLogReceived("24-hour free pass activated for this device.");
             }
@@ -125,13 +134,18 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            if (_windowClosed) return;
             OnLogReceived($"Startup could not finish license setup: {ex.Message}");
             ActivationStatusTextBlock.Text = "Donut Boost opened, but license setup needs attention. Try activating again.";
             ActivationStatusTextBlock.Visibility = Visibility.Visible;
         }
         finally
         {
-            IsEnabled = true;
+            _checkingStartupLicense = false;
+            StartBoostButton.IsEnabled = true;
+            RedeemCodeButton.IsEnabled = true;
+            ActivateTrialButton.IsEnabled = true;
+            GameBoostToggle.IsEnabled = true;
         }
     }
     private void UpdateLicenseUI()
@@ -176,6 +190,7 @@ public partial class MainWindow : Window
 
     private async void RedeemCodeButton_Click(object sender, RoutedEventArgs e)
     {
+        if (_checkingStartupLicense) return;
         string code = RedeemCodeTextBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(code))
         {
@@ -657,6 +672,7 @@ public partial class MainWindow : Window
 
     private async void StartBoostButton_Click(object sender, RoutedEventArgs e)
     {
+        if (_checkingStartupLicense) return;
         if (!_licenseManager.CurrentLicense.IsActive)
         {
             ActivationOverlayGrid.Visibility = Visibility.Visible;
@@ -1146,6 +1162,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _windowClosed = true;
         _autoUpdateTimer?.Stop();
         _licenseTimer?.Stop();
         _gameBoostProxy.Dispose();

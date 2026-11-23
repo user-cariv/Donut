@@ -11,38 +11,48 @@ namespace DonutBoost;
 public partial class App : Application
 {
     private static Mutex? _singleInstanceMutex;
+    private bool _ownsInstanceMutex;
     private const string DownloadPipeName = "DonutBoost.DownloadLink.v1";
     private CancellationTokenSource? _downloadPipeCancellation;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
-        _singleInstanceMutex = new Mutex(true, "DonutBoost_SingleInstance_AppMutex", out bool isNewInstance);
-        if (!isNewInstance)
-        {
-            string? link = FindDownloadLink(e.Args);
-            bool forwarded = string.IsNullOrWhiteSpace(link) || await TryForwardDownloadLinkAsync(link);
-
-            // Focus an already visible instance. A windowless process left
-            // behind by a previous crash must not block a fresh launch.
-            if (ActivateVisibleInstance())
-            {
-                if (!forwarded)
-                    MessageBox.Show("Donut Boost is already open but could not receive this link. Update the app, then try again.", "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Information);
-                Shutdown();
-                return;
-            }
-        }
-
         base.OnStartup(e);
 
         try
         {
+            _singleInstanceMutex = new Mutex(false, "DonutBoost_SingleInstance_AppMutex");
+            string? link = FindDownloadLink(e.Args);
+
+            if (!TryAcquireInstance())
+            {
+                if (link != null && await TryForwardDownloadLinkAsync(link))
+                {
+                    ActivateVisibleInstance();
+                    Shutdown();
+                    return;
+                }
+
+                // The original instance may have just exited. Only start a new
+                // window if this process can now take ownership of the mutex.
+                if (!TryAcquireInstance())
+                {
+                    ActivateVisibleInstance();
+                    if (link != null)
+                        MessageBox.Show("Donut Boost could not receive the link. Try again when the app is ready, or paste the link into its download box.",
+                            "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Information);
+                    Shutdown();
+                    return;
+                }
+            }
+
             var mainWindow = new MainWindow();
             MainWindow = mainWindow;
-            mainWindow.Show();
-            mainWindow.SetIncomingDownloadLink(FindDownloadLink(e.Args));
             _downloadPipeCancellation = new CancellationTokenSource();
-            _ = ListenForDownloadLinksAsync(_downloadPipeCancellation.Token);
+            var token = _downloadPipeCancellation.Token;
+            _ = Task.Run(() => ListenForDownloadLinksAsync(mainWindow, token), token);
+            mainWindow.Show();
+            mainWindow.SetIncomingDownloadLink(link);
         }
         catch (Exception ex)
         {
@@ -55,15 +65,24 @@ public partial class App : Application
         }
     }
 
+    private bool TryAcquireInstance()
+    {
+        try { _ownsInstanceMutex = _singleInstanceMutex!.WaitOne(0); }
+        catch (AbandonedMutexException) { _ownsInstanceMutex = true; }
+        return _ownsInstanceMutex;
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
         _downloadPipeCancellation?.Cancel();
         _downloadPipeCancellation?.Dispose();
+        if (_ownsInstanceMutex)
+            _singleInstanceMutex?.ReleaseMutex();
         _singleInstanceMutex?.Dispose();
         base.OnExit(e);
     }
 
-    private async Task ListenForDownloadLinksAsync(CancellationToken token)
+    private static async Task ListenForDownloadLinksAsync(MainWindow window, CancellationToken token)
     {
         while (!token.IsCancellationRequested)
         {
@@ -73,14 +92,23 @@ public partial class App : Application
                     DownloadPipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte,
                     PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
                 await pipe.WaitForConnectionAsync(token);
+                using var readTimeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+                readTimeout.CancelAfter(TimeSpan.FromSeconds(3));
                 using var reader = new StreamReader(pipe, Encoding.UTF8, false, 1024, leaveOpen: true);
-                string? message = await reader.ReadLineAsync(token);
-                if (TryGetDownloadLink(message, out string? link) && MainWindow is MainWindow window)
+                string? message = await reader.ReadLineAsync(readTimeout.Token);
+                if (TryGetDownloadLink(message, out string? link) && !window.Dispatcher.HasShutdownStarted)
                     _ = window.Dispatcher.BeginInvoke(() => window.SetIncomingDownloadLink(link));
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested) { break; }
-            catch (IOException) { }
+            catch (OperationCanceledException) { }
             catch (ObjectDisposedException) when (token.IsCancellationRequested) { break; }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // A busy pipe must not spin, particularly while Windows closes
+                // the previous app instance during an update.
+                try { await Task.Delay(200, token); }
+                catch (OperationCanceledException) { break; }
+            }
         }
     }
 
@@ -100,6 +128,7 @@ public partial class App : Application
             }
             catch (TimeoutException) { }
             catch (IOException) { }
+            catch (UnauthorizedAccessException) { return false; }
             await Task.Delay(100);
         }
         return false;
@@ -146,10 +175,11 @@ public partial class App : Application
     {
         foreach (var process in Process.GetProcessesByName("DonutBoost"))
         {
-            if (process.Id == Environment.ProcessId) continue;
+            using var candidate = process;
+            if (candidate.Id == Environment.ProcessId) continue;
             try
             {
-                IntPtr window = process.MainWindowHandle;
+                IntPtr window = candidate.MainWindowHandle;
                 if (window == IntPtr.Zero) continue;
                 if (IsIconic(window)) ShowWindow(window, 9);
                 SetForegroundWindow(window);

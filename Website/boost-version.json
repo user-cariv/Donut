@@ -2,7 +2,7 @@
   "latestVersion": "1.0.10",
   "minRequiredVersion": "1.0.0",
   "releaseDate": "2026-11-23",
-  "releaseNotes": "Stops active Donut downloads on an adapter as soon as it is switched off, and distinguishes Donut download bytes from total Windows traffic. Includes IPv6 support and improved pause and resume.",
+  "releaseNotes": "Fixes a browser link handoff freeze by keeping one Donut Boost window and receiving browser links in the background. Includes the adapter switch and pause/resume fixes.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }
