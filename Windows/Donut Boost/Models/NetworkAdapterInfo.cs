@@ -19,6 +19,9 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
     public string Description { get; set; } = string.Empty;
     public int InterfaceIndex { get; set; }
     public IPAddress? LocalIp { get; set; }
+    public int IPv6InterfaceIndex { get; set; }
+    public IPAddress? LocalIPv6 { get; set; }
+    public bool HasDownloadAddress => LocalIp != null || LocalIPv6 != null;
     public IPAddress? GatewayIp { get; set; }
     public NetworkInterfaceType InterfaceType { get; set; }
     public long SpeedBitsPerSecond { get; set; }

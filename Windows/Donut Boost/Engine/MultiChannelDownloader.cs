@@ -125,7 +125,7 @@ public class MultiChannelDownloader
             }
 
             // 1. Check enabled adapters
-            var allAdapters = _bondingManager.Adapters.Where(a => a.IsOnline && a.LocalIp != null).ToList();
+            var allAdapters = _bondingManager.Adapters.Where(a => a.IsOnline && a.HasDownloadAddress).ToList();
             var enabledAdapters = allAdapters.Where(a => a.IsEnabled).ToList();
             if (enabledAdapters.Count == 0)
             {
@@ -135,7 +135,7 @@ public class MultiChannelDownloader
             LogReceived?.Invoke($"Found {allAdapters.Count} network connection(s) available for download ({enabledAdapters.Count} enabled):");
             foreach (var adp in allAdapters)
             {
-                LogReceived?.Invoke($"  → [{adp.IconGlyph} {adp.Name}] ({adp.TypeLabel}) IP: {adp.LocalIp} - Enabled: {adp.IsEnabled}");
+                LogReceived?.Invoke($"  → [{adp.IconGlyph} {adp.Name}] ({adp.TypeLabel}) IP: {adp.LocalIp ?? adp.LocalIPv6} - Enabled: {adp.IsEnabled}");
             }
 
             // Reset adapter metrics for fresh download
@@ -144,13 +144,42 @@ public class MultiChannelDownloader
                 adp.TotalBytesDownloaded = 0;
             }
 
-            // Prefer enabled Wi-Fi or first active adapter for metadata probe
-            var probeAdapter = enabledAdapters.FirstOrDefault(a => a.IsWifi) ?? enabledAdapters[0];
-            var probeClient = _bondingManager.GetOrCreateClient(probeAdapter);
-
             string normalizedUrl = NormalizeDownloadUrl(url);
             session.Url = normalizedUrl;
-            var (fileName, totalSize, supportsRanges) = await ProbeUrlAsync(probeClient, normalizedUrl, token);
+            // Check each adapter against this host. A failed Wi-Fi probe must not
+            // force a range-capable mobile connection into single-stream mode.
+            var probes = await Task.WhenAll(enabledAdapters.OrderByDescending(a => a.IsWifi)
+                .Select(async adapter =>
+                {
+                    using var probeTimeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+                    probeTimeout.CancelAfter(TimeSpan.FromSeconds(8));
+                    try
+                    {
+                        var probe = await ProbeUrlAsync(_bondingManager.GetOrCreateClient(adapter), normalizedUrl, probeTimeout.Token);
+                        if (!probe.Reachable)
+                            LogReceived?.Invoke($"[{adapter.Name}] The server did not accept the download probe.");
+                        return (Adapter: adapter, Probe: probe);
+                    }
+                    catch (OperationCanceledException) when (!token.IsCancellationRequested)
+                    {
+                        LogReceived?.Invoke($"[{adapter.Name}] Download probe timed out.");
+                        return (Adapter: adapter, Probe: (FileName: string.Empty, TotalSize: -1L, SupportsRanges: false, Reachable: false));
+                    }
+                }));
+            var reachable = probes.Where(p => p.Probe.Reachable).ToList();
+            if (reachable.Count == 0)
+                throw new IOException("The download server could not be reached on any selected adapter.");
+
+            var selected = reachable.FirstOrDefault(p => p.Probe.SupportsRanges && p.Probe.TotalSize > 0);
+            if (selected.Adapter == null)
+                selected = reachable[0];
+            var (fileName, totalSize, supportsRanges, _) = selected.Probe;
+            var rangeAdapters = reachable
+                .Where(p => p.Probe.SupportsRanges && p.Probe.TotalSize == totalSize)
+                .Select(p => p.Adapter)
+                .ToList();
+            foreach (var probe in reachable.Where(p => supportsRanges && !rangeAdapters.Contains(p.Adapter)))
+                LogReceived?.Invoke($"[{probe.Adapter.Name}] The server did not confirm compatible byte ranges on this connection.");
 
             session.FileName = fileName;
             session.TotalBytes = totalSize;
@@ -182,14 +211,14 @@ public class MultiChannelDownloader
 
             // Only enabled adapters may receive chunks. Passing allAdapters here
             // caused Wi-Fi to keep downloading in Mobile Data Only mode.
-            if (supportsRanges && totalSize > 0 && enabledAdapters.Count > 0)
+            if (supportsRanges && totalSize > 0)
             {
-                await DownloadMultiChannelAsync(session, enabledAdapters, token);
+                await DownloadMultiChannelAsync(session, rangeAdapters, enabledAdapters, token);
             }
             else
             {
-                LogReceived?.Invoke("Server does not support Range slicing. Downloading via single stream...");
-                await DownloadSingleStreamAsync(session, enabledAdapters[0], token);
+                LogReceived?.Invoke($"Server did not confirm byte-range support. Using a single stream on {selected.Adapter.Name}.");
+                await DownloadSingleStreamAsync(session, selected.Adapter, token);
             }
 
             if (session.Status == DownloadStatus.Failed)
@@ -212,7 +241,7 @@ public class MultiChannelDownloader
                 LogReceived?.Invoke($"✓ Download completed successfully! File saved to {session.DestinationPath}");
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
             if (session.Status != DownloadStatus.Failed)
                 session.Status = DownloadStatus.Cancelled;
@@ -411,7 +440,8 @@ public class MultiChannelDownloader
         }
     }
 
-    private async Task DownloadMultiChannelAsync(DownloadSession session, List<NetworkAdapterInfo> adapters, CancellationToken token)
+    private async Task DownloadMultiChannelAsync(DownloadSession session, List<NetworkAdapterInfo> adapters,
+        List<NetworkAdapterInfo> probedAdapters, CancellationToken token)
     {
         // Compute chunk size: between 2 MB and 16 MB depending on total size
         long chunkSize = Math.Clamp(session.TotalBytes / (adapters.Count * 12), 2 * 1024 * 1024, 16 * 1024 * 1024);
@@ -477,7 +507,7 @@ public class MultiChannelDownloader
 
         // Worker tasks per network adapter (12 workers for Mobile 5G, 8 for Wi-Fi for maximum 300+ Mbps throughput)
         var workerTasks = new List<Task>();
-        var trackedAdapterIds = new HashSet<string>(adapters.Select(a => a.Id));
+        var trackedAdapterIds = new HashSet<string>(probedAdapters.Select(a => a.Id));
         var workerLock = new object();
 
         void SpawnWorkersForAdapter(NetworkAdapterInfo adp)
@@ -525,17 +555,18 @@ public class MultiChannelDownloader
                             }
 
                             bool success = false;
+                            bool interrupted = false;
                             bool attemptThrew = false;
                             long bytesBeforeAttempt = chunk.BytesDownloaded;
                             try
                             {
-                                await DownloadChunkWithClientAsync(client, session.Url, chunk, adp, session, token);
+                                interrupted = await DownloadChunkWithClientAsync(client, session.Url, chunk, adp, session, token);
                                 success = chunk.IsCompleted;
                             }
                             catch (Exception ex)
                             {
                                 attemptThrew = true;
-                                if (!token.IsCancellationRequested)
+                                if (!token.IsCancellationRequested && !_isPaused && adp.IsEnabled && adp.IsOnline)
                                 {
                                     string msg = $"[{adp.Name}] Notice on chunk {chunk.Index}: {ex.Message}";
                                     LogReceived?.Invoke(msg);
@@ -560,11 +591,11 @@ public class MultiChannelDownloader
                                 }
                             }
 
-                            if (success)
+                            if (success || chunk.BytesDownloaded > bytesBeforeAttempt)
                             {
                                 chunk.ConsecutiveFailures = 0;
                             }
-                            else if (!attemptThrew && !chunk.IsCompleted && !token.IsCancellationRequested && session.Status != DownloadStatus.Failed)
+                            else if (!attemptThrew && !interrupted && !chunk.IsCompleted && !token.IsCancellationRequested && session.Status != DownloadStatus.Failed)
                             {
                                 chunk.ConsecutiveFailures++;
                                 if (chunk.ConsecutiveFailures >= 32)
@@ -656,17 +687,17 @@ public class MultiChannelDownloader
         ProgressUpdated?.Invoke(session);
     }
 
-    private async Task DownloadChunkWithClientAsync(HttpClient client, string url, DownloadChunk chunk, NetworkAdapterInfo adapter, DownloadSession session, CancellationToken token)
+    private async Task<bool> DownloadChunkWithClientAsync(HttpClient client, string url, DownloadChunk chunk, NetworkAdapterInfo adapter, DownloadSession session, CancellationToken token)
     {
         // Support resuming chunk from exact downloaded offset
         long startFrom = chunk.StartOffset + chunk.BytesDownloaded;
         if (startFrom > chunk.EndOffset)
         {
             chunk.IsCompleted = true;
-            return;
+            return false;
         }
 
-        var request = new HttpRequestMessage(HttpMethod.Get, url);
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Range = new RangeHeaderValue(startFrom, chunk.EndOffset);
 
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
@@ -689,10 +720,20 @@ public class MultiChannelDownloader
         using var contentStream = await response.Content.ReadAsStreamAsync(token);
         byte[] buffer = new byte[256 * 1024]; // 256 KB high-throughput buffer for 300+ Mbps 5G & gigabit streams
         long writeOffset = startFrom;
+        long responseEnd = contentRange.To.Value;
+        using var readTimeout = CancellationTokenSource.CreateLinkedTokenSource(token);
 
-        int bytesRead;
-        while ((bytesRead = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), token)) > 0)
+        while (writeOffset <= responseEnd)
         {
+            if (_isPaused || !adapter.IsEnabled || !adapter.IsOnline)
+                return true;
+
+            int length = (int)Math.Min(buffer.Length, responseEnd - writeOffset + 1);
+            readTimeout.CancelAfter(TimeSpan.FromSeconds(20));
+            int bytesRead = await contentStream.ReadAsync(buffer.AsMemory(0, length), readTimeout.Token);
+            readTimeout.CancelAfter(Timeout.InfiniteTimeSpan);
+            if (bytesRead == 0) break;
+
             lock (_fileLock)
             {
                 if (_fileStream != null)
@@ -707,6 +748,11 @@ public class MultiChannelDownloader
 
             adapter.AddDownloadedBytes(bytesRead);
             session.AddDownloadedBytes(bytesRead);
+            if (chunk.BytesDownloaded == chunk.TotalBytes)
+            {
+                chunk.IsCompleted = true;
+                return false;
+            }
 
             // Apply real-time bandwidth throttling if configured by user
             // Speed limit applies ONLY to Home Wi-Fi / LAN — Mobile 5G runs 100% full unthrottled speed!
@@ -715,17 +761,9 @@ public class MultiChannelDownloader
                 await _throttler.ThrottleAsync(bytesRead, token);
             }
 
-            // If paused mid-read or connection turned OFF mid-download, exit chunk gracefully so it can hand off seamlessly
-            if (_isPaused || !adapter.IsEnabled || !adapter.IsOnline)
-            {
-                return;
-            }
         }
 
-        if (chunk.BytesDownloaded >= chunk.TotalBytes)
-        {
-            chunk.IsCompleted = true;
-        }
+        return false;
     }
 
     private async Task DownloadSingleStreamAsync(DownloadSession session, NetworkAdapterInfo adapter, CancellationToken token)
@@ -785,8 +823,14 @@ public class MultiChannelDownloader
                 var stopwatch = Stopwatch.StartNew();
                 long lastBytes = session.DownloadedBytes;
 
-                while ((bytesRead = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), token)) > 0)
+                while (true)
                 {
+                    // Keep the response open while paused. A server that ignored
+                    // the range probe cannot be expected to accept a resumed GET.
+                    while (_isPaused)
+                        await Task.Delay(200, token);
+                    bytesRead = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), token);
+                    if (bytesRead == 0) break;
                     lock (_fileLock)
                     {
                         if (_fileStream != null)
@@ -816,14 +860,8 @@ public class MultiChannelDownloader
                         ProgressUpdated?.Invoke(session);
                     }
 
-                    if (_isPaused)
-                    {
-                        // Cleanly disconnect socket during pause so server doesn't timeout
-                        break;
-                    }
                 }
 
-                if (_isPaused) continue;
                 // When the server does not provide a length, end at EOF instead
                 // of issuing another GET forever after the first full response.
                 if (session.TotalBytes <= 0) break;
@@ -861,7 +899,7 @@ public class MultiChannelDownloader
         }
     }
 
-    private async Task<(string fileName, long totalSize, bool supportsRanges)> ProbeUrlAsync(HttpClient client, string url, CancellationToken token)
+    private async Task<(string FileName, long TotalSize, bool SupportsRanges, bool Reachable)> ProbeUrlAsync(HttpClient client, string url, CancellationToken token)
     {
         string rawFileName = string.Empty;
         try
@@ -878,6 +916,7 @@ public class MultiChannelDownloader
 
         long totalSize = -1;
         bool supportsRanges = false;
+        bool reachable = false;
 
         // Use a single-byte range probe to confirm range support without reading a large test body.
         try
@@ -885,10 +924,11 @@ public class MultiChannelDownloader
             using var rangeReq = new HttpRequestMessage(HttpMethod.Get, url);
             rangeReq.Headers.Range = new RangeHeaderValue(0, 0);
             using var rangeRes = await client.SendAsync(rangeReq, HttpCompletionOption.ResponseHeadersRead, token);
+            reachable = rangeRes.IsSuccessStatusCode;
 
             if (rangeRes.StatusCode == System.Net.HttpStatusCode.PartialContent)
             {
-                supportsRanges = true;
+                supportsRanges = rangeRes.Content.Headers.ContentRange is { From: 0, To: 0 };
                 if (rangeRes.Content.Headers.ContentRange?.Length.HasValue == true)
                 {
                     totalSize = rangeRes.Content.Headers.ContentRange.Length.Value;
@@ -914,7 +954,7 @@ public class MultiChannelDownloader
                 }
             }
         }
-        catch (Exception ex)
+        catch (HttpRequestException ex)
         {
             LogReceived?.Invoke($"[Notice] Range probe check: {ex.Message}");
         }
@@ -928,6 +968,7 @@ public class MultiChannelDownloader
                 using var headRes = await client.SendAsync(headReq, token);
                 if (headRes.IsSuccessStatusCode)
                 {
+                    reachable = true;
                     if (headRes.Content.Headers.ContentLength.HasValue)
                     {
                         totalSize = headRes.Content.Headers.ContentLength.Value;
@@ -940,10 +981,10 @@ public class MultiChannelDownloader
                     }
                 }
             }
-            catch { }
+            catch (HttpRequestException) { }
         }
 
-        return (fileName, totalSize, supportsRanges);
+        return (fileName, totalSize, supportsRanges, reachable);
     }
 
     private static string SanitizeFileName(string name)

@@ -12,6 +12,7 @@ public class NetworkBondingManager : IDisposable
 {
     private readonly ConcurrentDictionary<string, HttpClient> _clientPool = new();
     private readonly List<NetworkAdapterInfo> _adapters = new();
+    private readonly Dictionary<string, NetworkAdapterInfo> _knownAdapters = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _lock = new();
     private readonly Timer? _pollTimer;
     private readonly Timer? _speedTimer;
@@ -145,7 +146,7 @@ public class NetworkBondingManager : IDisposable
         lock (_lock)
         {
             CurrentMode = mode;
-            foreach (var adp in _adapters)
+            foreach (var adp in _knownAdapters.Values)
             {
                 switch (mode)
                 {
@@ -203,13 +204,19 @@ public class NetworkBondingManager : IDisposable
                 var ipv4 = ipProps.UnicastAddresses
                     .FirstOrDefault(a => a.Address.AddressFamily == AddressFamily.InterNetwork
                                          && !IPAddress.IsLoopback(a.Address));
+                var ipv6 = ipProps.UnicastAddresses
+                    .Where(a => a.Address.AddressFamily == AddressFamily.InterNetworkV6
+                                && !a.Address.IsIPv6LinkLocal && !IPAddress.IsLoopback(a.Address))
+                    .OrderByDescending(a => a.SuffixOrigin == SuffixOrigin.Random)
+                    .FirstOrDefault();
 
-                if (ipv4 == null) continue;
+                if (ipv4 == null && ipv6 == null) continue;
 
                 var gateway = ipProps.GatewayAddresses
                     .FirstOrDefault(g => g.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.Any.Equals(g.Address))?.Address;
 
                 int ifIndex = 0;
+                int ipv6Index = 0;
                 try
                 {
                     var ipv4Props = ipProps.GetIPv4Properties();
@@ -222,10 +229,13 @@ public class NetworkBondingManager : IDisposable
                 {
                     // If IPv4 properties query fails, ifIndex remains 0
                 }
+                if (ipv6 != null)
+                {
+                    try { ipv6Index = ipProps.GetIPv6Properties()?.Index ?? 0; }
+                    catch (NetworkInformationException) { }
+                }
 
-                var existing = _adapters.FirstOrDefault(a => a.Id == nic.Id || a.Name.Equals(nic.Name, StringComparison.OrdinalIgnoreCase));
-
-                if (existing != null)
+                if (_knownAdapters.TryGetValue(nic.Id, out var existing))
                 {
                     // CRITICAL: Preserve existing instance so live download metrics and UI bindings never get severed!
                     existing.Name = nic.Name;
@@ -233,6 +243,8 @@ public class NetworkBondingManager : IDisposable
                     existing.InterfaceIndex = ifIndex;
                     existing.InterfaceType = nic.NetworkInterfaceType;
                     existing.LocalIp = ipv4?.Address;
+                    existing.IPv6InterfaceIndex = ipv6Index;
+                    existing.LocalIPv6 = ipv6?.Address;
                     existing.GatewayIp = gateway;
                     existing.SpeedBitsPerSecond = nic.Speed;
                     existing.IsOnline = true;
@@ -249,6 +261,8 @@ public class NetworkBondingManager : IDisposable
                         InterfaceIndex = ifIndex,
                         InterfaceType = nic.NetworkInterfaceType,
                         LocalIp = ipv4?.Address,
+                        IPv6InterfaceIndex = ipv6Index,
+                        LocalIPv6 = ipv6?.Address,
                         GatewayIp = gateway,
                         SpeedBitsPerSecond = nic.Speed,
                         IsEnabled = true,
@@ -269,7 +283,7 @@ public class NetworkBondingManager : IDisposable
                     }
 
                     detected.Add(adapter);
-                    GetOrCreateClient(adapter);
+                    _knownAdapters.Add(nic.Id, adapter);
                 }
             }
 
@@ -309,21 +323,6 @@ public class NetworkBondingManager : IDisposable
 
     public HttpClient GetOrCreateClient(NetworkAdapterInfo adapter)
     {
-        if (adapter.LocalIp == null)
-        {
-            var fallbackHandler = new SocketsHttpHandler
-            {
-                UseProxy = false, // NEVER route through localhost proxy
-                Proxy = null,
-                PooledConnectionLifetime = TimeSpan.FromMinutes(5),
-                EnableMultipleHttp2Connections = true,
-                MaxConnectionsPerServer = 24
-            };
-            var fallbackClient = new HttpClient(fallbackHandler) { Timeout = TimeSpan.FromMinutes(10) };
-            fallbackClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
-            return fallbackClient;
-        }
-
         return _clientPool.GetOrAdd(adapter.Id, _ =>
         {
             var handler = new SocketsHttpHandler
@@ -332,52 +331,48 @@ public class NetworkBondingManager : IDisposable
                 Proxy = null,
                 ConnectCallback = async (context, cancellationToken) =>
                 {
-                    var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                    try
+                    var targets = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
+                    // Prefer the Wi-Fi IPv6 route where available. Keep IPv4 as a
+                    // fallback and prefer it for tethering when both are available.
+                    var preferredFamily = adapter.IsWifi ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork;
+                    var orderedTargets = targets.GroupBy(ip => ip.AddressFamily)
+                        .OrderByDescending(group => group.Key == preferredFamily)
+                        .SelectMany(group => group.Take(2));
+                    Exception? lastError = null;
+                    foreach (var target in orderedTargets)
                     {
-                        var currentIp = adapter.LocalIp;
-                        if (currentIp == null)
+                        bool isIPv6 = target.AddressFamily == AddressFamily.InterNetworkV6;
+                        var localIp = isIPv6 ? adapter.LocalIPv6 : adapter.LocalIp;
+                        int ifIndex = isIPv6 ? adapter.IPv6InterfaceIndex : adapter.InterfaceIndex;
+                        if (localIp == null || ifIndex <= 0) continue;
+
+                        var socket = new Socket(target.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                        try
                         {
-                            throw new InvalidOperationException($"Adapter '{adapter.Name}' no longer has an active IPv4 address.");
+                            // Winsock's IPv6 option uses host order and the IPv4 option uses network order.
+                            socket.SetSocketOption(isIPv6 ? SocketOptionLevel.IPv6 : SocketOptionLevel.IP,
+                                (SocketOptionName)31, isIPv6 ? ifIndex : IPAddress.HostToNetworkOrder(ifIndex));
+                            socket.Bind(new IPEndPoint(localIp, 0));
+                            using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                            attempt.CancelAfter(TimeSpan.FromSeconds(3));
+                            await socket.ConnectAsync(target, context.DnsEndPoint.Port, attempt.Token);
+                            return new NetworkStream(socket, ownsSocket: true);
                         }
-
-                        int ifIndex = adapter.InterfaceIndex;
-
-                        // CRITICAL FOR SPEED BONDING:
-                        // Sockets bound to non-default adapters (like 5G USB tethering) will route
-                        // packets through Wi-Fi unless IP_UNICAST_IF (Winsock option 31) overrides it.
-                        if (ifIndex > 0)
+                        catch (Exception ex) when (!cancellationToken.IsCancellationRequested &&
+                            ex is SocketException or OperationCanceledException)
                         {
-                            try
-                            {
-                                int netIndex = IPAddress.HostToNetworkOrder(ifIndex);
-                                socket.SetSocketOption(SocketOptionLevel.IP, (SocketOptionName)31, netIndex);
-                            }
-                            catch (Exception ex)
-                            {
-                                throw new InvalidOperationException(
-                                    $"Windows could not bind a download connection to adapter '{adapter.Name}' (interface {ifIndex}). The connection was stopped to avoid silently using another network.",
-                                    ex);
-                            }
+                            socket.Dispose();
+                            lastError = ex;
                         }
-
-                        // Explicitly bind the socket to this adapter's IP address
-                        socket.Bind(new IPEndPoint(currentIp, 0));
-
-                        // Explicitly resolve DNS to IPv4 address to match the IPv4 socket
-                        var ipAddresses = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
-                        var targetIp = ipAddresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork)
-                                       ?? ipAddresses.First();
-
-                        await socket.ConnectAsync(targetIp, context.DnsEndPoint.Port, cancellationToken);
-                        return new NetworkStream(socket, ownsSocket: true);
+                        catch
+                        {
+                            socket.Dispose();
+                            throw;
+                        }
                     }
-                    catch
-                    {
-                        socket.Dispose();
-                        throw;
-                    }
+                    throw new HttpRequestException($"Could not connect to {context.DnsEndPoint.Host} through {adapter.Name}.", lastError);
                 },
+                ConnectTimeout = TimeSpan.FromSeconds(10),
                 PooledConnectionLifetime = TimeSpan.FromMinutes(5),
                 EnableMultipleHttp2Connections = true,
                 MaxConnectionsPerServer = 24
@@ -396,7 +391,7 @@ public class NetworkBondingManager : IDisposable
     {
         lock (_lock)
         {
-            return _adapters.Where(a => a.IsEnabled && a.IsOnline && a.LocalIp != null).ToList();
+            return _adapters.Where(a => a.IsEnabled && a.IsOnline && a.HasDownloadAddress).ToList();
         }
     }
 
