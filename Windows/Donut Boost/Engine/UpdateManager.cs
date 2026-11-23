@@ -127,16 +127,13 @@ public class UpdateManager
 
     public static async Task<bool> DownloadAndInstallUpdateAsync(
         UpdateManifest manifest, 
-        Action<int, long, long> onProgress, 
+        Action<int, long, long> onProgress,
+        Action<string> onStatus,
         CancellationToken cancellationToken = default)
     {
-        string[] downloadCandidates = new[]
-        {
-            manifest.DownloadUrl,
-            manifest.FallbackUrl,
-            "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
-            "https://raw.githubusercontent.com/user-cariv/Donut/main/Website/Install%20Donut%20Boost.exe"
-        };
+        var downloadCandidates = new[] { manifest.DownloadUrl, manifest.FallbackUrl }
+            .Where(url => !string.IsNullOrWhiteSpace(url))
+            .Distinct(StringComparer.Ordinal);
 
         string tempFolder = Path.Combine(Path.GetTempPath(), "DonutBoost_Update");
         Directory.CreateDirectory(tempFolder);
@@ -148,8 +145,6 @@ public class UpdateManager
 
         foreach (var url in downloadCandidates)
         {
-            if (string.IsNullOrWhiteSpace(url)) continue;
-
             try
             {
                 if (!Uri.TryCreate(url, UriKind.Absolute, out var downloadUri) || downloadUri.Scheme != Uri.UriSchemeHttps)
@@ -164,6 +159,7 @@ public class UpdateManager
 
                 byte[] buffer = new byte[64 * 1024];
                 long totalRead = 0;
+                int lastPercent = -1;
                 int bytesRead;
 
                 while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
@@ -173,14 +169,18 @@ public class UpdateManager
 
                     if (totalBytes > 0)
                     {
-                        int percent = (int)((double)totalRead / totalBytes * 100);
-                        onProgress?.Invoke(percent, totalRead, totalBytes);
+                        int percent = Math.Min(99, (int)((double)totalRead / totalBytes * 100));
+                        if (percent != lastPercent)
+                        {
+                            lastPercent = percent;
+                            onProgress(percent, totalRead, totalBytes);
+                        }
                     }
                 }
 
-                fileStream.Flush();
-                fileStream.Close();
+                await fileStream.DisposeAsync();
 
+                onStatus("Verifying installer...");
                 string actualHash;
                 await using (var verifyStream = File.OpenRead(installerPath))
                 {
@@ -190,13 +190,17 @@ public class UpdateManager
                 if (!string.Equals(actualHash, manifest.InstallerSha256, StringComparison.OrdinalIgnoreCase))
                 {
                     File.Delete(installerPath);
-                    continue;
+                    throw new InvalidDataException("The installer did not match the update manifest. Check for updates again or download the installer from the website.");
                 }
 
                 downloaded = true;
                 break;
             }
             catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (InvalidDataException)
             {
                 throw;
             }
@@ -211,7 +215,7 @@ public class UpdateManager
             return false;
         }
 
-        // Launch the update installer
+        onStatus("Opening installer. Approve the Windows prompt if it appears.");
         try
         {
             var psi = new ProcessStartInfo

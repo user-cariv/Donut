@@ -71,9 +71,14 @@ jobs:
           $installerVersion = (Get-Item $installer).VersionInfo.FileVersion.Trim()
           if ($installerVersion -ne $env:DONUT_BOOST_BUILD_VERSION) { throw "Installer version $installerVersion does not match $env:DONUT_BOOST_BUILD_VERSION" }
           Copy-Item $installer "_site/Install Donut Boost.exe" -Force
+          $updatePath = "updates/$env:DONUT_BOOST_BUILD_VERSION"
+          New-Item -ItemType Directory -Path "_site/$updatePath" -Force | Out-Null
+          Copy-Item $installer "_site/$updatePath/Install Donut Boost.exe" -Force
           $manifestPath = "_site/boost-version.json"
           $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
-          $manifest | Add-Member -NotePropertyName installerSha256 -NotePropertyValue (Get-FileHash "_site/Install Donut Boost.exe" -Algorithm SHA256).Hash -Force
+          $manifest.downloadUrl = "https://user-cariv.github.io/Donut/$updatePath/Install%20Donut%20Boost.exe"
+          $manifest.fallbackUrl = $manifest.downloadUrl
+          $manifest | Add-Member -NotePropertyName installerSha256 -NotePropertyValue (Get-FileHash "_site/$updatePath/Install Donut Boost.exe" -Algorithm SHA256).Hash -Force
           $manifest | ConvertTo-Json -Depth 10 | Set-Content $manifestPath -Encoding utf8
 
       - name: Configure Pages

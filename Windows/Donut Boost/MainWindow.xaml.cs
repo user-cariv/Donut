@@ -1074,12 +1074,21 @@ public partial class MainWindow : Window
         UpdateNowButton.IsEnabled = false;
         UpdateProgressPanel.Visibility = Visibility.Visible;
         UpdateNowButtonText.Text = "Updating...";
-        OnLogReceived($"⬇ [UPDATE] Downloading update v{_availableUpdate.LatestVersion} directly inside app...");
+        UpdateProgressBar.Value = 0;
+        UpdateProgressPercentText.Text = "Checking for the latest installer...";
 
         try
         {
+            var (hasUpdate, manifest) = await UpdateManager.CheckForUpdatesAsync();
+            if (!hasUpdate || manifest == null)
+                throw new InvalidOperationException("No newer installer could be verified. Check for updates again in a moment.");
+
+            _availableUpdate = manifest;
+            UpdateVersionTag.Text = $"v{manifest.LatestVersion}";
+            UpdateProgressPercentText.Text = "Downloading update...";
+            OnLogReceived($"⬇ [UPDATE] Downloading update v{manifest.LatestVersion}...");
             bool success = await UpdateManager.DownloadAndInstallUpdateAsync(
-                _availableUpdate,
+                manifest,
                 (percent, readBytes, totalBytes) =>
                 {
                     PostToUi(() =>
@@ -1089,7 +1098,12 @@ public partial class MainWindow : Window
                             ? $"Downloading update... {percent}% ({DownloadSession.FormatBytes(readBytes)} / {DownloadSession.FormatBytes(totalBytes)})"
                             : $"Downloading update... {DownloadSession.FormatBytes(readBytes)}";
                     });
-                });
+                },
+                status => PostToUi(() =>
+                {
+                    UpdateProgressBar.Value = 100;
+                    UpdateProgressPercentText.Text = status;
+                }));
 
             if (!success)
             {
@@ -1097,8 +1111,8 @@ public partial class MainWindow : Window
                 {
                     UpdateNowButton.IsEnabled = true;
                     UpdateNowButtonText.Text = "Try Again";
-                    UpdateProgressPercentText.Text = "✕ Download failed. Click 'Try Again' or download from website.";
-                    OnLogReceived("✕ In-app update failed to download. Please download from the website.");
+                    UpdateProgressPercentText.Text = "✕ Update did not finish. Click 'Try Again' or download from the website.";
+                    OnLogReceived("✕ In-app update did not finish. You can download the installer from the website.");
                 });
             }
         }

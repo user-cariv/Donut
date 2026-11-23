@@ -2,7 +2,7 @@
   "latestVersion": "1.0.10",
   "minRequiredVersion": "1.0.0",
   "releaseDate": "2026-11-23",
-  "releaseNotes": "Adds Chrome and Edge right-click handoff for direct links and magnets. Donut Boost opens or focuses the app and lets you review the URL before starting; browser cookies are not transferred. Also includes BitTorrent magnet and .torrent downloads.",
+  "releaseNotes": "Fixes repeated updater downloads and shows when Donut Boost verifies and opens the installer. Includes Chrome and Edge right-click handoff for direct links and magnets, plus BitTorrent magnet and .torrent downloads.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }
