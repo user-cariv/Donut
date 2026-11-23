@@ -1,5 +1,37 @@
-.footer-site-name {
+body > .donut-footer {
+  box-sizing: border-box;
+  width: min(1120px, calc(100% - 48px));
+  min-height: 104px;
+  margin: 0 auto;
+  padding: 28px 0 max(28px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px 22px;
+  border-top: 1px solid #c9b4aa66;
+  color: #625650;
+  font: 500 .875rem/1.45 "DM Sans", sans-serif;
+}
+body.dark-mode > .donut-footer {
+  border-color: #ffffff24;
+  color: #d1c5be;
+}
+.donut-footer a { color: inherit; text-decoration: none; }
+.donut-footer a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.donut-footer .donut-footer-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: #251a16;
   font: 800 1.25rem/1.2 Manrope, sans-serif;
   letter-spacing: -.025em;
-  text-transform: none;
+}
+body.dark-mode .donut-footer .donut-footer-brand { color: #fff4ec; }
+.donut-footer-brand img { display: block; width: 28px; height: 28px; object-fit: contain; }
+.donut-footer .donut-footer-youtube { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; }
+.donut-footer-youtube svg { width: 17px; height: 13px; color: #f04438; }
+@media (max-width: 760px) {
+  body > .donut-footer { width: calc(100% - 32px); justify-content: flex-start; }
+  .donut-footer .donut-footer-brand { flex-basis: 100%; }
 }
