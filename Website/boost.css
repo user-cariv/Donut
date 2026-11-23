@@ -255,7 +255,7 @@ body.dark-mode .boost-activation-cta { border-top-color: #ffffff20; }
   .boost-pricing-card:hover, .boost-step-card:hover, .boost-plan-action:hover { transform: none; }
 }
 
-/* Boost plans, activation, and platform downloads */
+/* Boost plans and activation */
 .boost-page {
   --boost-panel: #fff8f4;
   --boost-ink: #241a30;
@@ -350,59 +350,3 @@ body .boost-page .boost-step-num {
 }
 body .boost-page .boost-step-card h4 { font-size: 1.0625rem; }
 body .boost-page .boost-activation-cta { border-color: var(--boost-line); }
-
-body .boost-page .boost-download-options { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
-body .boost-page .boost-download-card {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 22px;
-  padding: clamp(22px, 4vw, 42px);
-  color: var(--boost-ink);
-  border-color: var(--boost-line);
-  background: radial-gradient(ellipse at top right, #f2794838, transparent 60%), var(--boost-panel);
-}
-body .boost-page .boost-download-copy h3 { font-size: clamp(1.6rem, 3.5vw, 2.65rem); }
-body .boost-page .boost-download-copy .hub-eyebrow { color: var(--boost-accent); }
-body .boost-page .boost-download-copy > p:not(.hub-eyebrow),
-.boost-download-details { color: var(--boost-muted); font-size: 1rem; line-height: 1.6; }
-body .boost-page .boost-download-copy .hub-button {
-  width: fit-content;
-  max-width: 100%;
-  justify-content: center;
-  text-align: center;
-  white-space: normal;
-  color: #27152a;
-  background: linear-gradient(105deg, #ffae86, #ffccab);
-  border-color: transparent;
-}
-.boost-download-details {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--boost-line);
-}
-.boost-download-details summary { cursor: pointer; color: var(--boost-ink); font-weight: 700; }
-.boost-download-details p { margin: 12px 0 0; }
-.boost-download-details a { color: var(--boost-accent); text-decoration: underline; text-underline-offset: 3px; }
-body .boost-page .boost-macos-card {
-  background: radial-gradient(ellipse at bottom right, #9c63ed3d, transparent 72%), var(--boost-panel);
-}
-.boost-macos-card::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  right: -100px;
-  bottom: -145px;
-  width: 305px;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  border: 1px solid #a975e66b;
-  box-shadow: 0 0 0 25px #a975e618, 0 0 0 50px #a975e611;
-  pointer-events: none;
-}
-body .boost-page .boost-macos-icon { background: linear-gradient(145deg, #593e82, #261c3c); }
-.boost-download :is(a, summary):focus-visible { outline: 3px solid var(--boost-accent); outline-offset: 4px; }
-@media (max-width: 760px) {
-  body .boost-page .boost-download-options { grid-template-columns: minmax(0, 1fr); }
-}
