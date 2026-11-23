@@ -427,11 +427,9 @@
           const result = await response.json().catch(() => ({}));
           if (!response.ok) throw new Error(result.error || "We couldn’t send your request. Please try again.");
           const shortId = String(result.ticketId || "").slice(0, 8).toUpperCase();
-          if (result.notificationStatus === "sent") {
-            message.textContent = `Thanks — we received your request (${shortId}) and sent a confirmation email.`;
-          } else {
-            message.textContent = `Your request (${shortId}) was saved, but email notifications aren’t configured yet.`;
-          }
+          message.textContent = shortId
+            ? `Your support request was sent successfully. Reference ${shortId}.`
+            : "Your support request was sent successfully.";
           form.elements.issue.value = "";
           if (fileInput) fileInput.value = "";
           renderFiles();
