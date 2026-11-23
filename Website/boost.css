@@ -48,7 +48,7 @@
 .boost-download-card {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
   gap: clamp(14px, 3vw, 24px);
   padding: clamp(18px, 3vw, 28px);
   border: 1px solid #fff;
@@ -56,15 +56,22 @@
   background: #fff9;
   box-shadow: var(--hub-shadow);
 }
-.boost-download-card h2 { margin: 0 0 12px; font-size: clamp(1.35rem, 3vw, 2rem); }
+.boost-download > h2 { margin: 0 0 20px; font-size: clamp(2rem, 4.6vw, 3.375rem); }
+.boost-download-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.boost-download-card h3 { margin: 0; font-size: clamp(1.35rem, 2.5vw, 1.875rem); letter-spacing: -.045em; }
+.boost-download-card .hub-eyebrow { margin: 0 0 7px; }
+.boost-download-note { margin: 10px 0 14px; color: var(--hub-muted); font-size: .9375rem; line-height: 1.6; }
+.boost-macos-icon { display: grid; place-items: center; border-radius: 24%; color: #fff; background: #271d23; font-size: 1.75rem; }
+.boost-coming-soon { display: inline-block; padding: 5px 12px; border-radius: 999px; color: #844626; background: #ffe4cf; font-size: .8125rem; font-weight: 700; }
+body.dark-mode .boost-coming-soon { color: #ffd2ac; background: #483123; }
 .boost-download-icon { width: clamp(44px, 6vw, 64px); aspect-ratio: 1; }
 .boost-download-icon img { display: block; width: 100%; height: auto; border-radius: 24%; }
 .boost-download-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .boost-download-actions .hub-button { width: auto; min-height: 44px; padding: 10px 16px; text-align: center; }
-.boost-download-actions .boost-extension-button { color: inherit; background: transparent; border: 1px solid #76635a; box-shadow: none; }
+.boost-download-actions .boost-extension-button, body.dark-mode .boost-download-actions .boost-extension-button { color: inherit; background: transparent; border: 1px solid #76635a; box-shadow: none; }
 .boost-download-actions a:focus-visible { outline: 2px solid var(--hub-orange); outline-offset: 3px; }
 body.dark-mode .boost-download-card { border-color: #3c2e29; background: #211a17; }
-@media (max-width: 480px) { .boost-download-card { align-items: start; } }
+@media (max-width: 760px) { .boost-download-options { grid-template-columns: minmax(0, 1fr); } }
 body.dark-mode .boost-steps article { border-color: #3c2e29; background: #211a17; }body.dark-mode .boost-note { border-color: #ffffff24; background: #ffffff08; }body.dark-mode .boost-game-card { border-color: #ffffff24; background: radial-gradient(ellipse at 84% 45%, #6745a633, transparent 36%), radial-gradient(ellipse at 5% 105%, #ed755024, transparent 40%), linear-gradient(135deg, #1d1a30, #111321 72%); }
 @media (max-width: 900px) { .boost-hero { gap: 28px; }.boost-hero h1 { font-size: clamp(46px, 6.4vw, 68px); } }
 @media (max-width: 760px) { .boost-page { width: min(100% - 32px, 560px); }.boost-hero { min-height: 0; grid-template-columns: 1fr; padding: 65px 0 45px; }.boost-hero-art { max-width: 560px; }.boost-how { padding: 45px 0 65px; }.boost-steps { grid-template-columns: 1fr; }.boost-game-card { grid-template-columns: 1fr; align-items: start; }.boost-game-visual { width: min(100%, 300px); height: 210px; margin: 8px auto 0; } }
