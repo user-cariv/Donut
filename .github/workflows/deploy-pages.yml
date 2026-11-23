@@ -68,7 +68,7 @@ jobs:
           }
           $installer = "Windows/Donut Boost/installer/Install Donut Boost.exe"
           if (-not (Test-Path $installer)) { throw "Donut Boost installer output is missing" }
-          $installerVersion = (Get-Item $installer).VersionInfo.FileVersion
+          $installerVersion = (Get-Item $installer).VersionInfo.FileVersion.Trim()
           if ($installerVersion -ne $env:DONUT_BOOST_BUILD_VERSION) { throw "Installer version $installerVersion does not match $env:DONUT_BOOST_BUILD_VERSION" }
           Copy-Item $installer "_site/Install Donut Boost.exe" -Force
           $manifestPath = "_site/boost-version.json"
