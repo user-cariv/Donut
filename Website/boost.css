@@ -254,3 +254,155 @@ body.dark-mode .boost-activation-cta { border-top-color: #ffffff20; }
   .boost-pricing-card, .boost-step-card, .boost-plan-action { transition: none; }
   .boost-pricing-card:hover, .boost-step-card:hover, .boost-plan-action:hover { transform: none; }
 }
+
+/* Boost plans, activation, and platform downloads */
+.boost-page {
+  --boost-panel: #fff8f4;
+  --boost-ink: #241a30;
+  --boost-muted: #554b60;
+  --boost-line: #35214329;
+  --boost-accent: #a94220;
+}
+body.dark-mode .boost-page {
+  --boost-panel: #191624;
+  --boost-ink: #fff6f4;
+  --boost-muted: #d1c5d5;
+  --boost-line: #f2dfff2b;
+  --boost-accent: #ffad82;
+}
+.boost-pricing-grid { gap: clamp(12px, 1.6vw, 20px); }
+body .boost-page .boost-pricing-card, body.dark-mode .boost-page .boost-pricing-card {
+  --plan-color: #6751a1;
+  --plan-wash: #9574ef22;
+  color: var(--boost-ink);
+  border-color: var(--boost-line);
+  border-top: 3px solid var(--plan-color);
+  background: radial-gradient(ellipse at 85% 0%, var(--plan-wash), transparent 60%), var(--boost-panel);
+  box-shadow: 0 16px 38px #160f1d19;
+}
+body .boost-page .boost-pricing-card.popular { --plan-color: var(--boost-accent); --plan-wash: #ff815333; }
+body .boost-page .boost-pricing-card.pro { --plan-color: #8738a6; --plan-wash: #c465e52b; }
+body .boost-page .boost-pricing-card.best-value { --plan-color: #096552; --plan-wash: #35c5a12b; }
+body.dark-mode .boost-page .boost-pricing-card.starter { --plan-color: #bdabff; }
+body.dark-mode .boost-page .boost-pricing-card.pro { --plan-color: #e1a6fc; }
+body.dark-mode .boost-page .boost-pricing-card.best-value { --plan-color: #8ae6cc; }
+body .boost-page .boost-pricing-card:is(:hover, :focus-within) { border-color: var(--plan-color); }
+body .boost-page .boost-plan-duration {
+  margin-bottom: 12px;
+  color: var(--plan-color);
+  background: var(--plan-wash);
+  font-size: .75rem;
+}
+body .boost-page .boost-plan-badge {
+  top: 10px;
+  right: 12px;
+  color: var(--boost-ink);
+  background: var(--boost-panel);
+  border: 1px solid var(--boost-line);
+  font-size: .625rem;
+}
+body .boost-page .boost-plan-header { padding-top: 15px; }
+body .boost-page .boost-plan-title { font-size: 1.4rem; }
+body .boost-page .boost-plan-desc,
+body .boost-page .boost-plan-features li,
+body .boost-page .boost-activation-header p,
+body .boost-page .boost-step-card p { color: var(--boost-muted); font-size: .9375rem; }
+body .boost-page .boost-plan-desc { min-height: 0; }
+body .boost-page .boost-plan-price-wrap { margin-top: auto; padding-top: 8px; }
+body .boost-page .boost-price-amount { font-size: clamp(2rem, 3.4vw, 3rem); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+body .boost-page .boost-plan-features { border-color: var(--boost-line); }
+body .boost-page .boost-plan-features li { align-items: flex-start; }
+body .boost-page .boost-plan-features svg { margin-top: .2em; stroke: var(--plan-color); }
+body .boost-page .boost-plan-action, body.dark-mode .boost-page .boost-plan-action {
+  min-height: 46px;
+  color: var(--boost-ink);
+  border: 1px solid var(--boost-line);
+  background: var(--plan-wash);
+  box-shadow: none;
+  font-size: .875rem;
+}
+body .boost-page .boost-plan-action:is(.popular-btn, .value-btn) {
+  color: var(--boost-panel);
+  border-color: var(--plan-color);
+  background: var(--plan-color);
+}
+body .boost-page .boost-plan-action:hover { border-color: var(--plan-color); box-shadow: 0 6px 18px var(--plan-wash); }
+
+body .boost-page .boost-activation-guide {
+  border-color: var(--boost-line);
+  color: var(--boost-ink);
+  background: radial-gradient(ellipse at top right, #b26cf02c, transparent 62%), var(--boost-panel);
+}
+body .boost-page .boost-activation-tag,
+body .boost-page .boost-step-card a { color: var(--boost-accent); }
+body .boost-page .boost-step-card {
+  min-height: 0;
+  background: transparent;
+  border-color: var(--boost-line);
+}
+body .boost-page .boost-step-num {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  color: var(--boost-accent);
+  background: #ff815326;
+  box-shadow: none;
+}
+body .boost-page .boost-step-card h4 { font-size: 1.0625rem; }
+body .boost-page .boost-activation-cta { border-color: var(--boost-line); }
+
+body .boost-page .boost-download-options { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+body .boost-page .boost-download-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+  padding: clamp(22px, 4vw, 42px);
+  color: var(--boost-ink);
+  border-color: var(--boost-line);
+  background: radial-gradient(ellipse at top right, #f2794838, transparent 60%), var(--boost-panel);
+}
+body .boost-page .boost-download-copy h3 { font-size: clamp(1.6rem, 3.5vw, 2.65rem); }
+body .boost-page .boost-download-copy .hub-eyebrow { color: var(--boost-accent); }
+body .boost-page .boost-download-copy > p:not(.hub-eyebrow),
+.boost-download-details { color: var(--boost-muted); font-size: 1rem; line-height: 1.6; }
+body .boost-page .boost-download-copy .hub-button {
+  width: fit-content;
+  max-width: 100%;
+  justify-content: center;
+  text-align: center;
+  white-space: normal;
+  color: #27152a;
+  background: linear-gradient(105deg, #ffae86, #ffccab);
+  border-color: transparent;
+}
+.boost-download-details {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--boost-line);
+}
+.boost-download-details summary { cursor: pointer; color: var(--boost-ink); font-weight: 700; }
+.boost-download-details p { margin: 12px 0 0; }
+.boost-download-details a { color: var(--boost-accent); text-decoration: underline; text-underline-offset: 3px; }
+body .boost-page .boost-macos-card {
+  background: radial-gradient(ellipse at bottom right, #9c63ed3d, transparent 72%), var(--boost-panel);
+}
+.boost-macos-card::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  right: -100px;
+  bottom: -145px;
+  width: 305px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid #a975e66b;
+  box-shadow: 0 0 0 25px #a975e618, 0 0 0 50px #a975e611;
+  pointer-events: none;
+}
+body .boost-page .boost-macos-icon { background: linear-gradient(145deg, #593e82, #261c3c); }
+.boost-download :is(a, summary):focus-visible { outline: 3px solid var(--boost-accent); outline-offset: 4px; }
+@media (max-width: 760px) {
+  body .boost-page .boost-download-options { grid-template-columns: minmax(0, 1fr); }
+}
