@@ -1,3 +1,5 @@
+importScripts("handoff.js");
+
 const MENU_LINK = "donutboost-send-link";
 const MENU_PAGE = "donutboost-send-page";
 
@@ -23,13 +25,8 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
   if (!value || !/^(https?:\/\/|magnet:)/i.test(value)) return;
 
   try {
-    const handoff = `donutboost://download?url=${encodeURIComponent(value)}`;
-    if (handoff.length > 8192) {
-      console.warn("The link is too long to send to Donut Boost.");
-      return;
-    }
-    await chrome.tabs.create({ url: handoff, active: false });
-  } catch {
-    console.warn("Could not open Donut Boost. Check that the Windows app is installed.");
+    await sendToDonutBoost(value);
+  } catch (error) {
+    console.warn(error.message);
   }
 });

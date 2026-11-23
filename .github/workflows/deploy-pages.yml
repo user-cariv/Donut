@@ -100,6 +100,32 @@ jobs:
         run: |
           New-Item -ItemType Directory -Path _site -Force | Out-Null
           Copy-Item -Path "Website\*" -Destination _site -Recurse -Force
+          $extensionSource = (Resolve-Path "Windows/Donut Boost/browser-extension/chrome").Path
+          $extension = Get-Content (Join-Path $extensionSource 'manifest.json') -Raw | ConvertFrom-Json
+          if ($extension.manifest_version -ne 3 -or $extension.version -notmatch '^\d+\.\d+\.\d+$') {
+            throw 'Invalid Donut Boost extension manifest'
+          }
+          $requiredExtensionFiles = @($extension.background.service_worker, $extension.action.default_popup, 'handoff.js', 'popup.js', 'popup.css')
+          $requiredExtensionFiles += $extension.icons.PSObject.Properties.Value
+          $requiredExtensionFiles += $extension.action.default_icon.PSObject.Properties.Value
+          foreach ($file in $requiredExtensionFiles) {
+            if (!$file -or !(Test-Path -LiteralPath (Join-Path $extensionSource $file) -PathType Leaf)) {
+              throw "Missing bundled extension file: $file"
+            }
+          }
+          $extensionZip = Join-Path (Resolve-Path _site).Path 'Donut Boost Chrome Extension.zip'
+          Push-Location $extensionSource
+          try {
+            $extensionEntries = @(Get-ChildItem -Name)
+            tar.exe -cf $extensionZip --format zip -- @extensionEntries
+            if ($LASTEXITCODE -ne 0) { throw 'Could not package the bundled extension' }
+          } finally {
+            Pop-Location
+          }
+          $boostPage = "_site/boost.html"
+          $boostHtml = Get-Content $boostPage -Raw
+          $boostHtml -replace 'Chrome%20Extension\.zip\?v=[\d.]+', "Chrome%20Extension.zip?v=$($extension.version)" |
+            Set-Content $boostPage -Encoding utf8
           $installer = if ($env:REUSE_BOOST_INSTALLER -eq 'true') {
             $env:DONUT_BOOST_CACHED_INSTALLER
           } else {
@@ -119,6 +145,8 @@ jobs:
           $manifest.fallbackUrl = $manifest.downloadUrl
           $manifest | Add-Member -NotePropertyName buildSource -NotePropertyValue $env:DONUT_BOOST_BUILD_SOURCE -Force
           $manifest | Add-Member -NotePropertyName installerSha256 -NotePropertyValue (Get-FileHash "_site/$updatePath/Install Donut Boost.exe" -Algorithm SHA256).Hash -Force
+          $manifest | Add-Member -NotePropertyName extensionVersion -NotePropertyValue $extension.version -Force
+          $manifest | Add-Member -NotePropertyName extensionSha256 -NotePropertyValue (Get-FileHash $extensionZip -Algorithm SHA256).Hash -Force
           $manifest | ConvertTo-Json -Depth 10 | Set-Content $manifestPath -Encoding utf8
 
       - name: Configure Pages

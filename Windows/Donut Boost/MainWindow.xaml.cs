@@ -316,6 +316,26 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OpenBrowserExtensionButton_Click(object sender, RoutedEventArgs e)
+    {
+        var folder = Path.Combine(AppContext.BaseDirectory, "browser-extension", "chrome");
+        if (!File.Exists(Path.Combine(folder, "manifest.json")))
+        {
+            MessageBox.Show("The bundled extension folder is missing. Select Check for Updates in Donut Boost to check for a newer installer.",
+                "Donut Boost browser extension", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        try
+        {
+            Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true });
+            OnLogReceived("In Chrome or Edge, select Load unpacked and choose the bundled folder. After an app update, click Reload on the extension card.");
+        }
+        catch (Exception ex)
+        {
+            OnLogReceived($"Could not open the browser extension folder: {ex.Message}");
+        }
+    }
+
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ClickCount == 2)

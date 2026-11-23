@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Send to Donut Boost</title>
+  <link rel="stylesheet" href="popup.css">
+  <script src="handoff.js" defer></script>
+  <script src="popup.js" defer></script>
+</head>
+<body>
+  <header><img src="icons/boost-48.png" width="32" height="32" alt=""><h1>Donut Boost</h1></header>
+  <form id="send-link">
+    <label for="download-link">Direct download or magnet link</label>
+    <input id="download-link" type="text" required autocomplete="off" spellcheck="false">
+    <button id="send-button" type="submit">Send to Donut Boost</button>
+  </form>
+  <p id="status" role="status">Review and start the download in the Windows app.</p>
+  <button id="reload-extension" type="button">Reload extension</button>
+</body>
+</html>

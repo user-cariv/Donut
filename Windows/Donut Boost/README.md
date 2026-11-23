@@ -54,4 +54,6 @@ Use **Add to queue** for a direct link, magnet link, or torrent file. Leave the 
 
 ## Send links from Chrome or Edge
 
-The Windows installer registers the `donutboost://` link handler and includes the unpacked extension under `browser-extension\chrome`. In Chrome or Edge, open `chrome://extensions` or `edge://extensions`, enable Developer mode, choose **Load unpacked**, and select that folder inside the Donut Boost installation directory. Right-click a direct HTTP(S) download link or page and select **Send link to Donut Boost**. Donut Boost opens or focuses its window and fills the link for review; a download starts only when you press **BOOST DOWNLOAD**. The extension sends the selected URL only, not browser cookies or page contents, so links requiring a signed-in browser session may not work.
+Click **Browser extension** in Donut Boost to open the folder bundled with the installed app. In Chrome or Edge, open `chrome://extensions` or `edge://extensions`, enable **Developer mode**, choose **Load unpacked**, and select that folder. App updates replace the bundled extension files. Use **Reload** on the extension card or **Reload extension** in the pinned toolbar panel to apply them.
+
+Right-click a direct download or magnet link, or paste it into the pinned panel. The extension opens Donut Boost and fills its download box. Review the link and press **Boost Download** to start. The handoff sends only the URL, so links that depend on browser cookies may fail.

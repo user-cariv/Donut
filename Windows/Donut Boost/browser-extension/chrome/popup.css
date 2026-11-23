@@ -1,0 +1,19 @@
+:root {
+  color-scheme: dark;
+  font: 14px/1.45 system-ui, sans-serif;
+  color: #fff5ee;
+  background: #1c1723;
+}
+body { width: 290px; margin: 0; padding: 16px; }
+header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+header img { border-radius: 8px; }
+h1 { margin: 0; font-size: 1.125rem; }
+form { display: grid; gap: 8px; }
+input, button { box-sizing: border-box; min-height: 36px; border: 1px solid #665772; border-radius: 8px; font: inherit; }
+input { width: 100%; padding: 7px 9px; color: inherit; background: #131018; }
+button { padding: 7px 12px; font-weight: 700; cursor: pointer; }
+#send-button { border-color: transparent; color: #24151c; background: #ffae81; }
+button:disabled { opacity: .68; cursor: wait; }
+#reload-extension { color: inherit; background: transparent; }
+#status { margin: 10px 0 14px; color: #d4c5d9; }
+:focus-visible { outline: 2px solid #ffae81; outline-offset: 2px; }

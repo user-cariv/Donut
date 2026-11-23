@@ -13,6 +13,7 @@ public partial class App : Application
     private static Mutex? _singleInstanceMutex;
     private bool _ownsInstanceMutex;
     private const string DownloadPipeName = "DonutBoost.DownloadLink.v1";
+    private const int MaxHandoffLength = 8192;
     private CancellationTokenSource? _downloadPipeCancellation;
 
     protected override async void OnStartup(StartupEventArgs e)
@@ -95,7 +96,7 @@ public partial class App : Application
                 using var readTimeout = CancellationTokenSource.CreateLinkedTokenSource(token);
                 readTimeout.CancelAfter(TimeSpan.FromSeconds(3));
                 using var reader = new StreamReader(pipe, Encoding.UTF8, false, 1024, leaveOpen: true);
-                string? message = await reader.ReadLineAsync(readTimeout.Token);
+                string? message = await ReadHandoffAsync(reader, readTimeout.Token);
                 if (TryGetDownloadLink(message, out string? link) && !window.Dispatcher.HasShutdownStarted)
                     _ = window.Dispatcher.BeginInvoke(() => window.SetIncomingDownloadLink(link));
             }
@@ -112,8 +113,27 @@ public partial class App : Application
         }
     }
 
+    private static async Task<string?> ReadHandoffAsync(StreamReader reader, CancellationToken token)
+    {
+        char[] buffer = new char[1024];
+        var message = new StringBuilder();
+        while (message.Length <= MaxHandoffLength)
+        {
+            int count = await reader.ReadAsync(buffer.AsMemory(), token);
+            if (count == 0) return null;
+            int newline = Array.IndexOf(buffer, '\n', 0, count);
+            int length = newline >= 0 ? newline : count;
+            if (message.Length + length > MaxHandoffLength) return null;
+            message.Append(buffer, 0, length);
+            if (newline >= 0) return message.ToString().TrimEnd('\r');
+        }
+        return null;
+    }
+
     private static async Task<bool> TryForwardDownloadLinkAsync(string link)
     {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        byte[] payload = Encoding.UTF8.GetBytes(link + "\n");
         for (int attempt = 0; attempt < 15; attempt++)
         {
             try
@@ -121,14 +141,14 @@ public partial class App : Application
                 await using var pipe = new NamedPipeClientStream(
                     ".", DownloadPipeName, PipeDirection.Out,
                     PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
-                await pipe.ConnectAsync(150);
-                await using var writer = new StreamWriter(pipe, new UTF8Encoding(false), 1024, leaveOpen: true) { AutoFlush = true };
-                await writer.WriteLineAsync(link);
+                await pipe.ConnectAsync(150, deadline.Token);
+                await pipe.WriteAsync(payload.AsMemory(), deadline.Token);
                 return true;
             }
             catch (TimeoutException) { }
             catch (IOException) { }
             catch (UnauthorizedAccessException) { return false; }
+            catch (OperationCanceledException) when (deadline.IsCancellationRequested) { return false; }
             await Task.Delay(100);
         }
         return false;
@@ -137,7 +157,7 @@ public partial class App : Application
     private static bool TryGetDownloadLink(string? value, out string? link)
     {
         link = null;
-        if (string.IsNullOrWhiteSpace(value) || value.Length > 8192) return false;
+        if (string.IsNullOrWhiteSpace(value) || value.Length > MaxHandoffLength) return false;
         string candidate = value.Trim();
         if (Uri.TryCreate(candidate, UriKind.Absolute, out var protocolUri)
             && protocolUri.Scheme.Equals("donutboost", StringComparison.OrdinalIgnoreCase))
