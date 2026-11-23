@@ -52,11 +52,14 @@ try {
     & $cli secrets set "--remote=$projectRef" "ALLOWED_ORIGINS=$origins"
     if ($LASTEXITCODE -ne 0) { throw "Setting the support function origin allow-list failed." }
 
-    & $cli functions deploy submit-support "--remote=$projectRef" --no-verify-jwt --use-api
-    if ($LASTEXITCODE -ne 0) { throw "Deploying the support function failed." }
+    foreach ($functionName in @("submit-support", "redeem-boost-license", "issue-boost-license")) {
+      & $cli functions deploy $functionName "--remote=$projectRef" --no-verify-jwt --use-api
+      if ($LASTEXITCODE -ne 0) { throw "Deploying the $functionName function failed." }
+    }
 
-    Write-Host "Support storage and the endpoint are deployed."
-    Write-Host "Email notifications still need a verified support sender and inbox before users are asked to submit real requests."
+    Write-Host "Database migrations and all Donut support and license functions are deployed."
+    Write-Host "Support email requires SUPPORT_INBOX, SUPPORT_FROM, and SENDGRID_API_KEY (or RESEND_API_KEY) secrets."
+    Write-Host "License activation requires DONUT_LICENSE_ISSUER_TOKEN, DONUT_LICENSE_SIGNING_PRIVATE_KEY, and DONUT_LICENSE_KEY_ID secrets."
   }
   finally {
     Pop-Location
