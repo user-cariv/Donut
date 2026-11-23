@@ -373,6 +373,8 @@ public class NetworkBondingManager : IDisposable
                     throw new HttpRequestException($"Could not connect to {context.DnsEndPoint.Host} through {adapter.Name}.", lastError);
                 },
                 ConnectTimeout = TimeSpan.FromSeconds(10),
+                // Closing a switched-off adapter's response must not drain it in the background.
+                MaxResponseDrainSize = 0,
                 PooledConnectionLifetime = TimeSpan.FromMinutes(5),
                 EnableMultipleHttp2Connections = true,
                 MaxConnectionsPerServer = 24

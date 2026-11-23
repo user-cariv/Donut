@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.ComponentModel;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -151,7 +152,8 @@ public class MultiChannelDownloader
             var probes = await Task.WhenAll(enabledAdapters.OrderByDescending(a => a.IsWifi)
                 .Select(async adapter =>
                 {
-                    using var probeTimeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+                    using var adapterTransfer = new AdapterTransferCancellation(adapter, token);
+                    using var probeTimeout = CancellationTokenSource.CreateLinkedTokenSource(adapterTransfer.Token);
                     probeTimeout.CancelAfter(TimeSpan.FromSeconds(8));
                     try
                     {
@@ -162,7 +164,8 @@ public class MultiChannelDownloader
                     }
                     catch (OperationCanceledException) when (!token.IsCancellationRequested)
                     {
-                        LogReceived?.Invoke($"[{adapter.Name}] Download probe timed out.");
+                        if (!adapterTransfer.Token.IsCancellationRequested)
+                            LogReceived?.Invoke($"[{adapter.Name}] Download probe timed out.");
                         return (Adapter: adapter, Probe: (FileName: string.Empty, TotalSize: -1L, SupportsRanges: false, Reachable: false));
                     }
                 }));
@@ -558,10 +561,15 @@ public class MultiChannelDownloader
                             bool interrupted = false;
                             bool attemptThrew = false;
                             long bytesBeforeAttempt = chunk.BytesDownloaded;
+                            using var adapterTransfer = new AdapterTransferCancellation(adp, token);
                             try
                             {
-                                interrupted = await DownloadChunkWithClientAsync(client, session.Url, chunk, adp, session, token);
+                                interrupted = await DownloadChunkWithClientAsync(client, session.Url, chunk, adp, session, adapterTransfer.Token);
                                 success = chunk.IsCompleted;
+                            }
+                            catch (Exception) when (adapterTransfer.Token.IsCancellationRequested)
+                            {
+                                interrupted = true;
                             }
                             catch (Exception ex)
                             {
@@ -736,6 +744,7 @@ public class MultiChannelDownloader
 
             lock (_fileLock)
             {
+                token.ThrowIfCancellationRequested();
                 if (_fileStream != null)
                 {
                     _fileStream.Seek(writeOffset, SeekOrigin.Begin);
@@ -766,10 +775,11 @@ public class MultiChannelDownloader
         return false;
     }
 
-    private async Task DownloadSingleStreamAsync(DownloadSession session, NetworkAdapterInfo adapter, CancellationToken token)
+    private async Task DownloadSingleStreamAsync(DownloadSession session, NetworkAdapterInfo preferredAdapter, CancellationToken token)
     {
-        var client = _bondingManager.GetOrCreateClient(adapter);
         int consecutiveFailures = 0;
+        NetworkAdapterInfo? lastAdapter = null;
+        bool waitingForAdapter = false;
 
         while (!token.IsCancellationRequested && (session.TotalBytes <= 0 || session.DownloadedBytes < session.TotalBytes))
         {
@@ -781,6 +791,31 @@ public class MultiChannelDownloader
 
             if (token.IsCancellationRequested) break;
 
+            var active = _bondingManager.GetActiveEnabledAdapters();
+            var adapter = active.Contains(preferredAdapter) ? preferredAdapter :
+                active.OrderByDescending(a => a.IsWifi).FirstOrDefault();
+            if (adapter == null)
+            {
+                if (!waitingForAdapter)
+                {
+                    LogReceived?.Invoke("Download is waiting for an enabled network adapter.");
+                    waitingForAdapter = true;
+                }
+                await Task.Delay(300, token);
+                continue;
+            }
+            waitingForAdapter = false;
+            if (lastAdapter != null && lastAdapter != adapter)
+            {
+                LogReceived?.Invoke($"Switching the download to {adapter.Name}.");
+                consecutiveFailures = 0;
+            }
+            lastAdapter = adapter;
+
+            using var adapterTransfer = new AdapterTransferCancellation(adapter, token);
+            var transferToken = adapterTransfer.Token;
+            var client = _bondingManager.GetOrCreateClient(adapter);
+
             using var request = new HttpRequestMessage(HttpMethod.Get, session.Url);
             if (session.DownloadedBytes > 0)
             {
@@ -790,7 +825,7 @@ public class MultiChannelDownloader
             try
             {
                 long bytesBeforeAttempt = session.DownloadedBytes;
-                using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
+                using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, transferToken);
                 if (IsPermanentHttpFailure(response.StatusCode))
                     throw new HttpRequestException($"The download server returned HTTP {(int)response.StatusCode}.", null, response.StatusCode);
                 response.EnsureSuccessStatusCode();
@@ -817,7 +852,7 @@ public class MultiChannelDownloader
                     session.TotalBytes = responseLength;
                 }
 
-                using var contentStream = await response.Content.ReadAsStreamAsync(token);
+                using var contentStream = await response.Content.ReadAsStreamAsync(transferToken);
                 byte[] buffer = new byte[256 * 1024]; // 256 KB high-throughput buffer for 300+ Mbps 5G & gigabit streams
                 int bytesRead;
                 var stopwatch = Stopwatch.StartNew();
@@ -828,11 +863,12 @@ public class MultiChannelDownloader
                     // Keep the response open while paused. A server that ignored
                     // the range probe cannot be expected to accept a resumed GET.
                     while (_isPaused)
-                        await Task.Delay(200, token);
-                    bytesRead = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), token);
+                        await Task.Delay(200, transferToken);
+                    bytesRead = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), transferToken);
                     if (bytesRead == 0) break;
                     lock (_fileLock)
                     {
+                        transferToken.ThrowIfCancellationRequested();
                         if (_fileStream != null)
                         {
                             _fileStream.Seek(session.DownloadedBytes, SeekOrigin.Begin);
@@ -847,7 +883,7 @@ public class MultiChannelDownloader
                     // Speed limit applies ONLY to Home Wi-Fi / LAN — Mobile 5G runs 100% full unthrottled speed!
                     if (!adapter.IsMobilePhone)
                     {
-                        await _throttler.ThrottleAsync(bytesRead, token);
+                        await _throttler.ThrottleAsync(bytesRead, transferToken);
                     }
 
                     if (stopwatch.ElapsedMilliseconds >= 250)
@@ -881,6 +917,11 @@ public class MultiChannelDownloader
             {
                 throw;
             }
+            catch (Exception) when (transferToken.IsCancellationRequested && !token.IsCancellationRequested)
+            {
+                // The adapter was turned off or disconnected. Retry with the
+                // currently selected adapters and the last saved byte offset.
+            }
             catch (Exception ex)
             {
                 if (ex is InvalidOperationException && ex.Message.StartsWith("This server cannot resume", StringComparison.Ordinal))
@@ -896,6 +937,41 @@ public class MultiChannelDownloader
                     await Task.Delay(Math.Min(4000, 250 * (1 << Math.Min(consecutiveFailures, 4))), token);
                 }
             }
+        }
+    }
+
+    private sealed class AdapterTransferCancellation : IDisposable
+    {
+        private readonly NetworkAdapterInfo _adapter;
+        private readonly CancellationTokenSource _source;
+        public CancellationToken Token { get; }
+
+        public AdapterTransferCancellation(NetworkAdapterInfo adapter, CancellationToken sessionToken)
+        {
+            _adapter = adapter;
+            _source = CancellationTokenSource.CreateLinkedTokenSource(sessionToken);
+            Token = _source.Token;
+            _adapter.PropertyChanged += OnAdapterChanged;
+            CancelIfUnavailable();
+        }
+
+        private void OnAdapterChanged(object? sender, PropertyChangedEventArgs args)
+        {
+            if (args.PropertyName is nameof(NetworkAdapterInfo.IsEnabled) or nameof(NetworkAdapterInfo.IsOnline))
+                CancelIfUnavailable();
+        }
+
+        private void CancelIfUnavailable()
+        {
+            if (_adapter.IsEnabled && _adapter.IsOnline) return;
+            try { _source.Cancel(); }
+            catch (ObjectDisposedException) { }
+        }
+
+        public void Dispose()
+        {
+            _adapter.PropertyChanged -= OnAdapterChanged;
+            _source.Dispose();
         }
     }
 

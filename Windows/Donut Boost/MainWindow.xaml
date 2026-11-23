@@ -556,7 +556,7 @@
                                 <TextBlock x:Name="AdapterCountTextBlock" Grid.Column="1" Text="0 Detected" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
                             </Grid>
 
-                            <TextBlock Grid.Row="1" Text="These are live receive rates for each detected adapter. Windows keeps its own default route; Donut does not redirect other apps:" FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                            <TextBlock Grid.Row="1" Text="Live receive rates include all Windows traffic. The switches control Donut downloads only. Donut downloaded shows the bytes this app saved on each adapter." FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,0,0,10"/>
 
                             <!-- Adapters List -->
                             <ItemsControl Grid.Row="2" x:Name="AdaptersItemsControl">
@@ -593,7 +593,7 @@
                                                 <!-- Speed & Apple iOS Toggle Switch -->
                                                 <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="8,0,0,0">
                                                     <TextBlock Text="{Binding DisplaySpeed}" FontWeight="Bold" FontSize="14" Foreground="{StaticResource SuccessBrush}" HorizontalAlignment="Right"/>
-                                                    <TextBlock Text="{Binding FormattedTotalBytes, StringFormat='Downloaded: {0}'}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Right" Margin="0,1,0,3"/>
+                                                    <TextBlock Text="{Binding FormattedTotalBytes, StringFormat='Donut downloaded: {0}'}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Right" Margin="0,1,0,3"/>
                                                     <ToggleButton IsChecked="{Binding IsEnabled, Mode=TwoWay}"
                                                                   Style="{StaticResource ModernToggleSwitchStyle}"
                                                                   Click="AdapterToggle_Click"
