@@ -77,6 +77,12 @@ body.dark-mode .boost-coming-soon { color: #ffd2ac; background: #483123; }
 .boost-download-actions .hub-button { width: auto; min-height: 44px; padding: 10px 16px; text-align: center; }
 .boost-download-actions .boost-extension-button, body.dark-mode .boost-download-actions .boost-extension-button { color: inherit; background: transparent; border: 1px solid #76635a; box-shadow: none; }
 .boost-download-actions a:focus-visible { outline: 2px solid var(--hub-orange); outline-offset: 3px; }
+.boost-extension-guide { margin-top: 16px; color: var(--hub-muted); font-size: .875rem; line-height: 1.55; }
+.boost-extension-guide summary { color: var(--hub-ink); font-weight: 700; cursor: pointer; }
+.boost-extension-guide summary:focus-visible { outline: 2px solid var(--hub-orange); outline-offset: 3px; }
+.boost-extension-guide ol { display: grid; gap: 6px; padding-inline-start: 1.25rem; }
+.boost-extension-guide p { margin: 0; }
+.boost-extension-guide code { overflow-wrap: anywhere; }
 body.dark-mode .boost-download-card { border-color: #3c2e29; background: #211a17; }
 @media (max-width: 760px) { .boost-download-options { grid-template-columns: minmax(0, 1fr); } }
 body.dark-mode .boost-steps article { border-color: #3c2e29; background: #211a17; }body.dark-mode .boost-note { border-color: #ffffff24; background: #ffffff08; }body.dark-mode .boost-game-card { border-color: #ffffff24; background: radial-gradient(ellipse at 84% 45%, #6745a633, transparent 36%), radial-gradient(ellipse at 5% 105%, #ed755024, transparent 40%), linear-gradient(135deg, #1d1a30, #111321 72%); }
