@@ -65,6 +65,7 @@
           <input class="account-input" id="account-email-signin" name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
           <label class="account-label" for="account-password-signin">Password</label>
           <input class="account-input" id="account-password-signin" name="password" type="password" autocomplete="current-password" required>
+          <button class="account-reset-link" type="button" data-reset-password>Forgot password?</button>
           <button class="account-primary" type="submit">Continue with email</button>
           <p class="account-divider">or</p>
           <button class="account-google" type="button" data-google-auth>
@@ -91,6 +92,14 @@
           <p class="account-message" aria-live="polite"></p>
         </form>
       </div>
+      <div class="account-panel" id="account-panel-reset" hidden>
+        <form data-password-reset-form>
+          <label class="account-label" for="account-password-new">New password</label>
+          <input class="account-input" id="account-password-new" name="password" type="password" autocomplete="new-password" minlength="8" required>
+          <button class="account-primary" type="submit">Save new password</button>
+          <p class="account-message" aria-live="polite"></p>
+        </form>
+      </div>
       <p class="account-footnote">Google sign-in is secure and continues across the Donut website.</p>
     </section>`;
   document.body.append(layer);
@@ -100,6 +109,12 @@
   const tabs = [...layer.querySelectorAll("[role=tab]")];
   const panels = [...layer.querySelectorAll("[role=tabpanel]")];
   const displayName = (user) => user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Donut member";
+  const getSafeRedirect = () => {
+    const allowedOrigins = new Set(["https://user-cariv.github.io", "http://127.0.0.1:4173", "http://localhost:4173"]);
+    const origin = allowedOrigins.has(window.location.origin) ? window.location.origin : "https://user-cariv.github.io";
+    const path = origin === "https://user-cariv.github.io" ? "/Donut/" : "/";
+    return `${origin}${path}`;
+  };
   const readAccount = () => authUser ? { name: displayName(authUser), email: authUser.email || "" } : null;
   const updateTriggers = () => {
     const user = readAccount();
@@ -148,7 +163,7 @@
       signout.textContent = "Sign out";
       signout.addEventListener("click", async () => {
         signout.disabled = true;
-        const { error } = await supabaseClient.auth.signOut();
+        const { error } = await supabaseClient.auth.signOut({ scope: "global" });
         if (error) {
           layer.querySelector(".account-preview-note").textContent = error.message;
           signout.disabled = false;
@@ -195,7 +210,7 @@
       submit.textContent = form.dataset.accountForm === "create" ? "Creating account…" : "Signing in…";
       message.textContent = "";
       try {
-        const redirectTo = `${window.location.origin}${window.location.pathname}`;
+        const redirectTo = getSafeRedirect();
         const result = form.dataset.accountForm === "create"
           ? await supabaseClient.auth.signUp({
             email,
@@ -212,13 +227,59 @@
           showProfile();
         }
       } catch (error) {
-        message.textContent = error instanceof Error ? error.message : "Sign-in failed. Please try again.";
+        message.textContent = form.dataset.accountForm === "create"
+          ? "We couldn’t create the account. Check the details or try signing in if you may already have an account."
+          : "Email or password is incorrect, or sign-in is temporarily unavailable.";
         message.dataset.kind = "error";
       } finally {
         submit.disabled = false;
         submit.textContent = originalText;
       }
     });
+  });
+  layer.querySelectorAll("[data-reset-password]").forEach((button) => button.addEventListener("click", async () => {
+    const form = button.closest("form");
+    const message = form?.querySelector(".account-message");
+    const email = String(form?.elements.email?.value || "").trim();
+    if (!supabaseClient || !email) {
+      message.textContent = "Enter your email address, then request a password reset.";
+      message.dataset.kind = "error";
+      return;
+    }
+    button.disabled = true;
+    try {
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: getSafeRedirect() });
+      if (error) throw error;
+      // Same response whether the account exists or not.
+      message.textContent = "If an account matches that email, password reset instructions will arrive shortly.";
+      message.dataset.kind = "";
+    } catch {
+      message.textContent = "Password reset is temporarily unavailable. Please try again later.";
+      message.dataset.kind = "error";
+    } finally {
+      button.disabled = false;
+    }
+  }));
+  layer.querySelector("[data-password-reset-form]")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const message = form.querySelector(".account-message");
+    const submit = form.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    try {
+      const { error } = await supabaseClient.auth.updateUser({ password: String(new FormData(form).get("password") || "") });
+      if (error) throw error;
+      await supabaseClient.auth.signOut({ scope: "global" });
+      resetProfile();
+      message.textContent = "Password updated. Sign in with your new password.";
+      message.dataset.kind = "";
+      setTab("signin");
+    } catch {
+      message.textContent = "Could not update the password. The link may have expired; request another reset email.";
+      message.dataset.kind = "error";
+    } finally {
+      submit.disabled = false;
+    }
   });
   layer.querySelectorAll("[data-google-auth]").forEach((button) => button.addEventListener("click", async () => {
     const form = button.closest("form");
@@ -232,7 +293,7 @@
     message.dataset.kind = "";
     message.textContent = "Connecting securely to Google…";
     try {
-      const redirectTo = `${window.location.origin}${window.location.pathname}`;
+      const redirectTo = getSafeRedirect();
       const { error } = await supabaseClient.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -242,7 +303,7 @@
       });
       if (error) throw error;
     } catch (error) {
-      message.textContent = error instanceof Error ? error.message : "Google sign-in could not start. Please try again.";
+      message.textContent = "Google sign-in could not start. Please try again.";
       message.dataset.kind = "error";
       button.disabled = false;
     }
@@ -255,7 +316,17 @@
     supabaseClient.auth.onAuthStateChange((event, session) => {
       authUser = session?.user || null;
       updateTriggers();
-      if (authUser && returningFromOAuth) {
+      if (event === "PASSWORD_RECOVERY") {
+        layer.hidden = false;
+        document.body.style.overflow = "hidden";
+        layer.querySelector(".account-title").textContent = "Choose a new password.";
+        layer.querySelector(".account-copy").textContent = "Use a new password for your Donut account.";
+        layer.querySelector(".account-preview-note").textContent = "Your reset link is verified. Set a new password to continue.";
+        layer.querySelector(".account-tabs").hidden = true;
+        panels.forEach((panel) => { panel.hidden = true; });
+        layer.querySelector("#account-panel-reset").hidden = false;
+        layer.querySelector("#account-password-new")?.focus();
+      } else if (authUser && returningFromOAuth) {
         open();
         showProfile();
       } else if (event === "SIGNED_IN" && !layer.hidden) {
@@ -268,7 +339,7 @@
     if (authError) {
       open("signin");
       const message = layer.querySelector("#account-panel-signin .account-message");
-      message.textContent = authError.replace(/\+/g, " ");
+      message.textContent = "Google sign-in did not complete. Please try again.";
       message.dataset.kind = "error";
     }
   }

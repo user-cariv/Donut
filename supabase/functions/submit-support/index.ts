@@ -45,6 +45,12 @@ function jsonResponse(
   });
 }
 
+function safeErrorCode(error: unknown): string {
+  if (typeof error !== "object" || error === null || !("code" in error)) return "no_code";
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" && /^[A-Z0-9_]{1,16}$/.test(code) ? code : "no_code";
+}
+
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({
     "&": "&amp;",
@@ -61,8 +67,8 @@ function getDefaultKey(keysEnvName: string, legacyEnvName: string): string | und
     try {
       const parsed = JSON.parse(configuredKeys) as Record<string, unknown>;
       if (typeof parsed.default === "string") return parsed.default;
-    } catch (error) {
-      console.error(`Invalid ${keysEnvName} environment value`, error);
+    } catch {
+      console.error(`Invalid ${keysEnvName} environment value`);
     }
   }
   return Deno.env.get(legacyEnvName) || undefined;
@@ -121,7 +127,8 @@ async function readBoundedFormData(request: Request, maxBytes: number): Promise<
 }
 
 async function sendEmail(
-  apiKey: string,
+  resendKey: string | undefined,
+  sendGridKey: string | undefined,
   from: string,
   to: string,
   subject: string,
@@ -129,26 +136,40 @@ async function sendEmail(
   replyTo?: string,
 ): Promise<boolean> {
   try {
+    if (sendGridKey) {
+      const mailbox = /^(.*?)\s*<([^<>]+)>$/.exec(from);
+      const fromAddress = mailbox?.[2]?.trim() ?? from.trim();
+      const fromName = mailbox?.[1]?.trim().replace(/^['"]|['"]$/g, "");
+      const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${sendGridKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: to }] }],
+          from: { email: fromAddress, ...(fromName ? { name: fromName } : {}) },
+          subject,
+          content: [{ type: "text/html", value: html }],
+          ...(replyTo ? { reply_to: { email: replyTo } } : {}),
+        }),
+      });
+      if (!response.ok) console.error("SendGrid delivery failed", response.status);
+      return response.ok;
+    }
+
+    if (!resendKey) return false;
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from,
-        to: [to],
-        subject,
-        html,
-        ...(replyTo ? { reply_to: replyTo } : {}),
-      }),
+      headers: { "Authorization": `Bearer ${resendKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from, to: [to], subject, html, ...(replyTo ? { reply_to: replyTo } : {}) }),
     });
-    if (!response.ok) console.error("Resend delivery failed", response.status, await response.text());
+    if (!response.ok) console.error("Resend delivery failed", response.status);
     return response.ok;
   } catch (error) {
     // Email is a notification side effect. A mail-provider outage must not
     // make a successfully stored support ticket look as if it was lost.
-    console.error("Resend request failed", error);
+      console.error("Support email request failed", error instanceof Error ? error.name : "UnknownError");
     return false;
   }
 }
@@ -267,14 +288,15 @@ Deno.serve(async (request) => {
     }
 
     const resendKey = Deno.env.get("RESEND_API_KEY");
+    const sendGridKey = Deno.env.get("SENDGRID_API_KEY");
     const supportInbox = Deno.env.get("SUPPORT_INBOX");
     const mailFrom = Deno.env.get("SUPPORT_FROM");
     let notificationStatus: "sent" | "failed" | "not_configured" = "not_configured";
-    if (resendKey && supportInbox && mailFrom) {
+    if ((sendGridKey || resendKey) && supportInbox && mailFrom) {
       failureStage = "email notification";
       const attachmentLinks = await Promise.all(attachments.map(async (attachment) => {
         const { data } = await admin.storage.from("support-attachments")
-          .createSignedUrl(attachment.path, 60 * 60 * 24 * 7);
+          .createSignedUrl(attachment.path, 60 * 60);
         return data?.signedUrl
           ? `<li><a href="${escapeHtml(data.signedUrl)}">${escapeHtml(attachment.filename)}</a> (${readableBytes(attachment.size)})</li>`
           : `<li>${escapeHtml(attachment.filename)} (download link unavailable)</li>`;
@@ -282,6 +304,7 @@ Deno.serve(async (request) => {
       const ticketHtml = `<h2>Donut support request</h2><p><b>Ticket:</b> ${ticketId}</p><p><b>Name:</b> ${escapeHtml(name)}</p><p><b>Email:</b> ${escapeHtml(email)}</p><p><b>Message:</b></p><pre style="white-space:pre-wrap;font:inherit">${escapeHtml(issue)}</pre><p><b>Attachments:</b></p><ul>${attachmentLinks.join("") || "<li>None</li>"}</ul>`;
       const notificationSent = await sendEmail(
         resendKey,
+        sendGridKey,
         mailFrom,
         supportInbox,
         `[Donut Support] ${ticketId.slice(0, 8)}`,
@@ -292,6 +315,7 @@ Deno.serve(async (request) => {
       if (notificationSent) {
         confirmationSent = await sendEmail(
           resendKey,
+          sendGridKey,
           mailFrom,
           email,
           `We received your Donut support request ${ticketId.slice(0, 8)}`,
@@ -308,7 +332,7 @@ Deno.serve(async (request) => {
       notificationStatus,
     }, 201, cors);
   } catch (error) {
-    console.error(`Support submission failed during ${failureStage}`, error);
+    console.error(`Support submission failed during ${failureStage}`, error instanceof Error ? error.name : "UnknownError", safeErrorCode(error));
     return jsonResponse({ error: "We couldn’t save your request. Please try again later." }, 500, cors);
   }
 });

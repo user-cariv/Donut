@@ -2,7 +2,11 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Text;
 using DonutBoost.Models;
+using MonoTorrent;
+using MonoTorrent.Client;
 
 namespace DonutBoost.Engine;
 
@@ -15,7 +19,10 @@ public class MultiChannelDownloader
     private DownloadSession? _currentSession;
     private FileStream? _fileStream;
     private readonly object _fileLock = new();
+    private readonly SemaphoreSlim _downloadGate = new(1, 1);
     private volatile bool _isPaused = false;
+    private ClientEngine? _torrentEngine;
+    private TorrentManager? _torrentManager;
 
     public DownloadSession? CurrentSession => _currentSession;
     public bool IsPaused => _isPaused;
@@ -38,6 +45,8 @@ public class MultiChannelDownloader
             _isPaused = true;
             _currentSession.Status = DownloadStatus.Paused;
             _currentSession.CombinedSpeedBps = 0;
+            if (_torrentManager != null)
+                _ = PauseTorrentSafelyAsync(_torrentManager);
             // Physical adapter rates keep updating while the file transfer is paused.
             StatusChanged?.Invoke(_currentSession);
             ProgressUpdated?.Invoke(_currentSession);
@@ -51,14 +60,40 @@ public class MultiChannelDownloader
         {
             _isPaused = false;
             _currentSession.Status = DownloadStatus.Downloading;
+            if (_torrentManager != null)
+                _ = ResumeTorrentSafelyAsync(_torrentManager);
             StatusChanged?.Invoke(_currentSession);
             LogReceived?.Invoke("▶ Resuming download pipeline...");
         }
     }
 
+    private async Task PauseTorrentSafelyAsync(TorrentManager manager)
+    {
+        try { await manager.PauseAsync(); }
+        catch (Exception ex) { LogReceived?.Invoke($"Could not pause torrent cleanly: {ex.Message}"); }
+    }
+
+    private async Task ResumeTorrentSafelyAsync(TorrentManager manager)
+    {
+        try { await manager.StartAsync(); }
+        catch (Exception ex) { LogReceived?.Invoke($"Could not resume torrent cleanly: {ex.Message}"); }
+    }
+
     public async Task StartDownloadAsync(string url, string outputFolder, CancellationToken externalToken = default)
     {
-        _cts?.Cancel();
+        await _downloadGate.WaitAsync(externalToken);
+        try
+        {
+            await StartDownloadCoreAsync(url, outputFolder, externalToken);
+        }
+        finally
+        {
+            _downloadGate.Release();
+        }
+    }
+
+    private async Task StartDownloadCoreAsync(string url, string outputFolder, CancellationToken externalToken)
+    {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(externalToken);
         var token = _cts.Token;
         _isPaused = false;
@@ -80,6 +115,12 @@ public class MultiChannelDownloader
                 session.Status = DownloadStatus.Failed;
                 session.ErrorMessage = "Active valid license required.";
                 StatusChanged?.Invoke(session);
+                return;
+            }
+
+            if (IsTorrentInput(url))
+            {
+                await StartTorrentDownloadAsync(url, outputFolder, session, token);
                 return;
             }
 
@@ -107,25 +148,34 @@ public class MultiChannelDownloader
             var probeAdapter = enabledAdapters.FirstOrDefault(a => a.IsWifi) ?? enabledAdapters[0];
             var probeClient = _bondingManager.GetOrCreateClient(probeAdapter);
 
-            var (fileName, totalSize, supportsRanges) = await ProbeUrlAsync(probeClient, url, token);
+            string normalizedUrl = NormalizeDownloadUrl(url);
+            session.Url = normalizedUrl;
+            var (fileName, totalSize, supportsRanges) = await ProbeUrlAsync(probeClient, normalizedUrl, token);
 
             session.FileName = fileName;
             session.TotalBytes = totalSize;
             session.SupportsRangeRequests = supportsRanges;
-            session.DestinationPath = Path.Combine(outputFolder, fileName);
-
-            LogReceived?.Invoke($"File: {fileName} | Size: {session.FormattedTotalSize} | Supports Range Slicing: {supportsRanges}");
-
             // Pre-allocate destination file
             Directory.CreateDirectory(outputFolder);
             lock (_fileLock)
             {
-                _fileStream = new FileStream(session.DestinationPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite, 64 * 1024, useAsync: true);
-                if (totalSize > 0)
+                _fileStream = OpenUniqueDestinationFile(outputFolder, fileName, out string destinationPath);
+                session.DestinationPath = destinationPath;
+                session.FileName = Path.GetFileName(destinationPath);
+                try
                 {
-                    _fileStream.SetLength(totalSize);
+                    if (totalSize > 0)
+                        _fileStream.SetLength(totalSize);
+                }
+                catch
+                {
+                    _fileStream.Dispose();
+                    _fileStream = null;
+                    try { File.Delete(destinationPath); } catch { }
+                    throw;
                 }
             }
+            LogReceived?.Invoke($"File: {session.FileName} | Size: {session.FormattedTotalSize} | Supports Range Slicing: {supportsRanges}");
 
             session.Status = DownloadStatus.Downloading;
             StatusChanged?.Invoke(session);
@@ -142,7 +192,11 @@ public class MultiChannelDownloader
                 await DownloadSingleStreamAsync(session, enabledAdapters[0], token);
             }
 
-            if (token.IsCancellationRequested || session.Status == DownloadStatus.Cancelled)
+            if (session.Status == DownloadStatus.Failed)
+            {
+                StatusChanged?.Invoke(session);
+            }
+            else if (token.IsCancellationRequested || session.Status == DownloadStatus.Cancelled)
             {
                 session.Status = DownloadStatus.Cancelled;
                 session.CombinedSpeedBps = 0;
@@ -160,9 +214,11 @@ public class MultiChannelDownloader
         }
         catch (OperationCanceledException)
         {
-            session.Status = DownloadStatus.Cancelled;
+            if (session.Status != DownloadStatus.Failed)
+                session.Status = DownloadStatus.Cancelled;
             StatusChanged?.Invoke(session);
-            LogReceived?.Invoke("Download was cancelled.");
+            if (session.Status == DownloadStatus.Cancelled)
+                LogReceived?.Invoke("Download was cancelled.");
         }
         catch (Exception ex)
         {
@@ -178,6 +234,179 @@ public class MultiChannelDownloader
                 _fileStream?.Flush();
                 _fileStream?.Dispose();
                 _fileStream = null;
+            }
+            _cts?.Dispose();
+            _cts = null;
+        }
+    }
+
+    private static bool IsTorrentInput(string input)
+    {
+        if (input.StartsWith("magnet:", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (File.Exists(input))
+            return string.Equals(Path.GetExtension(input), ".torrent", StringComparison.OrdinalIgnoreCase);
+        return Uri.TryCreate(input, UriKind.Absolute, out var uri) &&
+               string.Equals(Path.GetExtension(uri.AbsolutePath), ".torrent", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task StartTorrentDownloadAsync(string input, string outputFolder, DownloadSession session, CancellationToken token)
+    {
+        Directory.CreateDirectory(outputFolder);
+        var torrentId = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(input))).ToLowerInvariant();
+        var torrentSavePath = Path.Combine(outputFolder, "Torrents", torrentId);
+        Directory.CreateDirectory(torrentSavePath);
+        var cacheDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Donut", "TorrentCache");
+        Directory.CreateDirectory(cacheDirectory);
+        _torrentEngine = new ClientEngine(new EngineSettingsBuilder
+        {
+            CacheDirectory = cacheDirectory,
+            AllowPortForwarding = false
+        }.ToSettings());
+
+        try
+        {
+            if (input.StartsWith("magnet:", StringComparison.OrdinalIgnoreCase))
+            {
+                var magnet = MagnetLink.Parse(input);
+                _torrentManager = await _torrentEngine.AddAsync(magnet, torrentSavePath);
+                await _torrentManager.StartAsync();
+                session.FileName = "Resolving magnet metadata...";
+                StatusChanged?.Invoke(session);
+                LogReceived?.Invoke("Magnet added. Waiting for torrent metadata from peers...");
+                using var metadataTimeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+                metadataTimeout.CancelAfter(TimeSpan.FromMinutes(5));
+                try
+                {
+                    await _torrentManager.WaitForMetadataAsync(metadataTimeout.Token);
+                }
+                catch (OperationCanceledException) when (!token.IsCancellationRequested)
+                {
+                    throw new TimeoutException("Torrent metadata was not available from peers within five minutes.");
+                }
+            }
+            else
+            {
+                Torrent torrent;
+                if (File.Exists(input))
+                {
+                    var torrentPath = Path.GetFullPath(input);
+                    if (new FileInfo(torrentPath).Length > 10_485_760)
+                        throw new InvalidDataException("Torrent metadata is larger than the 10 MB safety limit.");
+                    torrent = await Torrent.LoadAsync(torrentPath);
+                }
+                else if (Uri.TryCreate(input, UriKind.Absolute, out var metadataUri) &&
+                         (metadataUri.Scheme == Uri.UriSchemeHttp || metadataUri.Scheme == Uri.UriSchemeHttps))
+                {
+                    using var metadataClient = new HttpClient { Timeout = TimeSpan.FromSeconds(45) };
+                    using var response = await metadataClient.GetAsync(metadataUri, HttpCompletionOption.ResponseHeadersRead, token);
+                    response.EnsureSuccessStatusCode();
+                    if (response.Content.Headers.ContentLength is > 10_485_760)
+                        throw new InvalidDataException("Torrent metadata is larger than the 10 MB safety limit.");
+                    var metadata = await response.Content.ReadAsByteArrayAsync(token);
+                    if (metadata.Length == 0 || metadata.Length > 10_485_760)
+                        throw new InvalidDataException("Torrent metadata is empty or larger than the 10 MB safety limit.");
+                    torrent = await Torrent.LoadAsync(new Memory<byte>(metadata));
+                }
+                else
+                {
+                    throw new ArgumentException("Enter a magnet link, an HTTP(S) .torrent link, or the path to a .torrent file.");
+                }
+
+                _torrentManager = await _torrentEngine.AddAsync(torrent, torrentSavePath);
+                await _torrentManager.StartAsync();
+            }
+
+            token.ThrowIfCancellationRequested();
+            var managerReady = _torrentManager ?? throw new InvalidOperationException("Torrent manager did not initialize.");
+            var torrentMetadata = managerReady.Torrent ?? throw new InvalidDataException("Torrent metadata could not be read.");
+            session.FileName = torrentMetadata.Name;
+            session.TotalBytes = torrentMetadata.Size;
+            session.SupportsRangeRequests = false;
+            session.DestinationPath = torrentSavePath;
+            session.Status = DownloadStatus.Downloading;
+            StatusChanged?.Invoke(session);
+            LogReceived?.Invoke($"Torrent ready: {session.FileName} | verified payload size: {session.FormattedTotalSize} | peer connections use the Windows network route.");
+
+            while (!token.IsCancellationRequested && !_torrentManager.Complete)
+            {
+                if (_isPaused)
+                {
+                    await Task.Delay(250, token);
+                    continue;
+                }
+
+                var manager = _torrentManager ?? throw new InvalidOperationException("Torrent manager stopped unexpectedly.");
+                var progress = Math.Clamp(manager.Progress / 100d, 0d, 1d);
+                session.DownloadedBytes = Math.Min(session.TotalBytes, (long)(session.TotalBytes * progress));
+                session.UpdateSpeed(manager.Monitor.DownloadRate);
+                ProgressUpdated?.Invoke(session);
+                await Task.Delay(500, token);
+            }
+
+            token.ThrowIfCancellationRequested();
+            session.DownloadedBytes = session.TotalBytes;
+            session.UpdateSpeed(0);
+            await _torrentManager.StopAsync(TimeSpan.FromSeconds(2));
+            session.Status = DownloadStatus.Completed;
+            StatusChanged?.Invoke(session);
+            ProgressUpdated?.Invoke(session);
+            LogReceived?.Invoke("Torrent download complete. Donut Boost stopped the torrent and is not seeding in the background.");
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            session.Status = DownloadStatus.Cancelled;
+            session.CombinedSpeedBps = 0;
+            StatusChanged?.Invoke(session);
+        }
+        catch (Exception ex)
+        {
+            session.Status = DownloadStatus.Failed;
+            session.ErrorMessage = ex.Message;
+            StatusChanged?.Invoke(session);
+            LogReceived?.Invoke($"Torrent download failed: {ex.Message}");
+        }
+        finally
+        {
+            if (_torrentManager != null)
+            {
+                try { await _torrentManager.StopAsync(TimeSpan.FromSeconds(2)); } catch { }
+                try { await _torrentEngine!.RemoveAsync(_torrentManager); } catch { }
+            }
+            _torrentManager = null;
+            _torrentEngine?.Dispose();
+            _torrentEngine = null;
+        }
+    }
+
+    private static string NormalizeDownloadUrl(string input)
+    {
+        string value = input.Trim();
+        if (!value.Contains("://", StringComparison.Ordinal)) value = "https://" + value;
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
+            string.IsNullOrWhiteSpace(uri.Host))
+            throw new InvalidOperationException("Enter a valid HTTP or HTTPS download link.");
+        return uri.AbsoluteUri;
+    }
+
+    private static FileStream OpenUniqueDestinationFile(string folder, string fileName, out string destinationPath)
+    {
+        string name = Path.GetFileNameWithoutExtension(fileName);
+        string extension = Path.GetExtension(fileName);
+        for (int suffix = 0; ; suffix++)
+        {
+            string candidateName = suffix == 0 ? fileName : $"{name} ({suffix}){extension}";
+            string candidate = Path.Combine(folder, candidateName);
+            try
+            {
+                var stream = new FileStream(candidate, FileMode.CreateNew, FileAccess.Write, FileShare.Read, 64 * 1024, useAsync: true);
+                destinationPath = candidate;
+                return stream;
+            }
+            catch (IOException) when (File.Exists(candidate))
+            {
+                // Another download or process created this name after our check; try the next suffix.
             }
         }
     }
@@ -296,24 +525,63 @@ public class MultiChannelDownloader
                             }
 
                             bool success = false;
+                            bool attemptThrew = false;
+                            long bytesBeforeAttempt = chunk.BytesDownloaded;
                             try
                             {
                                 await DownloadChunkWithClientAsync(client, session.Url, chunk, adp, session, token);
-                                success = true;
+                                success = chunk.IsCompleted;
                             }
                             catch (Exception ex)
                             {
+                                attemptThrew = true;
                                 if (!token.IsCancellationRequested)
                                 {
                                     string msg = $"[{adp.Name}] Notice on chunk {chunk.Index}: {ex.Message}";
                                     LogReceived?.Invoke(msg);
-                                    await Task.Delay(500, token);
+                                    if (chunk.BytesDownloaded == bytesBeforeAttempt)
+                                        chunk.ConsecutiveFailures++;
+                                    else
+                                        chunk.ConsecutiveFailures = 0;
+
+                                    if (IsPermanentHttpFailure(ex) || chunk.ConsecutiveFailures >= 8)
+                                    {
+                                        session.ErrorMessage = IsPermanentHttpFailure(ex)
+                                            ? "The download server rejected a byte-range request. Check that the link is valid and accessible."
+                                            : "The connection repeatedly failed without making progress. Please retry the download.";
+                                        session.Status = DownloadStatus.Failed;
+                                        _cts?.Cancel();
+                                    }
+                                    else
+                                    {
+                                        int delayMs = Math.Min(4000, 250 * (1 << Math.Min(chunk.ConsecutiveFailures, 4)));
+                                        await Task.Delay(delayMs, token);
+                                    }
+                                }
+                            }
+
+                            if (success)
+                            {
+                                chunk.ConsecutiveFailures = 0;
+                            }
+                            else if (!attemptThrew && !chunk.IsCompleted && !token.IsCancellationRequested && session.Status != DownloadStatus.Failed)
+                            {
+                                chunk.ConsecutiveFailures++;
+                                if (chunk.ConsecutiveFailures >= 32)
+                                {
+                                    session.ErrorMessage = "The server repeatedly ended a byte-range response early. Please retry or use another download link.";
+                                    session.Status = DownloadStatus.Failed;
+                                    _cts?.Cancel();
+                                }
+                                else
+                                {
+                                    await Task.Delay(Math.Min(4000, 250 * (1 << Math.Min(chunk.ConsecutiveFailures, 4))), token);
                                 }
                             }
 
                             // Seamless Handover: If chunk is not completed (e.g. paused, errored, or connection turned OFF mid-download),
                             // return it to pendingQueue immediately so an active connection picks it up right where it left off!
-                            if (!chunk.IsCompleted && !token.IsCancellationRequested)
+                            if (!chunk.IsCompleted && !token.IsCancellationRequested && session.Status != DownloadStatus.Failed)
                             {
                                 lock (queueLock)
                                 {
@@ -373,9 +641,12 @@ public class MultiChannelDownloader
         finally
         {
             _bondingManager.AdaptersChanged -= onAdaptersChanged;
+            try { await Task.WhenAll(workerTasks); }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         }
 
-        await monitorTask;
+        try { await monitorTask; }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
 
         session.UpdateSpeed(0);
         foreach (var adp in adapters)
@@ -460,6 +731,7 @@ public class MultiChannelDownloader
     private async Task DownloadSingleStreamAsync(DownloadSession session, NetworkAdapterInfo adapter, CancellationToken token)
     {
         var client = _bondingManager.GetOrCreateClient(adapter);
+        int consecutiveFailures = 0;
 
         while (!token.IsCancellationRequested && (session.TotalBytes <= 0 || session.DownloadedBytes < session.TotalBytes))
         {
@@ -471,7 +743,7 @@ public class MultiChannelDownloader
 
             if (token.IsCancellationRequested) break;
 
-            var request = new HttpRequestMessage(HttpMethod.Get, session.Url);
+            using var request = new HttpRequestMessage(HttpMethod.Get, session.Url);
             if (session.DownloadedBytes > 0)
             {
                 request.Headers.Range = new RangeHeaderValue(session.DownloadedBytes, null);
@@ -479,7 +751,10 @@ public class MultiChannelDownloader
 
             try
             {
+                long bytesBeforeAttempt = session.DownloadedBytes;
                 using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
+                if (IsPermanentHttpFailure(response.StatusCode))
+                    throw new HttpRequestException($"The download server returned HTTP {(int)response.StatusCode}.", null, response.StatusCode);
                 response.EnsureSuccessStatusCode();
 
                 long requestedOffset = session.DownloadedBytes;
@@ -552,6 +827,21 @@ public class MultiChannelDownloader
                 // When the server does not provide a length, end at EOF instead
                 // of issuing another GET forever after the first full response.
                 if (session.TotalBytes <= 0) break;
+                if (session.DownloadedBytes == bytesBeforeAttempt && session.DownloadedBytes < session.TotalBytes)
+                {
+                    consecutiveFailures++;
+                    if (consecutiveFailures >= 8)
+                        throw new IOException("The server repeatedly ended the response before the download completed.");
+                    await Task.Delay(Math.Min(4000, 250 * (1 << Math.Min(consecutiveFailures, 4))), token);
+                }
+                else
+                {
+                    consecutiveFailures = 0;
+                }
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -559,8 +849,13 @@ public class MultiChannelDownloader
                     throw;
                 if (!_isPaused && !token.IsCancellationRequested)
                 {
+                    if (ex is HttpRequestException httpError && httpError.StatusCode is { } status && IsPermanentHttpFailure(status))
+                        throw new InvalidOperationException($"The download server returned HTTP {(int)status}.");
+                    consecutiveFailures++;
+                    if (consecutiveFailures >= 8)
+                        throw new IOException("The connection repeatedly failed without making progress. Please retry the download.");
                     LogReceived?.Invoke($"Stream notice ({adapter.Name}): {ex.Message}. Retrying...");
-                    await Task.Delay(1000, token);
+                    await Task.Delay(Math.Min(4000, 250 * (1 << Math.Min(consecutiveFailures, 4))), token);
                 }
             }
         }
@@ -571,10 +866,7 @@ public class MultiChannelDownloader
         string rawFileName = string.Empty;
         try
         {
-            string urlToParse = url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
-                ? url
-                : "https://" + url;
-            rawFileName = Path.GetFileName(new Uri(urlToParse).LocalPath);
+            rawFileName = Path.GetFileName(new Uri(url).LocalPath);
         }
         catch { }
 
@@ -587,12 +879,11 @@ public class MultiChannelDownloader
         long totalSize = -1;
         bool supportsRanges = false;
 
-        // Primary Probe: Test byte-range request directly with a 1MB test slice (Range: bytes=0-1048575)
-        // Testing a non-zero range slice guarantees Google Drive, Google UserContent, Hetzner, and CDNs return 206 Partial Content!
+        // Use a single-byte range probe to confirm range support without reading a large test body.
         try
         {
-            var rangeReq = new HttpRequestMessage(HttpMethod.Get, url);
-            rangeReq.Headers.Range = new RangeHeaderValue(0, 1024 * 1024 - 1);
+            using var rangeReq = new HttpRequestMessage(HttpMethod.Get, url);
+            rangeReq.Headers.Range = new RangeHeaderValue(0, 0);
             using var rangeRes = await client.SendAsync(rangeReq, HttpCompletionOption.ResponseHeadersRead, token);
 
             if (rangeRes.StatusCode == System.Net.HttpStatusCode.PartialContent)
@@ -633,7 +924,7 @@ public class MultiChannelDownloader
         {
             try
             {
-                var headReq = new HttpRequestMessage(HttpMethod.Head, url);
+                using var headReq = new HttpRequestMessage(HttpMethod.Head, url);
                 using var headRes = await client.SendAsync(headReq, token);
                 if (headRes.IsSuccessStatusCode)
                 {
@@ -661,6 +952,14 @@ public class MultiChannelDownloader
         var clean = string.Concat(name.Split(invalid, StringSplitOptions.RemoveEmptyEntries));
         return string.IsNullOrWhiteSpace(clean) ? "downloaded_file.bin" : clean;
     }
+
+    private static bool IsPermanentHttpFailure(Exception exception) =>
+        exception is HttpRequestException { StatusCode: { } status } && IsPermanentHttpFailure(status);
+
+    private static bool IsPermanentHttpFailure(System.Net.HttpStatusCode status) =>
+        (int)status >= 400 && (int)status < 500 &&
+        status != System.Net.HttpStatusCode.RequestTimeout &&
+        (int)status != 429;
 
     public void Cancel()
     {

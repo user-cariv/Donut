@@ -74,12 +74,21 @@ public partial class MainWindow : Window
 
     }
 
+    public void SetIncomingDownloadLink(string? link)
+    {
+        if (string.IsNullOrWhiteSpace(link)) return;
+        UrlTextBox.Text = link;
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Activate();
+        OnLogReceived("Browser link received. Review it, then select BOOST DOWNLOAD to start.");
+    }
+
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         IsEnabled = false;
         try
         {
-            if (_licenseManager.CurrentLicense.IsActive && _licenseManager.CurrentLicense.Tier != LicenseTier.FreeTrial)
+            if (_licenseManager.CurrentLicense.IsActive)
             {
                 ActivationStatusTextBlock.Text = "Verifying this device activation...";
                 var verification = await _licenseManager.VerifyStoredLicenseCloudAsync();
@@ -89,7 +98,7 @@ public partial class MainWindow : Window
 
             if (!_licenseManager.CurrentLicense.IsActive)
             {
-                var trialResult = _licenseManager.ActivateTrial();
+                var trialResult = await _licenseManager.ActivateTrialAsync();
                 if (trialResult.Success)
                     OnLogReceived("24-hour free pass activated for this device.");
             }
@@ -202,9 +211,11 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ActivateTrialButton_Click(object sender, RoutedEventArgs e)
+    private async void ActivateTrialButton_Click(object sender, RoutedEventArgs e)
     {
-        var result = _licenseManager.ActivateTrial();
+        ActivateTrialButton.IsEnabled = false;
+        var result = await _licenseManager.ActivateTrialAsync();
+        ActivateTrialButton.IsEnabled = true;
         if (result.Success)
         {
             ActivationStatusTextBlock.Text = result.Message;
@@ -658,7 +669,7 @@ public partial class MainWindow : Window
         string url = UrlTextBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(url))
         {
-            MessageBox.Show("Please enter a valid download URL.", "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show("Enter a direct HTTP(S) download URL, a magnet link, or choose a .torrent file.", "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -703,11 +714,15 @@ public partial class MainWindow : Window
 
     private void OpenFolderButton_Click(object sender, RoutedEventArgs e)
     {
-        if (Directory.Exists(_outputFolder))
+        var sessionPath = _downloader.CurrentSession?.DestinationPath;
+        var folderToOpen = !string.IsNullOrWhiteSpace(sessionPath) && Directory.Exists(sessionPath)
+            ? sessionPath
+            : _outputFolder;
+        if (Directory.Exists(folderToOpen))
         {
             Process.Start(new ProcessStartInfo
             {
-                FileName = _outputFolder,
+                FileName = folderToOpen,
                 UseShellExecute = true
             });
         }
@@ -733,6 +748,19 @@ public partial class MainWindow : Window
         {
             UrlTextBox.Text = Clipboard.GetText().Trim();
         }
+    }
+
+    private void SelectTorrentButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Choose a BitTorrent metadata file",
+            Filter = "Torrent files (*.torrent)|*.torrent",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog() == true)
+            UrlTextBox.Text = dialog.FileName;
     }
 
     private void RefreshAdaptersButton_Click(object sender, RoutedEventArgs e)
@@ -884,8 +912,10 @@ public partial class MainWindow : Window
                 ? $" ({string.Join(" + ", parts)})"
                 : "";
 
-            if (hasLauncherActivity)
-                GameBoostStreamsText.Text = $"• Monitoring {lastHost} activity";
+            if (hasLauncherActivity && hasReliableProgress)
+                GameBoostStreamsText.Text = $"• Verified download: {lastHost}";
+            else if (hasLauncherActivity)
+                GameBoostStreamsText.Text = $"• Possible {lastHost} activity · download not verified";
             else if (!string.IsNullOrEmpty(lastHost) && !lastHost.Equals("Ready", StringComparison.OrdinalIgnoreCase))
                 GameBoostStreamsText.Text = $"• {lastHost} detected · waiting for activity";
             else
@@ -946,7 +976,7 @@ public partial class MainWindow : Window
                             : "Waiting for progress";
                 double percent = canShowProgress ? Math.Clamp((double)gameBytes / gameSizeBytes * 100.0, 0.0, 100.0) : 0;
 
-                StatusBadgeTextBlock.Text = "LAUNCHER ACTIVITY";
+                StatusBadgeTextBlock.Text = canShowProgress ? "VERIFIED DOWNLOAD" : "UNVERIFIED ACTIVITY";
                 FileNameTextBlock.Text = $"Detected: {lastHost}";
                 FileSizeTextBlock.Text = canShowProgress
                     ? $"{DownloadSession.FormatBytes(gameBytes)} / {DownloadSession.FormatBytes(gameSizeBytes)}"
@@ -961,7 +991,7 @@ public partial class MainWindow : Window
 
                 TitleBarLiveStatusPanel.Visibility = Visibility.Visible;
                 TitleBarSpeedTextBlock.Text = speedText;
-                TitleBarStatusBadge.Text = "MONITORING";
+                TitleBarStatusBadge.Text = canShowProgress ? "VERIFIED DOWNLOAD" : "UNVERIFIED";
                 TitleBarProgressText.Text = canShowProgress
                     ? $"{lastHost} · {percent:F1}% · ETA {eta}"
                     : $"{lastHost} · adapter traffic {speedText} · progress unavailable";

@@ -22,11 +22,26 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Assign a unique Donut Boost build version
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content "Windows/Donut Boost/DonutBoost.csproj" -Raw
+          $baseVersion = [string]$project.Project.PropertyGroup.Version
+          if ($baseVersion -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid Donut Boost base version: $baseVersion" }
+          $buildVersion = "$baseVersion.$env:GITHUB_RUN_NUMBER"
+          "DONUT_BOOST_BUILD_VERSION=$buildVersion" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $manifestPath = "Website/boost-version.json"
+          $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+          $manifest.latestVersion = $buildVersion
+          $manifest | ConvertTo-Json -Depth 10 | Set-Content $manifestPath -Encoding utf8
+
       - name: Publish Donut Boost for Windows
         shell: pwsh
         run: |
-          dotnet publish "Windows/Donut Boost/DonutBoost.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:PublishTrimmed=false -o "Windows/Donut Boost/publish/win-x64"
+          dotnet publish "Windows/Donut Boost/DonutBoost.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:PublishTrimmed=false "-p:Version=$env:DONUT_BOOST_BUILD_VERSION" "-p:AssemblyVersion=$env:DONUT_BOOST_BUILD_VERSION" "-p:FileVersion=$env:DONUT_BOOST_BUILD_VERSION" "-p:InformationalVersion=$env:DONUT_BOOST_BUILD_VERSION" -o "Windows/Donut Boost/publish/win-x64"
           if ($LASTEXITCODE -ne 0) { throw "Donut Boost publish failed" }
+          $appVersion = (Get-Item "Windows/Donut Boost/publish/win-x64/DonutBoost.exe").VersionInfo.FileVersion
+          if ($appVersion -ne $env:DONUT_BOOST_BUILD_VERSION) { throw "App version $appVersion does not match $env:DONUT_BOOST_BUILD_VERSION" }
 
       - name: Install Inno Setup compiler
         shell: pwsh
@@ -46,13 +61,15 @@ jobs:
           $compiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           Push-Location "Windows/Donut Boost"
           try {
-            & $compiler /Qp installer.iss
+            & $compiler /Qp "/DMyAppVersion=$env:DONUT_BOOST_BUILD_VERSION" installer.iss
             if ($LASTEXITCODE -ne 0) { throw "Donut Boost installer build failed" }
           } finally {
             Pop-Location
           }
           $installer = "Windows/Donut Boost/installer/Install Donut Boost.exe"
           if (-not (Test-Path $installer)) { throw "Donut Boost installer output is missing" }
+          $installerVersion = (Get-Item $installer).VersionInfo.FileVersion
+          if ($installerVersion -ne $env:DONUT_BOOST_BUILD_VERSION) { throw "Installer version $installerVersion does not match $env:DONUT_BOOST_BUILD_VERSION" }
           Copy-Item $installer "_site/Install Donut Boost.exe" -Force
           $manifestPath = "_site/boost-version.json"
           $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json

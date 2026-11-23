@@ -8,6 +8,7 @@ public class DownloadChunk
     public long BytesDownloaded { get; set; }
     public bool IsCompleted { get; set; }
     public string? AssignedAdapterId { get; set; }
+    public int ConsecutiveFailures { get; set; }
 
     public long TotalBytes => EndOffset - StartOffset + 1;
 }

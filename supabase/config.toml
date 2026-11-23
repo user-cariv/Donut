@@ -2,3 +2,9 @@ project_id = "qigzqfntaokxnsfcejiy"
 
 [functions.submit-support]
 verify_jwt = false
+
+[functions.redeem-boost-license]
+verify_jwt = false
+
+[functions.issue-boost-license]
+verify_jwt = false

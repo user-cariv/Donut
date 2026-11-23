@@ -31,7 +31,7 @@ public static class WifiRoutePreferenceManager
               if (-not (Test-Path -LiteralPath $backup)) { exit 2 }
               $saved = Get-Content -LiteralPath $backup -Raw | ConvertFrom-Json
               foreach ($row in $saved) {
-                try { Set-NetIPInterface -InterfaceIndex ([uint32]$row.InterfaceIndex) -AddressFamily $row.AddressFamily -AutomaticMetric $row.AutomaticMetric -InterfaceMetric ([uint32]$row.InterfaceMetric) -PolicyStore ActiveStore -ErrorAction Stop } catch { }
+                Set-NetIPInterface -InterfaceIndex ([uint32]$row.InterfaceIndex) -AddressFamily $row.AddressFamily -AutomaticMetric $row.AutomaticMetric -InterfaceMetric ([uint32]$row.InterfaceMetric) -PolicyStore ActiveStore -ErrorAction Stop
               }
               Remove-Item -LiteralPath $backup -Force
               exit 0

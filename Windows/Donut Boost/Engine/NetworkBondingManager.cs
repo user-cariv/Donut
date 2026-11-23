@@ -353,7 +353,12 @@ public class NetworkBondingManager : IDisposable
                                 int netIndex = IPAddress.HostToNetworkOrder(ifIndex);
                                 socket.SetSocketOption(SocketOptionLevel.IP, (SocketOptionName)31, netIndex);
                             }
-                            catch { }
+                            catch (Exception ex)
+                            {
+                                throw new InvalidOperationException(
+                                    $"Windows could not bind a download connection to adapter '{adapter.Name}' (interface {ifIndex}). The connection was stopped to avoid silently using another network.",
+                                    ex);
+                            }
                         }
 
                         // Explicitly bind the socket to this adapter's IP address

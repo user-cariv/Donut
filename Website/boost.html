@@ -53,6 +53,7 @@
         <article><span>03</span><h3>Download together</h3><p>For eligible direct file links, view file progress and transfer speed while selected adapters fetch separate byte ranges.</p></article>
       </div>
       <p class="boost-note"><strong>In the app:</strong> choose Combine Both, Home Wi-Fi Only, or Mobile Data Only; set custom download speed limits (or uncapped); toggle individual connections; pause, resume, or cancel a download; and choose its save folder.</p>
+      <p class="boost-note"><strong>Torrents:</strong> paste a magnet link or choose a `.torrent` file. Donut Boost shows metadata-based size, verified completion progress, measured peer speed, and ETA. Torrent traffic follows the Windows default route; adapter bonding is currently available for supported direct HTTP downloads only. Port forwarding is disabled, and Donut Boost stops the torrent when it completes.</p>
       <p class="boost-note">Adapter rates are measured from Windows network counters and include all traffic on each adapter, not only Donut Boost. By default, Windows keeps its existing route. If USB tethering makes Windows switch away from home Wi-Fi, use <strong>Prefer Wi-Fi</strong> in the app; Windows asks for administrator approval and Donut saves the previous metrics so you can restore them. The preference lasts until restored or Windows restarts. This keeps Wi-Fi as the normal system route while Donut's own direct downloads can still use selected adapters. Game launchers are not routed or bonded by Donut Boost.</p>
       <p class="boost-note">Setup help: <a href="https://support.google.com/android/answer/9059108" target="_blank" rel="noopener">Android USB tethering</a> · <a href="https://support.apple.com/en-gb/111785" target="_blank" rel="noopener">iPhone Personal Hotspot on Windows</a>. Multi-connection speed depends on the server supporting byte-range downloads. Links without that support may not benefit from combined connections and can fail.</p>
       <article class="boost-game-card">
@@ -254,9 +255,10 @@
           <div class="boost-download-copy">
             <p class="hub-eyebrow">Windows · x64 · Official Installer</p>
             <h3>Donut Boost for Windows</h3>
-            <p>Download the self-contained Windows installer for full installation, desktop shortcuts, and clean uninstallation from Windows Settings. It measures network adapters without changing Windows routing.</p>
+            <p>Download the self-contained Windows installer for full installation, desktop shortcuts, and clean uninstallation from Windows Settings. It measures network adapters without changing Windows routing. The installer also registers Donut Boost as a link handler for the optional Chrome and Edge browser extension.</p>
             <p class="boost-license-note">Direct-download acceleration and launcher activity monitoring require an active pass. A 24-hour free pass is available once per device; redeem codes cover 1 day, 7 days, 1 month, or lifetime access.</p>
             <a class="hub-button" href="Install%20Donut%20Boost.exe" download style="margin-top:16px;">Download Windows Installer (Setup.exe) <span>↓</span></a>
+            <p class="boost-license-note">Optional browser handoff: <a href="Donut%20Boost%20Chrome%20Extension.zip" download>download the Chrome/Edge extension</a>, unzip it, then load the folder in your browser’s Extensions page with Developer mode enabled. Donut Boost must be installed first. Right-click a direct link to send it to the app; browser cookies are never transferred.</p>
           </div>
         </article>
         <article class="boost-download-card boost-macos-card" aria-label="Donut Boost for macOS, coming soon">

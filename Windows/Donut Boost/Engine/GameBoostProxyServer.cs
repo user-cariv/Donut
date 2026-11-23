@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -112,7 +111,9 @@ public class GameBoostProxyServer : IDisposable
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool GetProcessIoCounters(IntPtr hProcess, out IO_COUNTERS counters);
 
-    private static readonly ConcurrentDictionary<int, ulong> _processLastWriteBytes = new();
+    private readonly Dictionary<ProcessSampleKey, ulong> _processLastWriteBytes = new();
+
+    private readonly record struct ProcessSampleKey(int ProcessId, long StartedUtcTicks);
 
     private class LauncherCandidate
     {
@@ -121,100 +122,106 @@ public class GameBoostProxyServer : IDisposable
         public double CurrentWriteSpeedBps { get; set; }
     }
 
-    private static (string ActiveLauncher, string SummaryLabel) DetectLauncher(Process[] processes, double elapsedSec)
+    private static string? ResolveLauncher(Process process)
     {
-        var candidates = new List<LauncherCandidate>();
+        string name;
+        try { name = process.ProcessName; }
+        catch { return null; }
 
-        // 1. Steam
-        var steam = processes.Where(p => {
-            try { return p.ProcessName.Contains("steam", StringComparison.OrdinalIgnoreCase); }
-            catch { return false; }
-        }).ToList();
-        if (steam.Count > 0) candidates.Add(new LauncherCandidate { Name = "Steam", Processes = steam });
+        // Exact executable names avoid attributing unrelated Chromium helpers,
+        // games built with Unity, or every process named "Agent" to a launcher.
+        switch (name.ToLowerInvariant())
+        {
+            case "steam":
+            case "steamservice":
+            case "steamwebhelper":
+                return "Steam";
+            case "epicgameslauncher":
+            case "epicwebhelper":
+                return "Epic Games";
+            case "rockstarservice":
+            case "socialclubhelper":
+            case "launcherpatcher":
+                return "Rockstar Games";
+            case "launcher":
+                return ProcessPathContains(process, "Rockstar Games") ? "Rockstar Games" : null;
+            case "eadesktop":
+            case "eabackgroundservice":
+            case "ealocalhostsvc":
+            case "origin":
+            case "originwebhelperservice":
+                return "EA App";
+            case "battle.net":
+            case "blizzarderror":
+            case "agent":
+                return ProcessPathContains(process, "Battle.net") || ProcessPathContains(process, "Battle.net\\Agent")
+                    ? "Battle.net" : null;
+            case "upc":
+            case "ubisoftconnect":
+            case "uplaywebcore":
+                return "Ubisoft Connect";
+            case "riotclientservices":
+            case "riotclientux":
+            case "riotclientuxrender":
+            case "riotclientcrashhandler":
+            case "leagueclient":
+            case "leagueclientux":
+                return "Riot Client";
+            case "xboxpcapp":
+            case "xboxapp":
+            case "gamingservices":
+            case "gamingservicesnet":
+                return "Xbox App";
+            case "galaxyclient":
+            case "galaxyclientservice":
+                return "GOG Galaxy";
+            case "winstore.app":
+            case "winstore":
+            case "installagent":
+            case "appinstaller":
+                return "Microsoft Store";
+            case "unityhub":
+            case "unity hub":
+            case "unitypackagemanager":
+                return "Unity Hub";
+            default:
+                return null;
+        }
+    }
 
-        // 2. Epic Games
-        var epic = processes.Where(p => {
-            try { return p.ProcessName.Contains("Epic", StringComparison.OrdinalIgnoreCase) || p.ProcessName.Contains("UnrealCEF", StringComparison.OrdinalIgnoreCase); }
-            catch { return false; }
-        }).ToList();
-        if (epic.Count > 0) candidates.Add(new LauncherCandidate { Name = "Epic Games", Processes = epic });
+    private static bool ProcessPathContains(Process process, string fragment)
+    {
+        try
+        {
+            string? path = process.MainModule?.FileName;
+            return !string.IsNullOrWhiteSpace(path) && path.Contains(fragment, StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
+    }
 
-        // 3. Rockstar Games
-        var rockstar = processes.Where(p => {
-            try { return p.ProcessName.Contains("Rockstar", StringComparison.OrdinalIgnoreCase) || p.ProcessName.Contains("SocialClub", StringComparison.OrdinalIgnoreCase); }
-            catch { return false; }
-        }).ToList();
-        if (rockstar.Count > 0) candidates.Add(new LauncherCandidate { Name = "Rockstar Games", Processes = rockstar });
-
-        // 4. EA App / Origin
-        var ea = processes.Where(p => {
-            try { return p.ProcessName.StartsWith("EA", StringComparison.OrdinalIgnoreCase) || p.ProcessName.Contains("Link2EA", StringComparison.OrdinalIgnoreCase) || p.ProcessName.Contains("Origin", StringComparison.OrdinalIgnoreCase); }
-            catch { return false; }
-        }).ToList();
-        if (ea.Count > 0) candidates.Add(new LauncherCandidate { Name = "EA App", Processes = ea });
-
-        // 5. Battle.net
-        var bnet = processes.Where(p => {
-            try { return p.ProcessName.Contains("Battle.net", StringComparison.OrdinalIgnoreCase) || p.ProcessName.Contains("Agent", StringComparison.OrdinalIgnoreCase) || p.ProcessName.Contains("Blizzard", StringComparison.OrdinalIgnoreCase); }
-            catch { return false; }
-        }).ToList();
-        if (bnet.Count > 0) candidates.Add(new LauncherCandidate { Name = "Battle.net", Processes = bnet });
-
-        // 6. Ubisoft Connect
-        var ubi = processes.Where(p => {
-            try { return p.ProcessName.Contains("upc", StringComparison.OrdinalIgnoreCase) || p.ProcessName.Contains("Ubisoft", StringComparison.OrdinalIgnoreCase) || p.ProcessName.Contains("uplay", StringComparison.OrdinalIgnoreCase); }
-            catch { return false; }
-        }).ToList();
-        if (ubi.Count > 0) candidates.Add(new LauncherCandidate { Name = "Ubisoft Connect", Processes = ubi });
-
-        // 7. Riot Client
-        var riot = processes.Where(p => {
-            try { return p.ProcessName.Contains("Riot", StringComparison.OrdinalIgnoreCase) || 
-                         p.ProcessName.Contains("LeagueClient", StringComparison.OrdinalIgnoreCase) ||
-                         p.ProcessName.Contains("VALORANT", StringComparison.OrdinalIgnoreCase); }
-            catch { return false; }
-        }).ToList();
-        if (riot.Count > 0) candidates.Add(new LauncherCandidate { Name = "Riot Client", Processes = riot });
-
-        // 8. Xbox App
-        var xbox = processes.Where(p => {
-            try { return p.ProcessName.Contains("GamingServices", StringComparison.OrdinalIgnoreCase) || p.ProcessName.Contains("XboxApp", StringComparison.OrdinalIgnoreCase); }
-            catch { return false; }
-        }).ToList();
-        if (xbox.Count > 0) candidates.Add(new LauncherCandidate { Name = "Xbox App", Processes = xbox });
-
-        // 9. GOG Galaxy
-        var gog = processes.Where(p => {
-            try { return p.ProcessName.Contains("Galaxy", StringComparison.OrdinalIgnoreCase) || p.ProcessName.Contains("GOG", StringComparison.OrdinalIgnoreCase); }
-            catch { return false; }
-        }).ToList();
-        if (gog.Count > 0) candidates.Add(new LauncherCandidate { Name = "GOG Galaxy", Processes = gog });
-
-        // 10. Microsoft Store
-        var msStore = processes.Where(p => {
-            try { return p.ProcessName.Contains("WinStore", StringComparison.OrdinalIgnoreCase) || 
-                         p.ProcessName.Contains("DeliveryOptimization", StringComparison.OrdinalIgnoreCase) ||
-                         p.ProcessName.Contains("InstallAgent", StringComparison.OrdinalIgnoreCase) ||
-                         p.ProcessName.Contains("wsappx", StringComparison.OrdinalIgnoreCase); }
-            catch { return false; }
-        }).ToList();
-        if (msStore.Count > 0) candidates.Add(new LauncherCandidate { Name = "Microsoft Store", Processes = msStore });
-
-        // 11. Unity / Unity Hub
-        var unity = processes.Where(p => {
-            try { return p.ProcessName.Contains("UnityHub", StringComparison.OrdinalIgnoreCase) || 
-                         p.ProcessName.Equals("Unity", StringComparison.OrdinalIgnoreCase) ||
-                         p.ProcessName.Contains("UnityPackage", StringComparison.OrdinalIgnoreCase); }
-            catch { return false; }
-        }).ToList();
-        if (unity.Count > 0) candidates.Add(new LauncherCandidate { Name = "Unity", Processes = unity });
+    private (string ActiveLauncher, string SummaryLabel) DetectLauncher(Process[] processes, double elapsedSec)
+    {
+        var candidates = processes
+            .Select(process => (Process: process, Launcher: ResolveLauncher(process)))
+            .Where(item => item.Launcher != null)
+            .GroupBy(item => item.Launcher!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new LauncherCandidate
+            {
+                Name = group.Key,
+                Processes = group.Select(item => item.Process).ToList()
+            })
+            .ToList();
 
         if (candidates.Count == 0)
         {
+            _processLastWriteBytes.Clear();
             return ("", "Ready");
         }
 
-        // Measure disk write throughput for each running launcher process
+        var liveSamples = new HashSet<ProcessSampleKey>();
+
+        // Disk writes are only a launcher-activity heuristic. They are never
+        // treated as downloaded bytes or used to invent a game percentage.
         foreach (var c in candidates)
         {
             double totalWriteBps = 0;
@@ -222,12 +229,14 @@ public class GameBoostProxyServer : IDisposable
             {
                 try
                 {
+                    var sampleKey = new ProcessSampleKey(p.Id, p.StartTime.ToUniversalTime().Ticks);
+                    liveSamples.Add(sampleKey);
                     if (GetProcessIoCounters(p.Handle, out var io))
                     {
                         ulong curr = io.WriteTransferCount;
-                        if (_processLastWriteBytes.TryGetValue(p.Id, out ulong prev))
+                        if (_processLastWriteBytes.TryGetValue(sampleKey, out ulong prev))
                         {
-                            _processLastWriteBytes[p.Id] = curr;
+                            _processLastWriteBytes[sampleKey] = curr;
                             if (curr >= prev && elapsedSec > 0)
                             {
                                 totalWriteBps += (curr - prev) / elapsedSec;
@@ -235,7 +244,7 @@ public class GameBoostProxyServer : IDisposable
                         }
                         else
                         {
-                            _processLastWriteBytes[p.Id] = curr;
+                            _processLastWriteBytes[sampleKey] = curr;
                         }
                     }
                 }
@@ -243,6 +252,9 @@ public class GameBoostProxyServer : IDisposable
             }
             c.CurrentWriteSpeedBps = totalWriteBps;
         }
+
+        foreach (var staleSample in _processLastWriteBytes.Keys.Where(key => !liveSamples.Contains(key)).ToArray())
+            _processLastWriteBytes.Remove(staleSample);
 
         // The active downloading launcher is the one with highest disk write activity (minimum 50 KB/s)
         var activeDownloading = candidates
@@ -345,7 +357,7 @@ public class GameBoostProxyServer : IDisposable
                 double reportSpeed = totalInstantBps;
 
                 // Refresh Steam's verified transfer counters every three seconds.
-                if (_detectedGameSizeBytes <= 0 || sizeDetectionStopwatch.ElapsedMilliseconds >= 3000)
+                if (sizeDetectionStopwatch.ElapsedMilliseconds >= 3000)
                 {
                     sizeDetectionStopwatch.Restart();
                     if (_detectedLauncher == "Steam")
@@ -389,6 +401,7 @@ public class GameBoostProxyServer : IDisposable
             }
         }
     }
+
 
     private static (string GameName, long TotalBytes, long CurrentDownloaded) DetectSteamDownloadSize()
     {
@@ -521,18 +534,29 @@ public class GameBoostProxyServer : IDisposable
             var flagMatch = Regex.Match(content, @"""StateFlags""\s+""(\d+)""");
             if (flagMatch.Success && int.TryParse(flagMatch.Groups[1].Value, out int sf)) stateFlags = sf;
 
-            // StateFlags=4 means FullyInstalled. The old check treated that bit
-            // as active and returned stale, completed manifests. Require an
-            // actual pending download/staging state and use transfer counters,
-            // never installed size/depot size, for download ETA.
-            const int activeUpdateStates = 2 | 1024 | 2048 | 4096 | 8192 | 16384 | 32768 | 65536;
+            // StateFlags is a bitmask. Keep only update/download work states;
+            // UpdateRequired (2), FullyInstalled (4), uninstall/backup, and app
+            // running flags are not evidence of an active game download.
+            const int updateRunning = 256;
+            const int updatePaused = 512;
+            const int updateStarted = 1024;
+            const int validating = 131072;
+            const int addingFiles = 262144;
+            const int preallocating = 524288;
+            const int downloading = 1048576;
+            const int staging = 2097152;
+            const int committing = 4194304;
+            const int updateStopping = 8388608;
+            const int activeUpdateStates = updateRunning | updatePaused | updateStarted | validating |
+                addingFiles | preallocating | downloading | staging | committing | updateStopping;
             bool updateIsActive = (stateFlags & activeUpdateStates) != 0;
             long effectiveSize = bytesDownload;
             long currentProgress = Math.Min(bytesDownloaded, bytesDownload);
 
             bool isSteamworksPrerequisite = name.Contains("Steamworks Common Redistributables", StringComparison.OrdinalIgnoreCase) ||
                                             name.Contains("Redistributable", StringComparison.OrdinalIgnoreCase);
-            if (updateIsActive && !isSteamworksPrerequisite && effectiveSize > 0)
+            bool transferStillPending = bytesDownload > 0 && bytesDownloaded < bytesDownload;
+            if (updateIsActive && transferStillPending && !isSteamworksPrerequisite && effectiveSize > 0)
             {
                 return (string.IsNullOrEmpty(name) ? "Steam Game" : name, effectiveSize, currentProgress);
             }

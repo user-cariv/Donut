@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Security.Cryptography;
@@ -30,6 +29,8 @@ public class LicenseRecord
     public DateTime LastVerifiedUtc { get; set; }
     public long LastVerifiedTick { get; set; }
     public string HardwareId { get; set; } = string.Empty;
+    public string SignedEntitlement { get; set; } = string.Empty;
+    // Retained only so existing DPAPI records can be read during migration.
     public string Signature { get; set; } = string.Empty;
 }
 
@@ -72,22 +73,32 @@ public class LicenseInfo
 }
 
 /// <summary>
-/// Military-Grade Cryptographic License Manager.
-/// Features:
-/// 1. Hardware ID binding (MachineGuid + Motherboard + Windows SID)
-/// 2. Dispersed obfuscated master key (Zero plain-text secret strings in IL)
-/// 3. Anti-clock-rollback detection (Time-manipulation lockout)
-/// 4. Anti-debugging / Anti-tamper verification
-/// 5. Stealth dual-anchor trial persistence (Prevents trial resets)
-/// 6. Cryptographic session token verification in core download engine
+/// Verifies server-signed entitlements and binds them to this Windows profile's
+/// device identifier. The server remains the authority for issuance and revocation.
 /// </summary>
 public class LicenseManager
 {
     private const string Alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
     private readonly string _licenseFilePath;
-    private readonly string _stealthAnchorPath;
     private readonly string _hwid;
-    private bool _cloudLicenseVerified;
+    private const string LicenseKeyId = "2026-11";
+    private const string LicensePublicKey = """
+-----BEGIN PUBLIC KEY-----
+MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAxUKV5jni0ItfTJ72zE6H
+2BhJ/N3PRdapP5987I8j0WPsQWXO8RLlI7azc/KztneHk2GjI6m5/EJxLQN34JpE
+p+MIO+3XQwlhi8ytCh8mqIB1cAgMneLkRmQKfA0Kq+gUUzpGin4sjBHkM+ZTcU5a
+UuigoaKOhWAu6WZv1lgtnDHt+F+VyHZSdGLuXjiWRlxKv1i2EyW/O5iTyqZmPqIC
+bgbHrSuHfbD5nu51ypO+pGjr4PkizNOcPI0bqpu32DyjbTJGPqAM7VB5ks8XLUb4
+TZ2y0uooB6z9A6e6mTd81YGvoHP8rwnfqdoFYihMi+D+dQRgeDluqJsL29EeyIHz
+Zwxg8Qpykn27lqS5FrDEv+s5HkL9x7KoxjT/HdlHGK3eLhe9dI5IVI6phkuAXjFu
+7so0BNfGTpnhDezyMt4qlRINuGZ2W3/CbSOwLkcza07YVjh22nxAVWY4636gdERS
+tPRpdmdCnoXb0QekBsuClGx5pQzWtpw3lrr1pkQKjJ/VAgMBAAE=
+-----END PUBLIC KEY-----
+""";
+    private static readonly IReadOnlyDictionary<string, string> LicensePublicKeys = new Dictionary<string, string>
+    {
+        [LicenseKeyId] = LicensePublicKey
+    };
 
     public LicenseInfo CurrentLicense { get; private set; } = new() { IsActive = false };
 
@@ -98,32 +109,10 @@ public class LicenseManager
         string appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DonutBoost");
         Directory.CreateDirectory(appData);
         _licenseFilePath = Path.Combine(appData, "license.dat");
-        _stealthAnchorPath = Path.Combine(appData, ".sys_token.dat");
-
         LoadLicense();
     }
 
     public string MachineHwid => _hwid;
-
-    /// <summary>
-    /// Obfuscated Key Dispersal: Dynamically reconstructs the signing secret at runtime
-    /// via bit-rotation and XOR arithmetic. Zero string literals exist in compiled IL bytecode.
-    /// </summary>
-    private static byte[] GetDispersedKey()
-    {
-        byte[] encoded = new byte[]
-        {
-            0x1E, 0x35, 0x34, 0x2F, 0x2E, 0x18, 0x35, 0x35, 0x29, 0x2E, 0x77, 0x16,
-            0x33, 0x39, 0x3F, 0x34, 0x29, 0x3F, 0x11, 0x3F, 0x23, 0x77, 0x09, 0x3F,
-            0x39, 0x28, 0x3F, 0x2E, 0x77, 0x68, 0x6A, 0x68, 0x6C, 0x7B, 0x79, 0x7E, 0x70
-        };
-        byte[] key = new byte[encoded.Length];
-        for (int i = 0; i < encoded.Length; i++)
-        {
-            key[i] = (byte)(encoded[i] ^ 0x5A);
-        }
-        return key;
-    }
 
     /// <summary>
     /// Cryptographically validates the active license and guarantees core engine authorization.
@@ -133,50 +122,23 @@ public class LicenseManager
     {
         try
         {
-            if (!CurrentLicense.IsActive) return false;
-            if (!CheckAntiTamperIntegrity()) return false;
             if (!File.Exists(_licenseFilePath)) return false;
-
             byte[] encrypted = File.ReadAllBytes(_licenseFilePath);
             byte[] decrypted = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
             var record = JsonSerializer.Deserialize<LicenseRecord>(Encoding.UTF8.GetString(decrypted));
-            if (record == null) return false;
-
-            if (!string.Equals(record.HardwareId, _hwid, StringComparison.OrdinalIgnoreCase)) return false;
-            if (record.ExpiresAtUtc <= DateTime.UtcNow) return false;
-
-            // Verify HMAC signature
-            byte[] key = GetDispersedKey();
-            using var hmac = new HMACSHA256(key);
-
-            string cleanCode = (record.Code ?? "").ToUpper().Replace("-", "").Replace(" ", "").Trim();
-            byte[] payloadClean = Encoding.UTF8.GetBytes($"{cleanCode}|{record.HardwareId}|{record.ExpiresAtUtc:o}|{(int)record.Tier}");
-            string expectedSigClean = Convert.ToHexString(hmac.ComputeHash(payloadClean));
-
-            byte[] payloadRaw = Encoding.UTF8.GetBytes($"{record.Code}|{record.HardwareId}|{record.ExpiresAtUtc:o}|{(int)record.Tier}");
-            string expectedSigRaw = Convert.ToHexString(hmac.ComputeHash(payloadRaw));
-
-            bool signatureValid = string.Equals(record.Signature, expectedSigClean, StringComparison.OrdinalIgnoreCase)
-                   || string.Equals(record.Signature, expectedSigRaw, StringComparison.OrdinalIgnoreCase)
-                   || record.Tier == LicenseTier.FreeTrial;
-            return signatureValid && (record.Tier == LicenseTier.FreeTrial || _cloudLicenseVerified);
+            if (record == null || !ValidateEntitlement(record.SignedEntitlement, out var claim)) return false;
+            return string.Equals(claim.HardwareId, _hwid, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(record.HardwareId, _hwid, StringComparison.OrdinalIgnoreCase)
+                && claim.Tier == (int)record.Tier
+                && claim.ExpiresAtUtc == record.ExpiresAtUtc
+                && claim.ExpiresAtUtc > DateTime.UtcNow;
         }
-        catch
-        {
-            return false;
-        }
+        catch { return false; }
     }
-
     public LicenseInfo LoadLicense()
     {
         try
         {
-            if (!CheckAntiTamperIntegrity())
-            {
-                CurrentLicense = new LicenseInfo { IsActive = false, HardwareId = _hwid, StatusMessage = "Debugger or security anomaly detected." };
-                return CurrentLicense;
-            }
-
             if (!File.Exists(_licenseFilePath))
             {
                 CurrentLicense = new LicenseInfo { IsActive = false, HardwareId = _hwid, StatusMessage = "No license found. Enter a redeem code to unlock." };
@@ -232,6 +194,19 @@ public class LicenseManager
                 return CurrentLicense;
             }
 
+            if (!string.IsNullOrEmpty(record.SignedEntitlement))
+            {
+                if (!ValidateEntitlement(record.SignedEntitlement, out var claims)
+                    || !string.Equals(claims.HardwareId, _hwid, StringComparison.OrdinalIgnoreCase)
+                    || claims.Tier != (int)record.Tier
+                    || claims.ExpiresAtUtc != record.ExpiresAtUtc
+                    || claims.ExpiresAtUtc <= now)
+                {
+                    CurrentLicense = new LicenseInfo { IsActive = false, HardwareId = _hwid, StatusMessage = "The saved activation signature is invalid." };
+                    return CurrentLicense;
+                }
+            }
+
             // Update monotonic verification timestamp
             record.LastVerifiedUtc = now;
             record.LastVerifiedTick = Environment.TickCount64;
@@ -252,7 +227,9 @@ public class LicenseManager
                 ActivatedAtUtc = record.ActivatedAtUtc,
                 ExpiresAtUtc = record.ExpiresAtUtc,
                 HardwareId = _hwid,
-                StatusMessage = "License active and cryptographically verified."
+                StatusMessage = string.IsNullOrEmpty(record.SignedEntitlement)
+                    ? "Existing activation requires online verification."
+                    : "Server-signed activation is valid."
             };
             return CurrentLicense;
         }
@@ -268,6 +245,48 @@ public class LicenseManager
         Timeout = TimeSpan.FromSeconds(10)
     };
 
+    private sealed record EntitlementClaims(string HardwareId, int Tier, DateTime ActivatedAtUtc, DateTime ExpiresAtUtc, string Subject);
+
+    private static bool ValidateEntitlement(string token, out EntitlementClaims claims)
+    {
+        claims = default!;
+        try
+        {
+            string[] parts = token.Split('.');
+            if (parts.Length != 3) return false;
+            using var header = JsonDocument.Parse(DecodeBase64Url(parts[0]));
+            if (header.RootElement.GetProperty("alg").GetString() != "RS256") return false;
+            string keyId = header.RootElement.GetProperty("kid").GetString() ?? "";
+            if (!LicensePublicKeys.TryGetValue(keyId, out var publicKey)) return false;
+
+            byte[] signedBytes = Encoding.ASCII.GetBytes($"{parts[0]}.{parts[1]}");
+            byte[] signature = DecodeBase64Url(parts[2]);
+            using var rsa = RSA.Create();
+            rsa.ImportFromPem(publicKey);
+            if (!rsa.VerifyData(signedBytes, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)) return false;
+
+            using var payload = JsonDocument.Parse(DecodeBase64Url(parts[1]));
+            var root = payload.RootElement;
+            if (root.GetProperty("iss").GetString() != "donut-boost") return false;
+            string hardwareId = root.GetProperty("hwid").GetString() ?? "";
+            string subject = root.GetProperty("sub").GetString() ?? "";
+            int tier = root.GetProperty("tier").GetInt32();
+            DateTime activated = DateTime.Parse(root.GetProperty("activated_at").GetString()!, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal);
+            DateTime expires = DateTime.Parse(root.GetProperty("expires_at").GetString()!, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal);
+            if (hardwareId.Length is < 1 or > 128 || subject.Length == 0 || tier is < 1 or > 5 || expires <= activated) return false;
+            claims = new EntitlementClaims(hardwareId, tier, activated, expires, subject);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    private static byte[] DecodeBase64Url(string value)
+    {
+        string base64 = value.Replace('-', '+').Replace('_', '/');
+        base64 = base64.PadRight(base64.Length + ((4 - base64.Length % 4) % 4), '=');
+        return Convert.FromBase64String(base64);
+    }
+
     public (bool Success, string Message, LicenseInfo Info) RedeemCode(string rawCode)
     {
         return RedeemCodeAsync(rawCode).GetAwaiter().GetResult();
@@ -275,176 +294,93 @@ public class LicenseManager
 
     public async Task<(bool Success, string Message, LicenseInfo Info)> RedeemCodeAsync(string rawCode)
     {
-        if (string.IsNullOrWhiteSpace(rawCode))
-        {
-            return (false, "Please enter a valid redeem code.", CurrentLicense);
-        }
+        string cleaned = (rawCode ?? string.Empty).ToUpperInvariant().Replace("-", string.Empty).Replace(" ", string.Empty).Trim();
+        if (cleaned.Length != 16 || cleaned.Any(character => !Alphabet.Contains(character)))
+            return (false, "Enter a valid activation code.", CurrentLicense);
 
-        string cleaned = rawCode.ToUpper().Replace("-", "").Replace(" ", "").Trim();
-        if (cleaned.Length != 16)
-        {
-            return (false, "Redeem code must be 16 characters (e.g. XXXX-XXXX-XXXX-XXXX).", CurrentLicense);
-        }
-
-        byte[]? decoded = DecodeBase32(cleaned);
-        if (decoded == null || decoded.Length != 10)
-        {
-            return (false, "Invalid code format or invalid characters entered.", CurrentLicense);
-        }
-
-        // Cryptographic HMAC Verification
-        byte[] payload = new byte[5];
-        Array.Copy(decoded, 0, payload, 0, 5);
-
-        byte[] key = GetDispersedKey();
-        using var hmac = new HMACSHA256(key);
-        byte[] expectedHmac = hmac.ComputeHash(payload);
-
-        // Constant-time comparison to prevent timing attacks
-        int diff = 0;
-        for (int i = 0; i < 5; i++)
-        {
-            diff |= decoded[5 + i] ^ expectedHmac[i];
-        }
-
-        if (diff != 0)
-        {
-            return (false, "Invalid or unrecognized redeem code.", CurrentLicense);
-        }
-
-        // Determine Tier
-        byte tierByte = payload[2];
-        LicenseTier tier = tierByte switch
-        {
-            0x1A => LicenseTier.OneDay,
-            0x2B => LicenseTier.SevenDays,
-            0x3C => LicenseTier.OneMonth,
-            0x4D => LicenseTier.Lifetime,
-            _ => LicenseTier.None
-        };
-
-        if (tier == LicenseTier.None)
-        {
-            return (false, "Unrecognized license tier encoded in code.", CurrentLicense);
-        }
-
-        // -------------------------------------------------------------
-        // Global Cloud 1-Time Redemption Check (Supabase Backend)
-        // -------------------------------------------------------------
-        var cloudCheck = await ClaimCodeWithCloudAsync(cleaned, _hwid, (int)tier);
-        if (!cloudCheck.Success)
-        {
-            return (false, cloudCheck.Message, CurrentLicense);
-        }
+        var cloud = await ClaimCodeWithCloudAsync(cleaned, _hwid);
+        if (!cloud.Success || !cloud.ActivatedAtUtc.HasValue || !cloud.ExpiresAtUtc.HasValue || string.IsNullOrEmpty(cloud.Entitlement))
+            return (false, cloud.Message, CurrentLicense);
 
         DateTime now = DateTime.UtcNow;
-        DateTime activatedAt = cloudCheck.ActivatedAtUtc ?? now;
-        DateTime expires = cloudCheck.ExpiresAtUtc ?? (tier switch
-        {
-            LicenseTier.OneDay => now.AddDays(1),
-            LicenseTier.SevenDays => now.AddDays(7),
-            LicenseTier.OneMonth => now.AddDays(30),
-            LicenseTier.Lifetime => now.AddYears(100),
-            _ => now
-        });
-
-        // Create cryptographically signed hardware-bound license record
-        byte[] sigPayload = Encoding.UTF8.GetBytes($"{cleaned}|{_hwid}|{expires:o}|{(int)tier}");
-        string signature = Convert.ToHexString(hmac.ComputeHash(sigPayload));
-
         var record = new LicenseRecord
         {
-            Code = rawCode.Trim().ToUpper(),
-            Tier = tier,
-            ActivatedAtUtc = activatedAt,
-            ExpiresAtUtc = expires,
+            Code = cleaned,
+            Tier = cloud.Tier,
+            ActivatedAtUtc = cloud.ActivatedAtUtc.Value,
+            ExpiresAtUtc = cloud.ExpiresAtUtc.Value,
             LastVerifiedUtc = now,
             LastVerifiedTick = Environment.TickCount64,
             HardwareId = _hwid,
-            Signature = signature
+            SignedEntitlement = cloud.Entitlement
         };
-
         try
         {
-            string json = JsonSerializer.Serialize(record);
-            byte[] rawBytes = Encoding.UTF8.GetBytes(json);
-            byte[] encrypted = ProtectedData.Protect(rawBytes, null, DataProtectionScope.CurrentUser);
-            File.WriteAllBytes(_licenseFilePath, encrypted);
-
-            _cloudLicenseVerified = true;
+            byte[] raw = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(record));
+            File.WriteAllBytes(_licenseFilePath, ProtectedData.Protect(raw, null, DataProtectionScope.CurrentUser));
             LoadLicense();
-            if (!CurrentLicense.IsActive)
-            {
-                return (false, "This activation period has already expired and cannot be restarted.", CurrentLicense);
-            }
-            return (true, $"✓ Success! Activated {GetTierName(tier)}.", CurrentLicense);
-        }
-        catch (Exception ex)
-        {
-            return (false, $"Failed to store license on disk: {ex.Message}", CurrentLicense);
-        }
-    }
-
-    private async Task<(bool Success, string Message, DateTime? ActivatedAtUtc, DateTime? ExpiresAtUtc)> ClaimCodeWithCloudAsync(string cleanCode, string hwid, int tier, DateTime? activatedAtUtc = null, DateTime? expiresAtUtc = null)
-    {
-        try
-        {
-            using var sha = SHA256.Create();
-            string codeHash = Convert.ToHexString(sha.ComputeHash(Encoding.UTF8.GetBytes(cleanCode)));
-            string supabaseUrl = "https://qigzqfntaokxnsfcejiy.supabase.co/rest/v1/rpc/claim_donut_boost_code";
-            string anonKey = "sb_publishable_e4pO853gqnhrfzYp19XCNQ_h6DLr3a0";
-
-            var reqObj = new
-            {
-                p_code_hash = codeHash,
-                p_hwid = hwid,
-                p_tier = tier,
-                p_activated_at = activatedAtUtc,
-                p_expires_at = expiresAtUtc
-            };
-            using var req = new HttpRequestMessage(HttpMethod.Post, supabaseUrl);
-            req.Headers.Add("apikey", anonKey);
-            req.Content = new StringContent(JsonSerializer.Serialize(reqObj), Encoding.UTF8, "application/json");
-
-            using var resp = await _authClient.SendAsync(req);
-            if (!resp.IsSuccessStatusCode)
-            {
-                return (false, $"Donut could not verify this code with the licensing server (HTTP {(int)resp.StatusCode}). Please try again later.", null, null);
-            }
-
-            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
-            string status = doc.RootElement.TryGetProperty("status", out var statusValue) ? statusValue.GetString() ?? "" : "";
-            string message = doc.RootElement.TryGetProperty("message", out var messageValue) ? messageValue.GetString() ?? "" : "";
-            DateTime? activatedAt = ReadUtcDate(doc.RootElement, "activated_at");
-            DateTime? expiresAt = ReadUtcDate(doc.RootElement, "expires_at");
-
-            if (string.Equals(status, "SUCCESS", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(status, "RESTORE_SAME_DEVICE", StringComparison.OrdinalIgnoreCase))
-            {
-                if (!activatedAt.HasValue || !expiresAt.HasValue || expiresAt <= activatedAt)
-                {
-                    return (false, "The licensing server returned an invalid activation period. Please contact Donut support.", null, null);
-                }
-                return (true, message, activatedAt, expiresAt);
-            }
-
-            if (string.Equals(status, "ALREADY_CLAIMED", StringComparison.OrdinalIgnoreCase))
-                return (false, "This redeem code has already been activated on another device.", null, null);
-            if (string.Equals(status, "ALREADY_CLAIMED_THIS_DEVICE", StringComparison.OrdinalIgnoreCase))
-                return (false, "This redeem code was already used on this device and cannot restart or extend its pass.", null, null);
-
-            return (false, string.IsNullOrWhiteSpace(message) ? "The licensing server rejected this activation code." : message, null, null);
-        }
-        catch (HttpRequestException)
-        {
-            return (false, "An internet connection is required to verify and activate your redeem code.", null, null);
+            return CurrentLicense.IsActive
+                ? (true, $"Success! Activated {GetTierName(record.Tier)}.", CurrentLicense)
+                : (false, CurrentLicense.StatusMessage, CurrentLicense);
         }
         catch
         {
-            return (false, "Donut could not verify this code with the licensing server. Please try again later.", null, null);
+            return (false, "Could not securely save the activation on this device.", CurrentLicense);
         }
     }
 
+    private sealed record CloudClaimResult(bool Success, string Message, LicenseTier Tier, DateTime? ActivatedAtUtc, DateTime? ExpiresAtUtc, string Entitlement, bool Retryable = false);
+
+    private async Task<CloudClaimResult> ClaimCodeWithCloudAsync(string cleanCode, string hwid, bool trial = false, bool restore = false)
+    {
+        try
+        {
+            const string supabaseUrl = "https://qigzqfntaokxnsfcejiy.supabase.co/functions/v1/redeem-boost-license";
+            const string publicKey = "sb_publishable_e4pO853gqnhrfzYp19XCNQ_h6DLr3a0";
+            using var request = new HttpRequestMessage(HttpMethod.Post, supabaseUrl);
+            request.Headers.Add("apikey", publicKey);
+            request.Content = new StringContent(JsonSerializer.Serialize(new
+            {
+                operation = trial ? "trial" : restore ? "restore" : "redeem",
+                code = trial ? null : cleanCode,
+                hardwareId = hwid
+            }), Encoding.UTF8, "application/json");
+            using var response = await _authClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+                {
+                    try
+                    {
+                        using var errorDocument = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                        if (errorDocument.RootElement.TryGetProperty("code", out var code)
+                            && code.GetString() == "ACTIVATION_ALREADY_USED")
+                            return new(false, "This activation code has already been used and cannot be redeemed again. Contact Donut Support if you need help.", LicenseTier.None, null, null, "");
+                    }
+                    catch { }
+                }
+                return new(false, "The licensing server could not verify this activation. Please try again later.", LicenseTier.None, null, null, "",
+                    (int)response.StatusCode >= 500 || response.StatusCode is System.Net.HttpStatusCode.RequestTimeout or System.Net.HttpStatusCode.TooManyRequests);
+            }
+
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var root = document.RootElement;
+            string entitlement = root.GetProperty("entitlement").GetString() ?? "";
+            if (!ValidateEntitlement(entitlement, out var claims)
+                || !string.Equals(claims.HardwareId, hwid, StringComparison.OrdinalIgnoreCase)
+                || claims.ExpiresAtUtc <= DateTime.UtcNow)
+                return new(false, "The licensing server returned an invalid activation.", LicenseTier.None, null, null, "");
+            return new(true, "Activation verified.", (LicenseTier)claims.Tier, claims.ActivatedAtUtc, claims.ExpiresAtUtc, entitlement);
+        }
+        catch (HttpRequestException)
+        {
+            return new(false, "An internet connection is required to verify this activation.", LicenseTier.None, null, null, "", true);
+        }
+        catch
+        {
+            return new(false, "Donut could not verify this activation. Please try again later.", LicenseTier.None, null, null, "");
+        }
+    }
     private static DateTime? ReadUtcDate(JsonElement root, string propertyName)
     {
         if (!root.TryGetProperty(propertyName, out var value) || value.ValueKind != JsonValueKind.String)
@@ -458,52 +394,39 @@ public class LicenseManager
 
     public async Task<(bool Success, string Message)> VerifyStoredLicenseCloudAsync()
     {
-        _cloudLicenseVerified = false;
-        LicenseInfo current = LoadLicense();
-        if (!current.IsActive)
-            return (false, current.StatusMessage);
-        if (current.Tier == LicenseTier.FreeTrial)
-            return (true, current.StatusMessage);
-
         try
         {
+            if (!File.Exists(_licenseFilePath)) return (false, "No saved activation was found.");
             byte[] encrypted = File.ReadAllBytes(_licenseFilePath);
             byte[] decrypted = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
             var record = JsonSerializer.Deserialize<LicenseRecord>(Encoding.UTF8.GetString(decrypted));
-            if (record == null || record.Tier == LicenseTier.None || record.Tier == LicenseTier.FreeTrial)
+            if (record == null || record.Tier == LicenseTier.None || !string.Equals(record.HardwareId, _hwid, StringComparison.OrdinalIgnoreCase))
                 return (false, "The saved activation could not be verified.");
-
-            string cleanCode = (record.Code ?? string.Empty).ToUpperInvariant().Replace("-", string.Empty).Replace(" ", string.Empty).Trim();
-            var claim = await ClaimCodeWithCloudAsync(cleanCode, _hwid, (int)record.Tier, record.ActivatedAtUtc, record.ExpiresAtUtc);
-            if (!claim.Success || !claim.ActivatedAtUtc.HasValue || !claim.ExpiresAtUtc.HasValue)
+            bool trial = record.Tier == LicenseTier.FreeTrial;
+            string code = trial ? string.Empty : (record.Code ?? string.Empty).ToUpperInvariant().Replace("-", string.Empty).Replace(" ", string.Empty).Trim();
+            var claim = await ClaimCodeWithCloudAsync(code, _hwid, trial, restore: !trial);
+            if (!claim.Success || claim.Tier != record.Tier || !claim.ActivatedAtUtc.HasValue || !claim.ExpiresAtUtc.HasValue)
             {
-                CurrentLicense = new LicenseInfo
+                if (claim.Retryable
+                    && ValidateEntitlement(record.SignedEntitlement, out var cached)
+                    && string.Equals(cached.HardwareId, _hwid, StringComparison.OrdinalIgnoreCase)
+                    && cached.Tier == (int)record.Tier
+                    && cached.ExpiresAtUtc > DateTime.UtcNow)
                 {
-                    IsActive = false,
-                    Tier = record.Tier,
-                    TierDisplayName = GetTierName(record.Tier),
-                    ActivatedAtUtc = record.ActivatedAtUtc,
-                    ExpiresAtUtc = record.ExpiresAtUtc,
-                    HardwareId = _hwid,
-                    StatusMessage = claim.Message
-                };
+                    var offline = LoadLicense();
+                    return (offline.IsActive, offline.IsActive ? "Using the saved signed activation while the server is unavailable." : offline.StatusMessage);
+                }
+                CurrentLicense = new LicenseInfo { IsActive = false, Tier = record.Tier, TierDisplayName = GetTierName(record.Tier), HardwareId = _hwid, StatusMessage = claim.Message };
                 return (false, claim.Message);
             }
-
             record.ActivatedAtUtc = claim.ActivatedAtUtc.Value;
             record.ExpiresAtUtc = claim.ExpiresAtUtc.Value;
+            record.SignedEntitlement = claim.Entitlement;
             record.LastVerifiedUtc = DateTime.UtcNow;
             record.LastVerifiedTick = Environment.TickCount64;
-
-            byte[] key = GetDispersedKey();
-            using var hmac = new HMACSHA256(key);
-            byte[] payload = Encoding.UTF8.GetBytes($"{cleanCode}|{record.HardwareId}|{record.ExpiresAtUtc:o}|{(int)record.Tier}");
-            record.Signature = Convert.ToHexString(hmac.ComputeHash(payload));
-
             byte[] updated = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(record));
             File.WriteAllBytes(_licenseFilePath, ProtectedData.Protect(updated, null, DataProtectionScope.CurrentUser));
-            _cloudLicenseVerified = true;
-            current = LoadLicense();
+            var current = LoadLicense();
             return (current.IsActive, current.StatusMessage);
         }
         catch (HttpRequestException)
@@ -520,81 +443,29 @@ public class LicenseManager
         }
     }
 
-    public (bool Success, string Message, LicenseInfo Info) ActivateTrial()
+    public async Task<(bool Success, string Message, LicenseInfo Info)> ActivateTrialAsync()
     {
-        // The protected per-user file is the primary trial marker. Registry
-        // anchors are optional because managed Windows profiles can deny HKCU
-        // writes; that must never prevent the app from opening.
-        if (File.Exists(_stealthAnchorPath))
-        {
-            return (false, "A free trial has already been used on this device.", CurrentLicense);
-        }
-
-        // Preserve the registry marker check where the profile allows reads.
-        string trialKey = @"Software\DonutBoost";
-        try
-        {
-            using var key = Registry.CurrentUser.OpenSubKey(trialKey, writable: false);
-            if (key?.GetValue("TrialActivatedUtc") != null)
-            {
-                return (false, "A free trial has already been used on this device.", CurrentLicense);
-            }
-        }
-        catch (UnauthorizedAccessException) { }
-        catch (System.Security.SecurityException) { }
-
-        // 3. Check Stealth CLSID Anchor in Explorer Registry
-        try
-        {
-            string stealthClsidKey = @"Software\Microsoft\Windows\CurrentVersion\Explorer\CLSID\{D090B005-7A8E-4F23-9112-E59C778B5D01}";
-            using var clsidKey = Registry.CurrentUser.OpenSubKey(stealthClsidKey);
-            if (clsidKey?.GetValue("Anchor") != null)
-            {
-                return (false, "A free trial has already been used on this device.", CurrentLicense);
-            }
-        }
-        catch { }
-
-        DateTime now = DateTime.UtcNow;
-        DateTime expires = now.AddHours(24);
-
-        // The encrypted per-user file is authoritative. Best-effort registry
-        // anchors retain compatibility with earlier installs.
-        byte[] anchorBytes = ProtectedData.Protect(Encoding.UTF8.GetBytes($"TRIAL_{_hwid}_{now:o}"), null, DataProtectionScope.CurrentUser);
-        File.WriteAllBytes(_stealthAnchorPath, anchorBytes);
-
-        try
-        {
-            using var key = Registry.CurrentUser.CreateSubKey(trialKey);
-            key?.SetValue("TrialActivatedUtc", now.ToString("o"));
-
-            string stealthClsidKey = @"Software\Microsoft\Windows\CurrentVersion\Explorer\CLSID\{D090B005-7A8E-4F23-9112-E59C778B5D01}";
-            using var clsidKey = Registry.CurrentUser.CreateSubKey(stealthClsidKey);
-            clsidKey?.SetValue("Anchor", Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(_hwid))));
-        }
-        catch { }
-
+        var cloud = await ClaimCodeWithCloudAsync(string.Empty, _hwid, trial: true);
+        if (!cloud.Success || !cloud.ActivatedAtUtc.HasValue || !cloud.ExpiresAtUtc.HasValue)
+            return (false, cloud.Message, CurrentLicense);
         var record = new LicenseRecord
         {
-            Code = "FREE-TRIAL-PASS",
-            Tier = LicenseTier.FreeTrial,
-            ActivatedAtUtc = now,
-            ExpiresAtUtc = expires,
-            LastVerifiedUtc = now,
-            LastVerifiedTick = Environment.TickCount64,
-            HardwareId = _hwid,
-            Signature = "TRIAL"
+            Code = "FREE-TRIAL-PASS", Tier = LicenseTier.FreeTrial,
+            ActivatedAtUtc = cloud.ActivatedAtUtc.Value, ExpiresAtUtc = cloud.ExpiresAtUtc.Value,
+            LastVerifiedUtc = DateTime.UtcNow, LastVerifiedTick = Environment.TickCount64,
+            HardwareId = _hwid, SignedEntitlement = cloud.Entitlement
         };
-
-        string json = JsonSerializer.Serialize(record);
-        byte[] rawBytes = Encoding.UTF8.GetBytes(json);
-        byte[] encrypted = ProtectedData.Protect(rawBytes, null, DataProtectionScope.CurrentUser);
-        File.WriteAllBytes(_licenseFilePath, encrypted);
-
-        LoadLicense();
-        return (true, "✓ 24-Hour Free Pass activated! Enjoy unlimited speed bonding.", CurrentLicense);
+        try
+        {
+            byte[] raw = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(record));
+            File.WriteAllBytes(_licenseFilePath, ProtectedData.Protect(raw, null, DataProtectionScope.CurrentUser));
+            LoadLicense();
+            return CurrentLicense.IsActive
+                ? (true, "24-hour free trial activated.", CurrentLicense)
+                : (false, CurrentLicense.StatusMessage, CurrentLicense);
+        }
+        catch { return (false, "Could not securely save the trial on this device.", CurrentLicense); }
     }
-
     public static string GetTierName(LicenseTier tier) => tier switch
     {
         LicenseTier.OneDay => "1 Day Pass (24 Hours)",
@@ -604,19 +475,6 @@ public class LicenseManager
         LicenseTier.FreeTrial => "24-Hour Free Pass",
         _ => "None"
     };
-
-    private static bool CheckAntiTamperIntegrity()
-    {
-        try
-        {
-            if (Debugger.IsAttached || Debugger.IsLogging())
-            {
-                return false;
-            }
-        }
-        catch { }
-        return true;
-    }
 
     private static string GenerateMachineHwid()
     {
@@ -646,22 +504,4 @@ public class LicenseManager
         }
     }
 
-    private static byte[]? DecodeBase32(string input)
-    {
-        var bitString = new StringBuilder();
-        foreach (char c in input)
-        {
-            int idx = Alphabet.IndexOf(c);
-            if (idx < 0) return null;
-            bitString.Append(Convert.ToString(idx, 2).PadLeft(5, '0'));
-        }
-
-        int byteCount = bitString.Length / 8;
-        byte[] bytes = new byte[byteCount];
-        for (int i = 0; i < byteCount; i++)
-        {
-            bytes[i] = Convert.ToByte(bitString.ToString(i * 8, 8), 2);
-        }
-        return bytes;
-    }
 }

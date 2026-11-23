@@ -23,6 +23,7 @@
 .account-textarea{min-height:116px;resize:vertical;line-height:1.5}
 .account-input:focus,.account-textarea:focus{border-color:#ec8950;box-shadow:0 0 0 3px rgba(236,137,80,.15)}
 .account-primary,.account-google,.account-secondary{width:100%;min-height:47px;margin-top:14px;border:0;border-radius:13px;font:700 14px "DM Sans",sans-serif;cursor:pointer}
+.account-reset-link{display:block;margin:8px 0 0 auto;padding:4px 0;border:0;background:transparent;color:#a84c24;font:600 12px "DM Sans",sans-serif;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .account-primary{background:#211915;color:#fff}
 .account-google,.account-secondary{border:1px solid #e6d9cd;background:#fff;color:#29211c}
 .account-google{display:flex;align-items:center;justify-content:center;gap:10px}
@@ -80,6 +81,7 @@ body.dark-mode .account-tabs,:root[data-theme="dark"] .account-tabs{background:#
 body.dark-mode .account-tab[aria-selected="true"],:root[data-theme="dark"] .account-tab[aria-selected="true"]{background:#49382c;color:#fff}
 body.dark-mode .account-input,body.dark-mode .account-textarea,:root[data-theme="dark"] .account-input,:root[data-theme="dark"] .account-textarea{border-color:#514137;background:#171310;color:#f7f0ea}
 body.dark-mode .account-google,body.dark-mode .account-secondary,:root[data-theme="dark"] .account-google,:root[data-theme="dark"] .account-secondary{border-color:#514137;background:#30261f;color:#f7f0ea}
+body.dark-mode .account-reset-link,:root[data-theme="dark"] .account-reset-link{color:#ffad7c}
 body.dark-mode .account-user-card,:root[data-theme="dark"] .account-user-card{border-color:#514137;background:#30261f}
 @media(max-width:760px){.account-trigger{min-height:36px;padding:0 12px;font-size:12px}.account-dialog{padding:26px 21px;border-radius:24px}.account-layer{padding:12px}.hub-nav{display:grid;height:auto;min-height:0;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"brand actions" "links links";align-items:center;gap:8px 10px}.hub-nav>.hub-brand{grid-area:brand;min-width:0}.hub-nav nav{grid-area:links;display:flex;width:100%;justify-content:space-between;gap:8px;padding:5px 0 2px;font-size:12px}.hub-nav>.account-actions{grid-area:actions}}
 @media(max-width:760px){.hub-support{width:min(100% - 32px,560px);margin-bottom:80px;padding:25px;grid-template-columns:1fr;gap:20px}.hub-support-copy>p:last-child{max-width:unset}}

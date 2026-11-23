@@ -40,6 +40,14 @@ Traditional applications route all traffic through a single default gateway. **D
 - **Per-Adapter Metrics:** See real-time bandwidth contribution of each phone and Wi-Fi connection.
 - **Mid-Download Switching:** Dedicated ON/OFF toggles allow disabling or enabling adapters mid-stream without resetting progress.
 - **Resilient Recovery:** If a phone gets disconnected during a download, in-flight chunks are recovered and seamlessly redirected to the remaining active connections.
-- **Game Launcher Accelerator:** Built-in multi-interface proxy engine automatically bonds connections for Steam, Epic Games, EA App, Rockstar, and Battle.net without requiring URL pasting.
+- **Game Launcher Monitor:** Detects selected launcher process activity and reports physical-adapter receive rates. Verified game size/progress is currently available only when Steam exposes active manifest counters; other launchers do not have a verified progress provider in this build. Launcher traffic stays on Windows network routing and is not bonded by this monitor.
 - **System Proxy Safety:** Automatic registry proxy cleanup on application close, exit, or crash to ensure Windows network settings are never left modified.
 - **Native Windows WPF:** Built on .NET 8 for fast, smooth performance and low CPU/RAM usage.
+
+## Torrent downloads
+
+Paste a BitTorrent magnet link into the download field, or use the **Torrent** button to choose a .torrent file. An HTTP(S) link ending in .torrent is also accepted. Donut Boost reads torrent metadata for total size and uses verified torrent progress and the peer client's measured receive rate for progress and ETA. Torrent connections use the normal Windows network route in this version; HTTP range downloader adapter bonding does not apply to peer-to-peer traffic. Port forwarding is disabled, and the torrent is stopped when complete so Donut Boost does not seed after the download finishes.
+
+## Send links from Chrome or Edge
+
+The Windows installer registers the `donutboost://` link handler and includes the unpacked extension under `browser-extension\chrome`. In Chrome or Edge, open `chrome://extensions` or `edge://extensions`, enable Developer mode, choose **Load unpacked**, and select that folder inside the Donut Boost installation directory. Right-click a direct HTTP(S) download link or page and select **Send link to Donut Boost**. Donut Boost opens or focuses its window and fills the link for review; a download starts only when you press **BOOST DOWNLOAD**. The extension sends the selected URL only, not browser cookies or page contents, so links requiring a signed-in browser session may not work.

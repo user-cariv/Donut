@@ -2,12 +2,16 @@ $ErrorActionPreference = "Stop"
 
 $projectRef = "qigzqfntaokxnsfcejiy"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$cli = Join-Path $repoRoot ".tools\supabase\supabase.exe"
+$cliCandidates = @(
+  (Join-Path $repoRoot ".tools\supabase\supabase.exe"),
+  (Join-Path (Split-Path $repoRoot -Parent) "_deploy-icon-fix\.tools\supabase\supabase.exe")
+)
+$cli = $cliCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 $env:SUPABASE_HOME = Join-Path $repoRoot ".tools\supabase-home"
 $env:SUPABASE_NO_UPDATE_NOTIFIER = "1"
 
-if (-not (Test-Path -LiteralPath $cli)) {
-  throw "Supabase CLI is missing. Re-download it before deploying."
+if (-not $cli) {
+  throw "Supabase CLI is missing. Install it at .tools\supabase\supabase.exe before deploying."
 }
 
 function ConvertTo-TemporaryPlainText([Security.SecureString]$Secret) {

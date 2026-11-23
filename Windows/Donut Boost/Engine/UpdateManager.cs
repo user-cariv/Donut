@@ -54,7 +54,7 @@ public class UpdateManager
         get
         {
             var v = Assembly.GetExecutingAssembly().GetName().Version;
-            return v != null ? $"{v.Major}.{v.Minor}.{v.Build}" : "1.0.0";
+            return v?.ToString() ?? "1.0.0.0";
         }
     }
 
@@ -105,16 +105,12 @@ public class UpdateManager
 
     public static bool IsVersionNewer(string latestStr, string currentStr)
     {
-        try
+        if (Version.TryParse(NormalizeVersion(latestStr), out var latest)
+            && Version.TryParse(NormalizeVersion(currentStr), out var current))
         {
-            if (Version.TryParse(NormalizeVersion(latestStr), out var latest) &&
-                Version.TryParse(NormalizeVersion(currentStr), out var current))
-            {
-                return latest > current;
-            }
+            return latest > current;
         }
-        catch { }
-        return string.Compare(latestStr, currentStr, StringComparison.OrdinalIgnoreCase) > 0;
+        return false;
     }
 
     private static string NormalizeVersion(string v)
@@ -221,40 +217,22 @@ public class UpdateManager
             var psi = new ProcessStartInfo
             {
                 FileName = installerPath,
-                Arguments = "/SILENT /CLOSEAPPLICATIONS",
-                UseShellExecute = true
+                Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS /NORESTART",
+                UseShellExecute = true,
+                Verb = "runas"
             };
-            Process.Start(psi);
+            using var installer = Process.Start(psi);
+            if (installer == null) return false;
 
-            // Give the installer half a second to begin then close current app
-            _ = Task.Run(async () =>
-            {
-                await Task.Delay(600);
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    Application.Current.Shutdown();
-                });
-            });
-
+            // Starting with runas succeeds only after UAC is accepted. Exit now so
+            // Inno Setup can replace the running executable without a close race.
+            Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
             return true;
         }
         catch
         {
-            // Fallback: launch installer normally if silent fails
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = installerPath,
-                    UseShellExecute = true
-                });
-                Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
+            // Keep the running app open if elevation is declined or the installer fails.
+            return false;
         }
     }
 }

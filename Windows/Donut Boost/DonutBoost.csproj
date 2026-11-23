@@ -11,10 +11,14 @@
     <Company>Donut</Company>
     <Authors>Donut</Authors>
     <Description>Donut Boost - Network Monitor and Direct Downloader</Description>
-    <Version>1.0.8</Version>
+    <Version>1.0.10</Version>
     <ApplicationIcon>Assets\Donut.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MonoTorrent" Version="3.0.2" />
+  </ItemGroup>
 
   <ItemGroup>
     <None Remove="Assets\**" />

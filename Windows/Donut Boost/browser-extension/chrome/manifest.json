@@ -1,0 +1,8 @@
+{
+  "manifest_version": 3,
+  "name": "Send to Donut Boost",
+  "version": "1.0.0",
+  "description": "Send a direct download link or magnet link from Chrome to Donut Boost.",
+  "permissions": ["contextMenus"],
+  "background": { "service_worker": "service-worker.js" }
+}
