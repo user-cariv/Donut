@@ -2,7 +2,7 @@
   "latestVersion": "1.0.10",
   "minRequiredVersion": "1.0.0",
   "releaseDate": "2026-11-23",
-  "releaseNotes": "Improves in-app updates, keeps active downloads running while an update is available, and improves browser handoff and game monitor reliability.",
+  "releaseNotes": "Adds torrent peer bonding across enabled Wi-Fi and tethered connections, plus a saved download queue with optional start times.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }

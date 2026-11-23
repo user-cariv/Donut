@@ -1,8 +1,10 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using DonutBoost.Engine;
 using DonutBoost.Models;
 
@@ -21,6 +23,9 @@ public partial class MainWindow : Window
     private bool _checkingStartupLicense;
     private bool _windowClosed;
     private CancellationTokenSource? _updateCancellation;
+    private readonly DownloadQueue _downloadQueue = new();
+    private readonly DispatcherTimer _downloadQueueTimer = new() { Interval = TimeSpan.FromSeconds(2) };
+    private bool _runningTransfer;
 
     public MainWindow()
     {
@@ -48,6 +53,10 @@ public partial class MainWindow : Window
         _downloader.ProgressUpdated += OnProgressUpdated;
         _downloader.StatusChanged += OnStatusChanged;
         _downloader.LogReceived += OnLogReceived;
+        DownloadQueueList.ItemsSource = _downloadQueue.Entries;
+        try { _downloadQueue.Load(); }
+        catch (Exception ex) { OnLogReceived($"Could not load the download queue: {ex.Message}"); }
+        _downloadQueueTimer.Tick += DownloadQueueTimer_Tick;
 
         _gameBoostProxy.LogReceived += OnLogReceived;
         _gameBoostProxy.ProxyMetricsUpdated += OnGameProxyMetricsUpdated;
@@ -120,6 +129,7 @@ public partial class MainWindow : Window
                 GameBoostToggle.IsChecked = false;
 
             _licenseTimer.Start();
+            _downloadQueueTimer.Start();
             _ = Task.Run(async () =>
             {
                 await Task.Delay(2500);
@@ -629,7 +639,8 @@ public partial class MainWindow : Window
             bool isPaused = session.Status == DownloadStatus.Paused;
             bool isProbing = session.Status == DownloadStatus.Probing;
 
-            StartBoostButton.IsEnabled = !isRunning && !isPaused && !isProbing;
+            StartBoostButton.IsEnabled = !_runningTransfer && _updateCancellation == null && !_checkingStartupLicense
+                && !isRunning && !isPaused && !isProbing;
             PauseResumeButton.IsEnabled = isRunning || isPaused;
             PauseResumeButtonText.Text = isPaused ? "▶ Resume" : "⏸ Pause";
 
@@ -674,7 +685,7 @@ public partial class MainWindow : Window
 
     private async void StartBoostButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_checkingStartupLicense || _updateCancellation != null) return;
+        if (_checkingStartupLicense || _updateCancellation != null || _runningTransfer) return;
         if (!_licenseManager.CurrentLicense.IsActive)
         {
             ActivationOverlayGrid.Visibility = Visibility.Visible;
@@ -699,8 +710,121 @@ public partial class MainWindow : Window
             return;
         }
 
-        LogOutputTextBlock.Text = "Initializing multi-channel parallel engine...";
-        await _downloader.StartDownloadAsync(url, _outputFolder);
+        try { await RunDownloadAsync(url, _outputFolder); }
+        catch (Exception ex) { OnLogReceived($"Download error: {ex.Message}"); }
+    }
+
+    private async Task RunDownloadAsync(string input, string folder)
+    {
+        _runningTransfer = true;
+        StartBoostButton.IsEnabled = false;
+        BondTorrentsCheckBox.IsEnabled = false;
+        _downloader.BondTorrentPeers = BondTorrentsCheckBox.IsChecked == true;
+        LogOutputTextBlock.Text = "Preparing download...";
+        try { await _downloader.StartDownloadAsync(input, folder); }
+        finally
+        {
+            _runningTransfer = false;
+            if (!_windowClosed)
+            {
+                StartBoostButton.IsEnabled = _updateCancellation == null && !_checkingStartupLicense;
+                BondTorrentsCheckBox.IsEnabled = true;
+            }
+        }
+    }
+
+    private void QueueDownloadButton_Click(object sender, RoutedEventArgs e)
+    {
+        string input = UrlTextBox.Text.Trim();
+        bool validUrl = Uri.TryCreate(input, UriKind.Absolute, out var uri) &&
+            uri.Scheme is "http" or "https" or "magnet";
+        bool validFile = File.Exists(input) && Path.GetExtension(input).Equals(".torrent", StringComparison.OrdinalIgnoreCase);
+        if (!validUrl && !validFile)
+        {
+            MessageBox.Show("Enter a direct download link, a magnet link, or choose a .torrent file.", "Download queue");
+            return;
+        }
+
+        DateTimeOffset? scheduledAt = null;
+        string schedule = QueueTimeTextBox.Text.Trim();
+        if (schedule.Length > 0)
+        {
+            if (!TimeOnly.TryParseExact(schedule, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var startTime))
+            {
+                MessageBox.Show("Use a 24-hour time such as 22:30, or leave it blank to start when the queue is free.", "Download queue");
+                return;
+            }
+            var next = DateTime.Today + startTime.ToTimeSpan();
+            if (next <= DateTime.Now) next = next.AddDays(1);
+            scheduledAt = new DateTimeOffset(next);
+        }
+
+        string name = validFile ? Path.GetFileName(input) : uri!.Scheme == "magnet" ? "Magnet download"
+            : Path.GetFileName(uri.LocalPath.TrimEnd('/'));
+        if (string.IsNullOrWhiteSpace(name)) name = uri?.Host ?? "Download";
+        _downloadQueue.Entries.Add(new(Guid.NewGuid(), input, _outputFolder, name, scheduledAt, QueueEntryStatus.Queued));
+        QueueTimeTextBox.Clear();
+        SaveDownloadQueue();
+    }
+
+    private async void DownloadQueueTimer_Tick(object? sender, EventArgs e)
+    {
+        if (_windowClosed || _checkingStartupLicense || _updateCancellation != null || _runningTransfer ||
+            !_licenseManager.CurrentLicense.IsActive || _bondingManager.GetActiveEnabledAdapters().Count == 0) return;
+
+        var now = DateTimeOffset.Now;
+        var entry = _downloadQueue.Entries.FirstOrDefault(item => item.Status == QueueEntryStatus.Queued &&
+            (item.ScheduledAt == null || item.ScheduledAt <= now));
+        if (entry == null) return;
+
+        _downloadQueue.Replace(entry with { Status = QueueEntryStatus.Downloading });
+        SaveDownloadQueue();
+        try
+        {
+            await RunDownloadAsync(entry.Input, entry.Folder);
+            if (_windowClosed) return;
+            var session = _downloader.CurrentSession;
+            var status = session?.Status switch
+            {
+                DownloadStatus.Completed => QueueEntryStatus.Completed,
+                DownloadStatus.Cancelled => QueueEntryStatus.Cancelled,
+                _ => QueueEntryStatus.Failed
+            };
+            _downloadQueue.Replace(entry with
+            {
+                Name = string.IsNullOrEmpty(session?.FileName) ? entry.Name : session.FileName,
+                Status = status,
+                Detail = session?.ErrorMessage
+            });
+        }
+        catch (Exception ex)
+        {
+            if (_windowClosed) return;
+            _downloadQueue.Replace(entry with { Status = QueueEntryStatus.Failed, Detail = ex.Message });
+            OnLogReceived($"Queued download error: {ex.Message}");
+        }
+        SaveDownloadQueue();
+    }
+
+    private void RetryQueuedDownloadButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (DownloadQueueList.SelectedItem is not QueuedDownload entry ||
+            entry.Status is not (QueueEntryStatus.Failed or QueueEntryStatus.Cancelled or QueueEntryStatus.Interrupted)) return;
+        _downloadQueue.Replace(entry with { Status = QueueEntryStatus.Queued, ScheduledAt = null, Detail = null });
+        SaveDownloadQueue();
+    }
+
+    private void RemoveQueuedDownloadButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (DownloadQueueList.SelectedItem is not QueuedDownload entry || entry.Status == QueueEntryStatus.Downloading) return;
+        _downloadQueue.Entries.Remove(entry);
+        SaveDownloadQueue();
+    }
+
+    private void SaveDownloadQueue()
+    {
+        try { _downloadQueue.Save(); }
+        catch (Exception ex) { OnLogReceived($"Could not save the download queue: {ex.Message}"); }
     }
 
     private void PauseResumeButton_Click(object sender, RoutedEventArgs e)
@@ -1103,7 +1227,7 @@ public partial class MainWindow : Window
         if (_availableUpdate == null || _updateCancellation != null) return;
 
         UpdateProgressPanel.Visibility = Visibility.Visible;
-        if (_downloader.CurrentSession?.Status is DownloadStatus.Probing or DownloadStatus.Downloading or DownloadStatus.Paused)
+        if (_runningTransfer)
         {
             UpdateProgressPercentText.Text = "Finish or cancel the active download before updating.";
             return;
@@ -1194,6 +1318,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _windowClosed = true;
+        _downloadQueueTimer.Stop();
         _updateCancellation?.Cancel();
         _autoUpdateTimer?.Stop();
         _licenseTimer?.Stop();

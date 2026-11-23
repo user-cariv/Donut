@@ -214,6 +214,7 @@
                             <RowDefinition Height="Auto"/> <!-- Row 1: Bonding Mode Segmented Control -->
                             <RowDefinition Height="Auto"/> <!-- Row 2: Bandwidth Speed Limiter (Home Wi-Fi Only) -->
                             <RowDefinition Height="Auto"/> <!-- Row 3: Destination Folder -->
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <!-- Row 0: URL Field + Action Buttons -->
@@ -243,7 +244,7 @@
                                 </StackPanel>
                             </Button>
 
-                            <Button Grid.Column="2" Click="SelectTorrentButton_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="8,0,0,0" ToolTip="Choose a .torrent file. Torrent peer traffic uses the Windows default network route.">
+                            <Button Grid.Column="2" Click="SelectTorrentButton_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="8,0,0,0" ToolTip="Choose a .torrent file">
                                 <TextBlock Text="Torrent"/>
                             </Button>
 
@@ -342,6 +343,9 @@
                                 <TextBlock Text="Change..." FontSize="11"/>
                             </Button>
                         </Grid>
+                        <CheckBox x:Name="BondTorrentsCheckBox" Grid.Row="4" Content="Combine connections for torrent peers"
+                                  IsChecked="True" Foreground="{StaticResource TextSecondaryBrush}" Margin="4,10,0,0"
+                                  ToolTip="Use enabled adapters for outgoing torrent peers. Tracker and DHT discovery may follow Windows routing. Clear this for incoming peers and HTTP web seeds."/>
                     </Grid>
                 </Border>
 
@@ -534,6 +538,28 @@
                         <TextBlock x:Name="LogOutputTextBlock" Text="Ready. Adapter speeds show measured network receive traffic." FontSize="10.5" FontFamily="Consolas" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
                                     </ScrollViewer>
                                 </Border>
+                                <TextBlock Text="Download queue" Margin="0,16,0,8" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                <WrapPanel Margin="0,0,0,8">
+                                    <TextBlock Text="Start at (optional, HH:mm)" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,8,0"/>
+                                    <TextBox x:Name="QueueTimeTextBox" Width="62" Padding="4" Margin="0,0,8,0"
+                                             Background="#121214" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <Button Content="Add to queue" Click="QueueDownloadButton_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                                </WrapPanel>
+                                <ListBox x:Name="DownloadQueueList" MaxHeight="174" Background="#121214"
+                                         Foreground="{StaticResource TextPrimaryBrush}" BorderThickness="0">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="4,3" ToolTip="{Binding Detail}">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <WrapPanel Margin="0,8,0,0">
+                                    <Button Content="Retry selected" Click="RetryQueuedDownloadButton_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0"/>
+                                    <Button Content="Remove selected" Click="RemoveQueuedDownloadButton_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                                </WrapPanel>
                             </StackPanel>
                         </Border>
                     </Grid>
@@ -556,7 +582,7 @@
                                 <TextBlock x:Name="AdapterCountTextBlock" Grid.Column="1" Text="0 Detected" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
                             </Grid>
 
-                            <TextBlock Grid.Row="1" Text="Live receive rates include all Windows traffic. The switches control Donut downloads only. Donut downloaded shows the bytes this app saved on each adapter." FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                            <TextBlock Grid.Row="1" Text="Live receive rates include all Windows traffic. The switches control direct downloads and bonded torrent peers. Donut received shows bytes read through each adapter." FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,0,0,10"/>
 
                             <!-- Adapters List -->
                             <ItemsControl Grid.Row="2" x:Name="AdaptersItemsControl">
@@ -593,7 +619,7 @@
                                                 <!-- Speed & Apple iOS Toggle Switch -->
                                                 <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="8,0,0,0">
                                                     <TextBlock Text="{Binding DisplaySpeed}" FontWeight="Bold" FontSize="14" Foreground="{StaticResource SuccessBrush}" HorizontalAlignment="Right"/>
-                                                    <TextBlock Text="{Binding FormattedTotalBytes, StringFormat='Donut downloaded: {0}'}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Right" Margin="0,1,0,3"/>
+                                                    <TextBlock Text="{Binding FormattedTotalBytes, StringFormat='Donut received: {0}'}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Right" Margin="0,1,0,3"/>
                                                     <ToggleButton IsChecked="{Binding IsEnabled, Mode=TwoWay}"
                                                                   Style="{StaticResource ModernToggleSwitchStyle}"
                                                                   Click="AdapterToggle_Click"

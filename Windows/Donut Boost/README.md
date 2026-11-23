@@ -46,7 +46,11 @@ Traditional applications route all traffic through a single default gateway. **D
 
 ## Torrent downloads
 
-Paste a BitTorrent magnet link into the download field, or use the **Torrent** button to choose a .torrent file. An HTTP(S) link ending in .torrent is also accepted. Donut Boost reads torrent metadata for total size and uses verified torrent progress and the peer client's measured receive rate for progress and ETA. Torrent connections use the normal Windows network route in this version; HTTP range downloader adapter bonding does not apply to peer-to-peer traffic. Port forwarding is disabled, and the torrent is stopped when complete so Donut Boost does not seed after the download finishes.
+Paste a BitTorrent magnet link into the download field, or use **Torrent** to choose a `.torrent` file. An HTTP(S) link ending in `.torrent` also works. **Combine connections for torrent peers** assigns outgoing TCP peers to enabled adapters and closes their connections when an adapter is switched off. Tracker and DHT discovery may use the Windows route. Clear the option before starting for the original Windows routing, incoming peers, and HTTP web seeds. Donut Boost shows verified progress and stops the torrent when it completes.
+
+## Download queue
+
+Use **Add to queue** for a direct link, magnet link, or torrent file. Leave the time blank to start when the current download finishes, or enter a local time in `HH:mm` format. Scheduled downloads start while the app is open. The queue and its history are saved locally. After an interruption, **Retry selected** restarts a direct transfer or rechecks the partial torrent data.
 
 ## Send links from Chrome or Edge
 

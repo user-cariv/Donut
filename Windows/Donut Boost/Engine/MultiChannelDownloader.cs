@@ -28,6 +28,7 @@ public class MultiChannelDownloader
 
     public DownloadSession? CurrentSession => _currentSession;
     public bool IsPaused => _isPaused;
+    public bool BondTorrentPeers { get; set; } = true;
     public BandwidthThrottler Throttler => _throttler;
 
     public event Action<DownloadSession>? ProgressUpdated;
@@ -291,11 +292,33 @@ public class MultiChannelDownloader
         Directory.CreateDirectory(torrentSavePath);
         var cacheDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Donut", "TorrentCache");
         Directory.CreateDirectory(cacheDirectory);
-        _torrentEngine = new ClientEngine(new EngineSettingsBuilder
+        foreach (var adapter in _bondingManager.Adapters)
+            adapter.TotalBytesDownloaded = 0;
+
+        int nextAdapter = -1;
+        IReadOnlyList<NetworkAdapterInfo> GetPeerAdapters()
+        {
+            var adapters = _bondingManager.GetActiveEnabledAdapters();
+            if (adapters.Count < 2) return adapters;
+            int first = (int)((uint)Interlocked.Increment(ref nextAdapter) % (uint)adapters.Count);
+            return adapters.Skip(first).Concat(adapters.Take(first)).ToArray();
+        }
+        var factories = Factories.Default
+            .WithPeerConnectionCreator("ipv4", uri => new TorrentPeerConnection(uri, GetPeerAdapters, _throttler, token))
+            .WithPeerConnectionCreator("ipv6", uri => new TorrentPeerConnection(uri, GetPeerAdapters, _throttler, token));
+        bool bondPeers = BondTorrentPeers;
+        var settings = new EngineSettingsBuilder
         {
             CacheDirectory = cacheDirectory,
             AllowPortForwarding = false
-        }.ToSettings());
+        };
+        if (bondPeers)
+        {
+            // Incoming connections and HTTP web seeds do not use the peer connection factory.
+            settings.ListenEndPoints.Clear();
+            settings.WebSeedSpeedTrigger = 0;
+        }
+        _torrentEngine = new ClientEngine(settings.ToSettings(), bondPeers ? factories : Factories.Default);
 
         try
         {
@@ -352,7 +375,8 @@ public class MultiChannelDownloader
             session.DestinationPath = torrentSavePath;
             session.Status = DownloadStatus.Downloading;
             StatusChanged?.Invoke(session);
-            LogReceived?.Invoke($"Torrent ready: {session.FileName} | verified payload size: {session.FormattedTotalSize} | peer connections use the Windows network route.");
+            string route = bondPeers ? "peer connections use enabled Donut adapters" : "peer connections use the Windows route";
+            LogReceived?.Invoke($"Torrent ready: {session.FileName} | verified payload size: {session.FormattedTotalSize} | {route}.");
 
             while (!token.IsCancellationRequested && !_torrentManager.Complete)
             {

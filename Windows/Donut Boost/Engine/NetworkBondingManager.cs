@@ -346,13 +346,10 @@ public class NetworkBondingManager : IDisposable
                         int ifIndex = isIPv6 ? adapter.IPv6InterfaceIndex : adapter.InterfaceIndex;
                         if (localIp == null || ifIndex <= 0) continue;
 
-                        var socket = new Socket(target.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                        Socket? socket = null;
                         try
                         {
-                            // Winsock's IPv6 option uses host order and the IPv4 option uses network order.
-                            socket.SetSocketOption(isIPv6 ? SocketOptionLevel.IPv6 : SocketOptionLevel.IP,
-                                (SocketOptionName)31, isIPv6 ? ifIndex : IPAddress.HostToNetworkOrder(ifIndex));
-                            socket.Bind(new IPEndPoint(localIp, 0));
+                            socket = CreateBoundSocket(localIp, ifIndex);
                             using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                             attempt.CancelAfter(TimeSpan.FromSeconds(3));
                             await socket.ConnectAsync(target, context.DnsEndPoint.Port, attempt.Token);
@@ -361,12 +358,12 @@ public class NetworkBondingManager : IDisposable
                         catch (Exception ex) when (!cancellationToken.IsCancellationRequested &&
                             ex is SocketException or OperationCanceledException)
                         {
-                            socket.Dispose();
+                            socket?.Dispose();
                             lastError = ex;
                         }
                         catch
                         {
-                            socket.Dispose();
+                            socket?.Dispose();
                             throw;
                         }
                     }
@@ -387,6 +384,25 @@ public class NetworkBondingManager : IDisposable
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
             return client;
         });
+    }
+
+    internal static Socket CreateBoundSocket(IPAddress localIp, int interfaceIndex)
+    {
+        var socket = new Socket(localIp.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        try
+        {
+            bool isIPv6 = localIp.AddressFamily == AddressFamily.InterNetworkV6;
+            // Winsock expects the IPv4 index in network byte order and the IPv6 index in host order.
+            socket.SetSocketOption(isIPv6 ? SocketOptionLevel.IPv6 : SocketOptionLevel.IP,
+                (SocketOptionName)31, isIPv6 ? interfaceIndex : IPAddress.HostToNetworkOrder(interfaceIndex));
+            socket.Bind(new IPEndPoint(localIp, 0));
+            return socket;
+        }
+        catch
+        {
+            socket.Dispose();
+            throw;
+        }
     }
 
     public List<NetworkAdapterInfo> GetActiveEnabledAdapters()
