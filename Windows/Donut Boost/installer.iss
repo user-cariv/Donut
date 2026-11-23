@@ -20,6 +20,7 @@ AppUpdatesURL={#MyAppURL}
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription=Donut Boost - Network Monitor and Direct Downloader
 VersionInfoProductName={#MyAppName}
+VersionInfoVersion={#MyAppVersion}
 VersionInfoTextVersion={#MyAppVersion}
 SetupIconFile=Assets\Donut.ico
 DefaultDirName={autopf}\Donut Boost
