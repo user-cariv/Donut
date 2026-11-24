@@ -240,9 +240,10 @@ tPRpdmdCnoXb0QekBsuClGx5pQzWtpw3lrr1pkQKjJ/VAgMBAAE=
         }
     }
 
-    private static readonly HttpClient _authClient = new()
+    private static readonly HttpClient _authClient = new(new SocketsHttpHandler { AllowAutoRedirect = false })
     {
-        Timeout = TimeSpan.FromSeconds(10)
+        Timeout = TimeSpan.FromSeconds(10),
+        MaxResponseContentBufferSize = 32 * 1024
     };
 
     private sealed record EntitlementClaims(string HardwareId, int Tier, DateTime ActivatedAtUtc, DateTime ExpiresAtUtc, string Subject);

@@ -110,9 +110,11 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.WebResourceRequest;
 import android.webkit.PermissionRequest;
 
 public class MainActivity extends Activity {
+    private static final String APP_URL = "file:///android_asset/www/index.html";
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
     private final static int FILECHOOSER_RESULTCODE = 101;
@@ -128,10 +130,10 @@ public class MainActivity extends Activity {
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
-        settings.setAllowFileAccess(true);
+        settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(true);
         settings.setAllowFileAccessFromFileURLs(true);
-        settings.setAllowUniversalAccessFromFileURLs(true);
+        settings.setAllowUniversalAccessFromFileURLs(false);
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(true);
         settings.setBuiltInZoomControls(false);
@@ -139,26 +141,32 @@ public class MainActivity extends Activity {
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
-            public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                if (url.startsWith("file://") || url.startsWith("blob:") || url.startsWith("data:")) {
-                    return false;
-                }
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                Uri url = request.getUrl();
+                String scheme = url.getScheme();
+                if ("file".equals(scheme)) return !isAppPage(url);
+                if ("blob".equals(scheme) || "data".equals(scheme)) return false;
+                if (!request.isForMainFrame() || (!"https".equals(scheme) && !"http".equals(scheme))) return true;
                 try {
-                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                    startActivity(intent);
-                    return true;
-                } catch (Exception e) {
-                    return false;
-                }
+                    startActivity(new Intent(Intent.ACTION_VIEW, url));
+                } catch (android.content.ActivityNotFoundException ignored) { }
+                return true;
             }
         });
 
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    request.grant(request.getResources());
+                String currentUrl = webView.getUrl();
+                if (currentUrl != null && isAppPage(Uri.parse(currentUrl)) && "file".equals(request.getOrigin().getScheme())) {
+                    for (String resource : request.getResources()) {
+                        if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) {
+                            request.grant(new String[] { PermissionRequest.RESOURCE_VIDEO_CAPTURE });
+                            return;
+                        }
+                    }
                 }
+                request.deny();
             }
 
             @Override
@@ -185,7 +193,12 @@ public class MainActivity extends Activity {
             }
         });
 
-        webView.loadUrl("file:///android_asset/www/index.html");
+        webView.loadUrl(APP_URL);
+    }
+
+    private static boolean isAppPage(Uri url) {
+        return "file".equals(url.getScheme()) && android.text.TextUtils.isEmpty(url.getAuthority())
+            && "/android_asset/www/index.html".equals(url.getPath());
     }
 
     @Override

@@ -198,7 +198,7 @@ public class MultiChannelDownloader
                 session.FileName = Path.GetFileName(destinationPath);
                 try
                 {
-                    if (totalSize > 0)
+                    if (supportsRanges && totalSize > 0)
                         _fileStream.SetLength(totalSize);
                     MarkInternetDownload(destinationPath);
                 }
@@ -242,6 +242,7 @@ public class MultiChannelDownloader
             }
             else
             {
+                CloseDownloadFile();
                 session.Status = DownloadStatus.Completed;
                 StatusChanged?.Invoke(session);
                 LogReceived?.Invoke($"✓ Download completed successfully! File saved to {session.DestinationPath}");
@@ -264,14 +265,19 @@ public class MultiChannelDownloader
         }
         finally
         {
-            lock (_fileLock)
-            {
-                _fileStream?.Flush();
-                _fileStream?.Dispose();
-                _fileStream = null;
-            }
-            _cts?.Dispose();
-            _cts = null;
+            try { CloseDownloadFile(); }
+            catch (IOException ex) { LogReceived?.Invoke($"Could not finish writing the partial file: {ex.Message}"); }
+            finally { Interlocked.Exchange(ref _cts, null)?.Dispose(); }
+        }
+    }
+
+    private void CloseDownloadFile()
+    {
+        lock (_fileLock)
+        {
+            var file = _fileStream;
+            _fileStream = null;
+            file?.Dispose();
         }
     }
 
@@ -782,7 +788,7 @@ public class MultiChannelDownloader
         }
 
         var contentRange = response.Content.Headers.ContentRange;
-        if (contentRange?.From != startFrom || contentRange.To is null || contentRange.To > chunk.EndOffset ||
+        if (contentRange?.Unit != "bytes" || contentRange.From != startFrom || contentRange.To is null || contentRange.To < startFrom || contentRange.To > chunk.EndOffset ||
             (session.TotalBytes > 0 && contentRange.Length != session.TotalBytes) ||
             (response.Content.Headers.ContentLength.HasValue &&
              response.Content.Headers.ContentLength.Value != contentRange.To.Value - contentRange.From.Value + 1))
@@ -896,28 +902,33 @@ public class MultiChannelDownloader
                 response.EnsureSuccessStatusCode();
 
                 long requestedOffset = session.DownloadedBytes;
-                if (requestedOffset > 0)
+                long? responseEnd;
+                if (response.StatusCode == System.Net.HttpStatusCode.PartialContent)
                 {
                     var contentRange = response.Content.Headers.ContentRange;
-                    if (response.StatusCode != System.Net.HttpStatusCode.PartialContent || contentRange?.From != requestedOffset)
-                    {
-                        throw new InvalidOperationException("This server cannot resume the interrupted single-stream download safely. The partial file was not extended.");
-                    }
-                    if (contentRange.Length.HasValue && session.TotalBytes > 0 && contentRange.Length.Value != session.TotalBytes)
-                    {
-                        throw new InvalidOperationException("Server returned a different file size while resuming; refusing to corrupt the partial file.");
-                    }
+                    if (contentRange is not { Unit: "bytes", From: long from, To: long to, Length: long total }
+                        || from != requestedOffset || to < from || to >= total
+                        || (requestedOffset > 0 && session.TotalBytes > 0 && total != session.TotalBytes)
+                        || (response.Content.Headers.ContentLength is long length && length != to - from + 1))
+                        throw new InvalidDataException("The server returned an incompatible byte range. The partial file was not extended.");
+
+                    session.TotalBytes = total;
+                    responseEnd = to;
                 }
-                else if (response.StatusCode == System.Net.HttpStatusCode.PartialContent && response.Content.Headers.ContentRange?.Length is long rangedLength)
+                else if (requestedOffset > 0)
                 {
-                    session.TotalBytes = rangedLength;
+                    throw new InvalidDataException("This server cannot resume the interrupted single-stream download safely. The partial file was not extended.");
                 }
-                else if (response.Content.Headers.ContentLength is long responseLength)
+                else if (response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
-                    session.TotalBytes = responseLength;
+                    session.TotalBytes = response.Content.Headers.ContentLength ?? -1;
+                    responseEnd = session.TotalBytes >= 0 ? session.TotalBytes - 1 : null;
                 }
+                else
+                    throw new InvalidDataException("The server did not return a downloadable file.");
 
                 using var contentStream = await response.Content.ReadAsStreamAsync(transferToken);
+                using var readTimeout = CancellationTokenSource.CreateLinkedTokenSource(transferToken);
                 byte[] buffer = new byte[256 * 1024]; // 256 KB high-throughput buffer for 300+ Mbps 5G & gigabit streams
                 int bytesRead;
                 var stopwatch = Stopwatch.StartNew();
@@ -929,8 +940,12 @@ public class MultiChannelDownloader
                     // the range probe cannot be expected to accept a resumed GET.
                     while (_isPaused)
                         await Task.Delay(200, transferToken);
-                    bytesRead = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), transferToken);
+                    readTimeout.CancelAfter(TimeSpan.FromSeconds(20));
+                    bytesRead = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), readTimeout.Token);
+                    readTimeout.CancelAfter(Timeout.InfiniteTimeSpan);
                     if (bytesRead == 0) break;
+                    if (responseEnd is long end && bytesRead > end - session.DownloadedBytes + 1)
+                        throw new InvalidDataException("The server sent more bytes than it advertised.");
                     lock (_fileLock)
                     {
                         transferToken.ThrowIfCancellationRequested();
@@ -989,7 +1004,7 @@ public class MultiChannelDownloader
             }
             catch (Exception ex)
             {
-                if (ex is InvalidOperationException && ex.Message.StartsWith("This server cannot resume", StringComparison.Ordinal))
+                if (ex is InvalidDataException)
                     throw;
                 if (!_isPaused && !token.IsCancellationRequested)
                 {
@@ -1063,7 +1078,7 @@ public class MultiChannelDownloader
             rangeReq.Headers.Range = new RangeHeaderValue(0, 0);
             using var rangeRes = await client.SendAsync(rangeReq, HttpCompletionOption.ResponseHeadersRead, rangeTimeout.Token);
             if (rangeRes.StatusCode == System.Net.HttpStatusCode.PartialContent &&
-                rangeRes.Content.Headers.ContentRange is { From: 0, To: 0, Length: > 0 } range)
+                rangeRes.Content.Headers.ContentRange is { Unit: "bytes", From: 0, To: 0, Length: > 0 } range)
                 return (GetFileName(rangeRes, fileName), range.Length.Value, true, true);
 
             if (rangeRes.StatusCode == System.Net.HttpStatusCode.OK)
@@ -1134,6 +1149,7 @@ public class MultiChannelDownloader
             ProgressUpdated?.Invoke(_currentSession);
             LogReceived?.Invoke("🛑 Download cancelled by user.");
         }
-        _cts?.Cancel();
+        try { _cts?.Cancel(); }
+        catch (ObjectDisposedException) { } // The transfer finished during cancellation.
     }
 }

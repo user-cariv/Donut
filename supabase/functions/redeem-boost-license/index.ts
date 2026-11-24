@@ -171,7 +171,10 @@ Deno.serve(async (request) => {
       expires_at: new Date(expiresMs).toISOString(),
       iat: Math.floor(Date.now() / 1000),
     });
-    return Response.json({ entitlement, tier, activatedAt: new Date(activatedMs).toISOString(), expiresAt: new Date(expiresMs).toISOString() });
+    return Response.json(
+      { entitlement, tier, activatedAt: new Date(activatedMs).toISOString(), expiresAt: new Date(expiresMs).toISOString() },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
     if (error instanceof LicenseRequestError) return Response.json({ error: error.message }, { status: error.status });
     // Log only a stage label, not client data, codes, hardware IDs, or database details.
