@@ -153,6 +153,7 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
         return value.Contains("Apple Mobile", StringComparison.OrdinalIgnoreCase) ||
                value.Contains("iPhone", StringComparison.OrdinalIgnoreCase) ||
                value.Contains("RNDIS", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("Remote NDIS", StringComparison.OrdinalIgnoreCase) ||
                value.Contains("Android", StringComparison.OrdinalIgnoreCase) ||
                value.Contains("Samsung", StringComparison.OrdinalIgnoreCase) ||
                value.Contains("Pixel", StringComparison.OrdinalIgnoreCase) ||

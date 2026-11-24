@@ -2,7 +2,7 @@
   "latestVersion": "1.0.11",
   "minRequiredVersion": "1.0.0",
   "releaseDate": "2026-11-24",
-  "releaseNotes": "Donut Boost stays in the Windows notification area when you close the dashboard. The System Log now shows which network links System merge can use and whether they have carried data. Restart Donut Boost to finish applying the update.",
+  "releaseNotes": "USB phone tethers that use Remote NDIS now appear as mobile data adapters. Restart Donut Boost to finish applying the update.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }
