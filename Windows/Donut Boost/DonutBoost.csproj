@@ -11,7 +11,7 @@
     <Company>Donut</Company>
     <Authors>Donut</Authors>
     <Description>Donut Boost - Network Monitor and Direct Downloader</Description>
-    <Version>1.0.10</Version>
+    <Version>1.0.11</Version>
     <ApplicationIcon>Assets\Donut.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
@@ -26,4 +26,8 @@
     <Resource Include="Assets\**" />
     <Resource Include="photos\**" />
   </ItemGroup>
+
+  <Target Name="VerifyWpfRuntime" AfterTargets="Publish" Condition="'$(SelfContained)' == 'true'">
+    <Error Condition="!Exists('$(PublishDir)Accessibility.dll')" Text="The self-contained WPF runtime is missing Accessibility.dll, which is required to open tooltips." />
+  </Target>
 </Project>

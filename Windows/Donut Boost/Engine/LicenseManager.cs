@@ -292,13 +292,16 @@ tPRpdmdCnoXb0QekBsuClGx5pQzWtpw3lrr1pkQKjJ/VAgMBAAE=
         return RedeemCodeAsync(rawCode).GetAwaiter().GetResult();
     }
 
-    public async Task<(bool Success, string Message, LicenseInfo Info)> RedeemCodeAsync(string rawCode)
+    public async Task<(bool Success, string Message, LicenseInfo Info)> RedeemCodeAsync(
+        string rawCode, Func<bool>? confirmRestore = null)
     {
         string cleaned = (rawCode ?? string.Empty).ToUpperInvariant().Replace("-", string.Empty).Replace(" ", string.Empty).Trim();
         if (cleaned.Length != 16 || cleaned.Any(character => !Alphabet.Contains(character)))
             return (false, "Enter a valid activation code.", CurrentLicense);
 
         var cloud = await ClaimCodeWithCloudAsync(cleaned, _hwid);
+        if (cloud.CanRestore && confirmRestore?.Invoke() == true)
+            cloud = await ClaimCodeWithCloudAsync(cleaned, _hwid, restore: true);
         if (!cloud.Success || !cloud.ActivatedAtUtc.HasValue || !cloud.ExpiresAtUtc.HasValue || string.IsNullOrEmpty(cloud.Entitlement))
             return (false, cloud.Message, CurrentLicense);
 
@@ -329,7 +332,7 @@ tPRpdmdCnoXb0QekBsuClGx5pQzWtpw3lrr1pkQKjJ/VAgMBAAE=
         }
     }
 
-    private sealed record CloudClaimResult(bool Success, string Message, LicenseTier Tier, DateTime? ActivatedAtUtc, DateTime? ExpiresAtUtc, string Entitlement, bool Retryable = false);
+    private sealed record CloudClaimResult(bool Success, string Message, LicenseTier Tier, DateTime? ActivatedAtUtc, DateTime? ExpiresAtUtc, string Entitlement, bool Retryable = false, bool CanRestore = false);
 
     private async Task<CloudClaimResult> ClaimCodeWithCloudAsync(string cleanCode, string hwid, bool trial = false, bool restore = false)
     {
@@ -355,7 +358,7 @@ tPRpdmdCnoXb0QekBsuClGx5pQzWtpw3lrr1pkQKjJ/VAgMBAAE=
                         using var errorDocument = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
                         if (errorDocument.RootElement.TryGetProperty("code", out var code)
                             && code.GetString() == "ACTIVATION_ALREADY_USED")
-                            return new(false, "This activation code has already been used and cannot be redeemed again. Contact Donut Support if you need help.", LicenseTier.None, null, null, "");
+                            return new(false, "This code has already been activated on this device.", LicenseTier.None, null, null, "", CanRestore: true);
                     }
                     catch { }
                 }
@@ -369,7 +372,7 @@ tPRpdmdCnoXb0QekBsuClGx5pQzWtpw3lrr1pkQKjJ/VAgMBAAE=
             if (!ValidateEntitlement(entitlement, out var claims)
                 || !string.Equals(claims.HardwareId, hwid, StringComparison.OrdinalIgnoreCase)
                 || claims.ExpiresAtUtc <= DateTime.UtcNow)
-                return new(false, "The licensing server returned an invalid activation.", LicenseTier.None, null, null, "");
+                return new(false, "This build could not verify the server's signed activation. Contact Donut Support for help restoring this code.", LicenseTier.None, null, null, "");
             return new(true, "Activation verified.", (LicenseTier)claims.Tier, claims.ActivatedAtUtc, claims.ExpiresAtUtc, entitlement);
         }
         catch (HttpRequestException)

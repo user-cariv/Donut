@@ -1,6 +1,6 @@
 #define MyAppName "Donut Boost"
 #ifndef MyAppVersion
-  #define MyAppVersion "1.0.10"
+  #define MyAppVersion "1.0.11"
 #endif
 #define MyAppPublisher "Donut"
 #define MyAppURL "https://user-cariv.github.io/Donut/boost.html"
@@ -47,7 +47,7 @@ UninstallDisplayIcon={app}\{#MyAppExeName}
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"
 
 [Files]
-Source: "publish\{#Runtime}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.old,*.old.*,*.pdb"
+Source: "publish\{#Runtime}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs uninsrestartdelete; Excludes: "*.old,*.old.*,*.pdb"
 ; Keep the brand icon available for the Start Menu and desktop shortcuts.
 Source: "Assets\Donut.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "browser-extension\chrome\*"; DestDir: "{app}\browser-extension\chrome"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -61,6 +61,8 @@ Root: HKA; Subkey: "Software\Classes\donutboost"; ValueType: string; ValueName: 
 Root: HKA; Subkey: "Software\Classes\donutboost"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
 Root: HKA; Subkey: "Software\Classes\donutboost\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"
 Root: HKA; Subkey: "Software\Classes\donutboost\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
+Root: HKCU; Subkey: "Software\DonutBoost"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Explorer\CLSID\{{D090B005-7A8E-4F23-9112-E59C778B5D01}"; ValueName: "Anchor"; Flags: uninsdeletevalue uninsdeletekeyifempty
 
 [Run]
 ; Run the app with the signed-in user's normal privileges after setup.
@@ -69,7 +71,31 @@ Filename: "{app}\{#MyAppExeName}"; Description: "Launch Donut Boost"; Flags: she
 Filename: "{app}\{#MyAppExeName}"; Flags: shellexec runasoriginaluser nowait; Check: WizardSilent
 
 [UninstallDelete]
-; Completely remove application directory on uninstall
-Type: filesandordirs; Name: "{app}"
+; Inno removes installed files and its own executable from the install folder.
+Type: files; Name: "{app}\DonutBoost.exe.old*"
+Type: files; Name: "{app}\DonutBoost.dll.old*"
+Type: files; Name: "{userprograms}\Donut Boost.lnk"
+Type: files; Name: "{userdesktop}\Donut Boost.lnk"
 Type: filesandordirs; Name: "{localappdata}\DonutBoost"
 Type: filesandordirs; Name: "{userappdata}\DonutBoost"
+Type: filesandordirs; Name: "{localappdata}\Donut\TorrentCache"
+Type: filesandordirs; Name: "{localappdata}\Temp\DonutBoost_Update"
+
+[Code]
+function InitializeUninstall(): Boolean;
+begin
+  Result := False;
+  if CheckForMutexes('DonutBoost_SingleInstance_AppMutex') then
+  begin
+    if not UninstallSilent then
+      MsgBox('Close Donut Boost and run the uninstaller again.', mbInformation, MB_OK);
+    Exit;
+  end;
+  if FileExists(ExpandConstant('{localappdata}\DonutBoost\network-route-metrics.json')) then
+  begin
+    if not UninstallSilent then
+      MsgBox('Open Donut Boost and select Restore route settings before uninstalling.', mbInformation, MB_OK);
+    Exit;
+  end;
+  Result := True;
+end;

@@ -215,7 +215,12 @@ public partial class MainWindow : Window
         ActivationStatusTextBlock.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(251, 191, 36));
         ActivationStatusTextBlock.Visibility = Visibility.Visible;
 
-        var result = await _licenseManager.RedeemCodeAsync(code);
+        RedeemCodeButton.IsEnabled = false;
+        var result = await _licenseManager.RedeemCodeAsync(code, () => !_windowClosed &&
+            MessageBox.Show(this, "Restore this device's existing activation with its original expiry?",
+                "Restore Donut Boost activation", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes);
+        if (_windowClosed) return;
+        RedeemCodeButton.IsEnabled = true;
         if (result.Success)
         {
             ActivationStatusTextBlock.Text = result.Message;

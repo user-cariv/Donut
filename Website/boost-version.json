@@ -1,8 +1,8 @@
 {
-  "latestVersion": "1.0.10",
+  "latestVersion": "1.0.11",
   "minRequiredVersion": "1.0.0",
-  "releaseDate": "2026-11-23",
-  "releaseNotes": "Hardens installer verification and Windows handling of downloaded files. The bundled Chrome and Edge extension stays up to date with in-app releases.",
+  "releaseDate": "2026-11-24",
+  "releaseNotes": "Improves Windows uninstall cleanup and adds a way to restore an existing activation on the same device.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }

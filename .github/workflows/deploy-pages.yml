@@ -144,6 +144,8 @@ jobs:
           $updatePath = "updates/$env:DONUT_BOOST_BUILD_VERSION"
           New-Item -ItemType Directory -Path "_site/$updatePath" -Force | Out-Null
           Copy-Item $installer "_site/$updatePath/Install Donut Boost.exe" -Force
+          (Get-Content $boostPage -Raw).Replace('href="Install%20Donut%20Boost.exe"', "href=`"$updatePath/Install%20Donut%20Boost.exe`"") |
+            Set-Content $boostPage -Encoding utf8
           $manifestPath = "_site/boost-version.json"
           $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
           $manifest.latestVersion = $env:DONUT_BOOST_BUILD_VERSION
