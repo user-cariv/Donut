@@ -66,6 +66,7 @@
 .boost-download > h2 { margin: 0 0 20px; font-size: clamp(2rem, 4.6vw, 3.375rem); }
 .boost-download-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .boost-download-card h3 { margin: 0; font-size: clamp(1.35rem, 2.5vw, 1.875rem); letter-spacing: -.045em; }
+.boost-download-card h3 + .boost-download-actions { margin-top: 12px; }
 .boost-download-card .hub-eyebrow { margin: 0 0 7px; }
 .boost-download-note { margin: 10px 0 14px; color: var(--hub-muted); font-size: .9375rem; line-height: 1.6; }
 .boost-macos-icon { display: grid; place-items: center; border-radius: 24%; color: #fff; background: #271d23; font-size: 1.75rem; }
