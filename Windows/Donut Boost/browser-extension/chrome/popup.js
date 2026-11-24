@@ -7,7 +7,8 @@ form.addEventListener("submit", async event => {
   submit.disabled = true;
   feedback.textContent = "Opening Donut Boost…";
   try {
-    await sendToDonutBoost(document.getElementById("download-link").value);
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    await sendToDonutBoost(document.getElementById("download-link").value, tab?.id);
     feedback.textContent = "Review the link in Donut Boost and click Boost Download.";
   } catch (error) {
     feedback.textContent = error.message;

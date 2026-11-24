@@ -19,13 +19,13 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
-chrome.contextMenus.onClicked.addListener(async (info) => {
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const value = info.menuItemId === MENU_LINK ? info.linkUrl
     : info.menuItemId === MENU_PAGE ? info.pageUrl : null;
   if (!value || !/^(https?:\/\/|magnet:)/i.test(value)) return;
 
   try {
-    await sendToDonutBoost(value);
+    await sendToDonutBoost(value, tab?.id);
   } catch (error) {
     console.warn(error.message);
   }
