@@ -53,8 +53,8 @@
       <button class="account-close" type="button" aria-label="Close account dialog">×</button>
       <p class="account-eyebrow">Your Donut account</p>
       <h2 class="account-title" id="account-title">One account, every Donut.</h2>
-      <p class="account-copy">Save your place and keep future purchases together in one Donut account.</p>
-      <p class="account-preview-note">Sign in with your Donut account email and password. Your account follows you across Donut pages.</p>
+      <p class="account-copy">Use your Donut account across all Donut pages.</p>
+      <p class="account-preview-note"></p>
       <div class="account-tabs" role="tablist" aria-label="Account options">
         <button class="account-tab" id="account-tab-signin" type="button" role="tab" aria-selected="true" aria-controls="account-panel-signin">Sign in</button>
         <button class="account-tab" id="account-tab-create" type="button" role="tab" aria-selected="false" aria-controls="account-panel-create">Create account</button>
@@ -66,7 +66,7 @@
           <label class="account-label" for="account-password-signin">Password</label>
           <input class="account-input" id="account-password-signin" name="password" type="password" autocomplete="current-password" required>
           <button class="account-reset-link" type="button" data-reset-password>Forgot password?</button>
-          <button class="account-primary" type="submit">Continue with email</button>
+          <button class="account-primary" type="submit">Sign in</button>
           <p class="account-message" aria-live="polite"></p>
         </form>
       </div>
@@ -168,8 +168,8 @@
     layer.querySelector(".account-user-card")?.remove();
     layer.querySelector(".account-secondary")?.remove();
     layer.querySelector(".account-title").textContent = "One account, every Donut.";
-    layer.querySelector(".account-copy").textContent = "Save your place and keep future purchases together in one Donut account.";
-    layer.querySelector(".account-preview-note").textContent = "Sign in with your Donut account email and password. Your account follows you across Donut pages.";
+    layer.querySelector(".account-copy").textContent = "Use your Donut account across all Donut pages.";
+    layer.querySelector(".account-preview-note").textContent = "";
     layer.querySelector(".account-tabs").hidden = false;
     panels.forEach((panel) => { panel.hidden = panel.id !== "account-panel-signin"; });
   };
