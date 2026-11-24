@@ -553,13 +553,28 @@
                                     <Button Content="Add to queue" Click="QueueDownloadButton_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                                 </WrapPanel>
                                 <ListBox x:Name="DownloadQueueList" MaxHeight="174" Background="#121214"
-                                         Foreground="{StaticResource TextPrimaryBrush}" BorderThickness="0">
+                                         Foreground="{StaticResource TextPrimaryBrush}" BorderThickness="0"
+                                         SelectionMode="Multiple" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem">
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                        </Style>
+                                    </ListBox.ItemContainerStyle>
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
-                                            <StackPanel Margin="4,3" ToolTip="{Binding Detail}">
-                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
-                                            </StackPanel>
+                                            <Grid Background="Transparent" Margin="4,3" ToolTip="{Binding Detail}">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <CheckBox VerticalAlignment="Center" Margin="0,0,8,0"
+                                                          Focusable="False" IsHitTestVisible="False"
+                                                          IsChecked="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}, Mode=OneWay}"/>
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                                </StackPanel>
+                                            </Grid>
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
                                 </ListBox>

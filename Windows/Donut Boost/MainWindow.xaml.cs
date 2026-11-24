@@ -830,16 +830,23 @@ public partial class MainWindow : Window
 
     private void RetryQueuedDownloadButton_Click(object sender, RoutedEventArgs e)
     {
-        if (DownloadQueueList.SelectedItem is not QueuedDownload entry ||
-            entry.Status is not (QueueEntryStatus.Failed or QueueEntryStatus.Cancelled or QueueEntryStatus.Interrupted)) return;
-        _downloadQueue.Replace(entry with { Status = QueueEntryStatus.Queued, ScheduledAt = null, Detail = null });
+        var entries = DownloadQueueList.SelectedItems.OfType<QueuedDownload>()
+            .Where(entry => entry.Status is QueueEntryStatus.Failed or QueueEntryStatus.Cancelled or QueueEntryStatus.Interrupted)
+            .ToArray();
+        if (entries.Length == 0) return;
+        foreach (var entry in entries)
+            _downloadQueue.Replace(entry with { Status = QueueEntryStatus.Queued, ScheduledAt = null, Detail = null });
         SaveDownloadQueue();
     }
 
     private void RemoveQueuedDownloadButton_Click(object sender, RoutedEventArgs e)
     {
-        if (DownloadQueueList.SelectedItem is not QueuedDownload entry || entry.Status == QueueEntryStatus.Downloading) return;
-        _downloadQueue.Entries.Remove(entry);
+        var entries = DownloadQueueList.SelectedItems.OfType<QueuedDownload>()
+            .Where(entry => entry.Status != QueueEntryStatus.Downloading)
+            .ToArray();
+        if (entries.Length == 0) return;
+        foreach (var entry in entries)
+            _downloadQueue.Entries.Remove(entry);
         SaveDownloadQueue();
     }
 
