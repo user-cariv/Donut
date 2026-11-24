@@ -108,6 +108,8 @@ func run() (runErr error) {
 	done := make(chan struct{})
 	defer close(done)
 	go scheduler.RunProbes(done)
+	updates := make(chan adapterScan, 1)
+	go scanAdapters(done, updates)
 	tunnel := tun.New(balancer)
 	if err := tunnel.On(); err != nil {
 		return err
@@ -119,7 +121,9 @@ func run() (runErr error) {
 		return err
 	}
 	last := time.Now()
-	nextScan := last.Add(3 * time.Second)
+	capturing := true
+	failedSamples := 0
+	var retryMergeAfter time.Time
 	for {
 		result, err := windows.WaitForMultipleObjects(handles, false, 1000)
 		if err != nil {
@@ -129,17 +133,73 @@ func run() (runErr error) {
 			return nil
 		}
 		now := time.Now()
-		if !now.Before(nextScan) {
-			if adapters, excluded, err := nics.DiscoverNicsDetailed(nil, nil); err == nil {
-				scheduler.Update(adapters)
-				skipped = excluded
-			}
-			nextScan = now.Add(3 * time.Second)
+		select {
+		case scan := <-updates:
+			scheduler.Update(scan.adapters)
+			skipped = scan.skipped
+		default:
 		}
 		scheduler.Tick(now.Sub(last))
-		report(summarizeLinks(scheduler.Snapshot(), skipped))
+		slots := scheduler.Snapshot()
+		healthy, checking := linkHealth(slots)
+		if healthy || checking {
+			failedSamples = 0
+		} else {
+			failedSamples++
+		}
+		if capturing && failedSamples >= 3 {
+			tunnel.Off()
+			capturing = false
+			retryMergeAfter = now.Add(15 * time.Second)
+		} else if !capturing && healthy && !now.Before(retryMergeAfter) {
+			if err := tunnel.On(); err != nil {
+				return fmt.Errorf("could not restore merge routes: %w", err)
+			}
+			capturing = true
+		}
+		message := summarizeLinks(slots, skipped)
+		if !capturing {
+			message = "Using normal Windows routing while merge waits for a stable link. " + message
+		}
+		report(message)
 		last = now
 	}
+}
+
+type adapterScan struct {
+	adapters []nics.Nic
+	skipped  []nics.Skip
+}
+
+func scanAdapters(done <-chan struct{}, updates chan<- adapterScan) {
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			adapters, skipped, err := nics.DiscoverNicsDetailed(nil, nil)
+			if err != nil {
+				continue
+			}
+			select {
+			case updates <- adapterScan{adapters, skipped}:
+			case <-done:
+				return
+			}
+		}
+	}
+}
+
+func linkHealth(slots []engine.SlotStats) (healthy, checking bool) {
+	for _, slot := range slots {
+		if slot.Present {
+			healthy = healthy || slot.State == "up" || slot.State6 == "up"
+			checking = checking || slot.State == "checking" || slot.State6 == "checking"
+		}
+	}
+	return
 }
 
 func upstreamTunnelActive() bool {
