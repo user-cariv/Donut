@@ -9,7 +9,8 @@ namespace DonutBoost.Models;
 public enum QueueEntryStatus { Queued, Downloading, Completed, Failed, Cancelled, Interrupted }
 
 public sealed record QueuedDownload(Guid Id, string Input, string Folder, string Name,
-    DateTimeOffset? ScheduledAt, QueueEntryStatus Status, string? Detail = null)
+    DateTimeOffset? ScheduledAt, QueueEntryStatus Status, string? Detail = null, long? ExpectedBytes = null,
+    bool RequiresBrowserSession = false)
 {
     [JsonIgnore]
     public string StatusText => Status == QueueEntryStatus.Queued && ScheduledAt is { } when
@@ -31,7 +32,9 @@ internal sealed class DownloadQueue
         var entries = JsonSerializer.Deserialize<List<QueuedDownload>>(serialized) ?? new();
         foreach (var entry in entries)
         {
-            Entries.Add(entry.Status == QueueEntryStatus.Downloading
+            Entries.Add(entry.RequiresBrowserSession && entry.Status is QueueEntryStatus.Queued or QueueEntryStatus.Downloading
+                ? entry with { Status = QueueEntryStatus.Interrupted, Detail = "Send this link again from your signed-in browser." }
+                : entry.Status == QueueEntryStatus.Downloading
                 ? entry with { Status = QueueEntryStatus.Interrupted, Detail = "Select Retry to restart this download." }
                 : entry);
         }

@@ -27,6 +27,7 @@ public partial class MainWindow : Window
     private readonly DownloadQueue _downloadQueue = new();
     private readonly DispatcherTimer _downloadQueueTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private bool _runningTransfer;
+    private readonly Dictionary<Guid, (string CookieHeader, DateTimeOffset Expiry)> _browserSessions = new();
     private readonly Dictionary<string, double> _savedAdapterLimits = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, long> _savedAdapterDataLimits = new(StringComparer.OrdinalIgnoreCase);
     private static readonly string SpeedLimitsPath = Path.Combine(
@@ -842,14 +843,14 @@ public partial class MainWindow : Window
         catch (Exception ex) { OnLogReceived($"Download error: {ex.Message}"); }
     }
 
-    private async Task RunDownloadAsync(string input, string folder)
+    private async Task RunDownloadAsync(string input, string folder, long? expectedBytes = null, string? browserCookieHeader = null)
     {
         _runningTransfer = true;
         StartBoostButton.IsEnabled = false;
         BondTorrentsCheckBox.IsEnabled = false;
         _downloader.BondTorrentPeers = BondTorrentsCheckBox.IsChecked == true;
         LogOutputTextBlock.Text = "Preparing download...";
-        try { await _downloader.StartDownloadAsync(input, folder); }
+        try { await _downloader.StartDownloadAsync(input, folder, expectedBytes: expectedBytes, browserCookieHeader: browserCookieHeader); }
         finally
         {
             _runningTransfer = false;
@@ -895,21 +896,78 @@ public partial class MainWindow : Window
         SaveDownloadQueue();
     }
 
+    internal BrowserCaptureReply HandleBrowserCapture(BrowserCaptureRequest request)
+    {
+        if (_windowClosed || request.Id == Guid.Empty) return new("unavailable");
+        var existing = _downloadQueue.Entries.FirstOrDefault(entry => entry.Id == request.Id);
+        if (existing is not null)
+            return new(existing.Status switch
+            {
+                QueueEntryStatus.Queued or QueueEntryStatus.Downloading => "accepted",
+                QueueEntryStatus.Completed => "completed",
+                _ => "failed"
+            });
+        bool withBrowserSession = request.Action == "authenticated";
+        if (request.Action != "queue" && !withBrowserSession) return new("missing");
+        if (_checkingStartupLicense || _updateCancellation != null || !_licenseManager.CurrentLicense.IsActive ||
+            _bondingManager.GetActiveEnabledAdapters().Count == 0 || _downloadQueue.Entries.Count > 500 ||
+            (!withBrowserSession && request.ExpectedBytes is not > 0) ||
+            request.Url is null || request.Url.Length > 8192 || request.Url.Any(char.IsControl) ||
+            !Uri.TryCreate(request.Url, UriKind.Absolute, out var uri) ||
+            uri.Scheme is not ("http" or "https") || !string.IsNullOrEmpty(uri.UserInfo) ||
+            uri.AbsolutePath.EndsWith(".torrent", StringComparison.OrdinalIgnoreCase))
+            return new("unavailable");
+        if (withBrowserSession && (uri.Scheme != "https" ||
+            request.CookieHeader is not { Length: > 0 and <= 4096 } header ||
+            header.Any(character => character is < ' ' or > '~')))
+            return new("unavailable");
+
+        var name = Path.GetFileName(uri.LocalPath.TrimEnd('/'));
+        var entry = new QueuedDownload(request.Id, uri.AbsoluteUri, _outputFolder,
+            string.IsNullOrWhiteSpace(name) ? uri.Host : name, null, QueueEntryStatus.Queued,
+            ExpectedBytes: request.ExpectedBytes, RequiresBrowserSession: withBrowserSession);
+        _downloadQueue.Entries.Add(entry);
+        try { _downloadQueue.Save(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.Cryptography.CryptographicException)
+        {
+            _downloadQueue.Entries.Remove(entry);
+            OnLogReceived("Could not save the browser download to the queue. Chrome or Edge will keep the download.");
+            return new("unavailable");
+        }
+        if (withBrowserSession)
+            _browserSessions[request.Id] = (request.CookieHeader!, DateTimeOffset.UtcNow.AddMinutes(5));
+        return new("accepted");
+    }
+
     private async void DownloadQueueTimer_Tick(object? sender, EventArgs e)
     {
+        var now = DateTimeOffset.UtcNow;
+        foreach (var id in _browserSessions.Where(session => session.Value.Expiry <= now).Select(session => session.Key).ToArray())
+            _browserSessions.Remove(id);
         if (_windowClosed || _checkingStartupLicense || _updateCancellation != null || _runningTransfer ||
             !_licenseManager.CurrentLicense.IsActive || _bondingManager.GetActiveEnabledAdapters().Count == 0) return;
 
-        var now = DateTimeOffset.Now;
         var entry = _downloadQueue.Entries.FirstOrDefault(item => item.Status == QueueEntryStatus.Queued &&
             (item.ScheduledAt == null || item.ScheduledAt <= now));
         if (entry == null) return;
+
+        string? browserCookieHeader = null;
+        if (entry.RequiresBrowserSession)
+        {
+            if (!_browserSessions.Remove(entry.Id, out var browserSession) || browserSession.Expiry <= DateTimeOffset.UtcNow)
+            {
+                _downloadQueue.Replace(entry with { Status = QueueEntryStatus.Interrupted, Detail = "Send this link again from your signed-in browser." });
+                SaveDownloadQueue();
+                return;
+            }
+            browserCookieHeader = browserSession.CookieHeader;
+        }
 
         _downloadQueue.Replace(entry with { Status = QueueEntryStatus.Downloading });
         SaveDownloadQueue();
         try
         {
-            await RunDownloadAsync(entry.Input, entry.Folder);
+            await RunDownloadAsync(entry.Input, entry.Folder, entry.ExpectedBytes, browserCookieHeader);
             if (_windowClosed) return;
             var session = _downloader.CurrentSession;
             var status = session?.Status switch
@@ -937,7 +995,8 @@ public partial class MainWindow : Window
     private void RetryQueuedDownloadButton_Click(object sender, RoutedEventArgs e)
     {
         var entries = DownloadQueueList.SelectedItems.OfType<QueuedDownload>()
-            .Where(entry => entry.Status is QueueEntryStatus.Failed or QueueEntryStatus.Cancelled or QueueEntryStatus.Interrupted)
+            .Where(entry => !entry.RequiresBrowserSession &&
+                entry.Status is QueueEntryStatus.Failed or QueueEntryStatus.Cancelled or QueueEntryStatus.Interrupted)
             .ToArray();
         if (entries.Length == 0) return;
         foreach (var entry in entries)
@@ -952,7 +1011,10 @@ public partial class MainWindow : Window
             .ToArray();
         if (entries.Length == 0) return;
         foreach (var entry in entries)
+        {
             _downloadQueue.Entries.Remove(entry);
+            _browserSessions.Remove(entry.Id);
+        }
         SaveDownloadQueue();
     }
 

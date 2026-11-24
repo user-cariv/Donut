@@ -1,4 +1,4 @@
-importScripts("handoff.js");
+importScripts("handoff.js", "capture.js");
 
 const MENU_LINK = "donutboost-send-link";
 const MENU_PAGE = "donutboost-send-page";

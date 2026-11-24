@@ -13,7 +13,15 @@ input, button { box-sizing: border-box; min-height: 36px; border: 1px solid #665
 input { width: 100%; padding: 7px 9px; color: inherit; background: #131018; }
 button { padding: 7px 12px; font-weight: 700; cursor: pointer; }
 #send-button { border-color: transparent; color: #24151c; background: #ffae81; }
+#send-signed-in { color: inherit; background: transparent; }
 button:disabled { opacity: .68; cursor: wait; }
 #reload-extension { color: inherit; background: transparent; }
 #status { margin: 10px 0 14px; color: #d4c5d9; }
+#capture-options { margin-bottom: 12px; padding: 8px; border-top: 1px solid #665772; }
+#capture-options summary { cursor: pointer; font-weight: 650; }
+#capture-form { margin-top: 10px; }
+.capture-toggle { display: flex; align-items: center; gap: 8px; }
+.capture-toggle input { width: auto; min-height: 0; accent-color: #ffae81; }
+#capture-exclusions { width: 100%; box-sizing: border-box; padding: 6px 9px; resize: vertical; background: #131018; color: inherit; border: 1px solid #665772; border-radius: 8px; font: inherit; }
+#capture-feedback { margin: 0; }
 :focus-visible { outline: 2px solid #ffae81; outline-offset: 2px; }

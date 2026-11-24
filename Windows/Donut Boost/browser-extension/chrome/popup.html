@@ -14,8 +14,21 @@
     <label for="download-link">Direct download or magnet link</label>
     <input id="download-link" type="text" required autocomplete="off" spellcheck="false">
     <button id="send-button" type="submit">Send to Donut Boost</button>
+    <button id="send-signed-in" type="button" title="Use cookies from this HTTPS site for this download only">Send with browser sign-in</button>
   </form>
   <p id="status" role="status">Review and start the download in the Windows app.</p>
+  <details id="capture-options">
+    <summary>Automatic browser downloads</summary>
+    <form id="capture-form">
+      <label class="capture-toggle"><input id="capture-enabled" type="checkbox"> Send eligible downloads to Donut Boost</label>
+      <label for="capture-minimum">Minimum size in MB</label>
+      <input id="capture-minimum" type="number" min="0" max="1000000" step="1" value="10" required>
+      <label for="capture-exclusions">Excluded domains, one per line</label>
+      <textarea id="capture-exclusions" rows="3" maxlength="2000" placeholder="example.com"></textarea>
+      <button type="submit">Save capture settings</button>
+      <p id="capture-feedback" role="status"></p>
+    </form>
+  </details>
   <button id="reload-extension" type="button">Reload extension</button>
 </body>
 </html>

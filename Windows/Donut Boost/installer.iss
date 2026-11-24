@@ -65,6 +65,8 @@ Name: "{autoprograms}\Donut Boost"; Filename: "{app}\{#MyAppExeName}"; IconFilen
 Name: "{autodesktop}\Donut Boost"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\Donut.ico"; Tasks: desktopicon
 
 [Registry]
+Root: HKLM32; Subkey: "Software\Google\Chrome\NativeMessagingHosts\com.donutboost.browser"; ValueType: string; ValueData: "{app}\browser-native-host.json"; Flags: uninsdeletekey
+Root: HKLM32; Subkey: "Software\Microsoft\Edge\NativeMessagingHosts\com.donutboost.browser"; ValueType: string; ValueData: "{app}\browser-native-host.json"; Flags: uninsdeletekey
 Root: HKA; Subkey: "Software\Classes\donutboost"; ValueType: string; ValueName: ""; ValueData: "URL:Donut Boost download link"; Flags: uninsdeletekey
 Root: HKA; Subkey: "Software\Classes\donutboost"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
 Root: HKA; Subkey: "Software\Classes\donutboost\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"
@@ -82,6 +84,7 @@ Filename: "{app}\{#MyAppExeName}"; Flags: shellexec runasoriginaluser nowait; Ch
 ; Inno removes installed files and its own executable from the install folder.
 Type: files; Name: "{app}\DonutBoost.exe.old*"
 Type: files; Name: "{app}\DonutBoost.dll.old*"
+Type: files; Name: "{app}\browser-native-host.json"
 Type: files; Name: "{userprograms}\Donut Boost.lnk"
 Type: files; Name: "{userdesktop}\Donut Boost.lnk"
 Type: filesandordirs; Name: "{localappdata}\DonutBoost"
@@ -90,6 +93,38 @@ Type: filesandordirs; Name: "{localappdata}\Donut\TorrentCache"
 Type: filesandordirs; Name: "{localappdata}\Temp\DonutBoost_Update"
 
 [Code]
+function ExtensionOrigin(Folder: String): String;
+var
+  Hash, Alphabet, HexDigits: String;
+  Index, Digit: Integer;
+begin
+  if (Length(Folder) >= 2) and (Folder[2] = ':') then
+    Folder := Uppercase(Copy(Folder, 1, 1)) + Copy(Folder, 2, Length(Folder) - 1);
+  Hash := Lowercase(GetSHA256OfUnicodeString(Folder));
+  Alphabet := 'abcdefghijklmnop';
+  HexDigits := '0123456789abcdef';
+  Result := 'chrome-extension://';
+  for Index := 1 to 32 do
+  begin
+    Digit := Pos(Hash[Index], HexDigits);
+    Result := Result + Alphabet[Digit];
+  end;
+  Result := Result + '/';
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  Manifest: AnsiString;
+begin
+  if CurStep <> ssPostInstall then Exit;
+  Manifest := '{"name":"com.donutboost.browser","description":"Donut Boost browser handoff",' +
+    '"path":"DonutBoost.exe","type":"stdio","allowed_origins":["' +
+    ExtensionOrigin(ExpandConstant('{app}\browser-extension\chrome')) + '","' +
+    ExtensionOrigin(ExpandConstant('{app}\browser-extension\{#ExtensionSetupFolder}')) + '"]}';
+  if not SaveStringToFile(ExpandConstant('{app}\browser-native-host.json'), Manifest, False) then
+    Log('Could not write the optional Donut Boost browser capture registration.');
+end;
+
 function GetChromePath(Param: String): String;
 var
   Key: String;

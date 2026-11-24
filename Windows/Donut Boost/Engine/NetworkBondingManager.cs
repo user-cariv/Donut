@@ -321,69 +321,73 @@ public class NetworkBondingManager : IDisposable
         return virtualMarkers.Any(marker => identity.Contains(marker, StringComparison.OrdinalIgnoreCase));
     }
 
-    public HttpClient GetOrCreateClient(NetworkAdapterInfo adapter)
+    public HttpClient GetOrCreateClient(NetworkAdapterInfo adapter) =>
+        _clientPool.GetOrAdd(adapter.Id, _ => CreateBoundClient(adapter));
+
+    internal HttpClient CreateBoundClient(NetworkAdapterInfo adapter, string? browserCookieHeader = null)
     {
-        return _clientPool.GetOrAdd(adapter.Id, _ =>
+        var handler = new SocketsHttpHandler
         {
-            var handler = new SocketsHttpHandler
+            UseProxy = false, // CRITICAL: NEVER route direct downloads through local Game Boost proxy!
+            Proxy = null,
+            AllowAutoRedirect = browserCookieHeader is null,
+            UseCookies = browserCookieHeader is null,
+            ConnectCallback = async (context, cancellationToken) =>
             {
-                UseProxy = false, // CRITICAL: NEVER route direct downloads through local Game Boost proxy!
-                Proxy = null,
-                ConnectCallback = async (context, cancellationToken) =>
+                var targets = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
+                // Prefer the Wi-Fi IPv6 route where available. Keep IPv4 as a
+                // fallback and prefer it for tethering when both are available.
+                var preferredFamily = adapter.IsWifi ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork;
+                var orderedTargets = targets.GroupBy(ip => ip.AddressFamily)
+                    .OrderByDescending(group => group.Key == preferredFamily)
+                    .SelectMany(group => group.Take(2));
+                Exception? lastError = null;
+                foreach (var target in orderedTargets)
                 {
-                    var targets = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
-                    // Prefer the Wi-Fi IPv6 route where available. Keep IPv4 as a
-                    // fallback and prefer it for tethering when both are available.
-                    var preferredFamily = adapter.IsWifi ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork;
-                    var orderedTargets = targets.GroupBy(ip => ip.AddressFamily)
-                        .OrderByDescending(group => group.Key == preferredFamily)
-                        .SelectMany(group => group.Take(2));
-                    Exception? lastError = null;
-                    foreach (var target in orderedTargets)
+                    bool isIPv6 = target.AddressFamily == AddressFamily.InterNetworkV6;
+                    var localIp = isIPv6 ? adapter.LocalIPv6 : adapter.LocalIp;
+                    int ifIndex = isIPv6 ? adapter.IPv6InterfaceIndex : adapter.InterfaceIndex;
+                    if (localIp == null || ifIndex <= 0) continue;
+
+                    Socket? socket = null;
+                    try
                     {
-                        bool isIPv6 = target.AddressFamily == AddressFamily.InterNetworkV6;
-                        var localIp = isIPv6 ? adapter.LocalIPv6 : adapter.LocalIp;
-                        int ifIndex = isIPv6 ? adapter.IPv6InterfaceIndex : adapter.InterfaceIndex;
-                        if (localIp == null || ifIndex <= 0) continue;
-
-                        Socket? socket = null;
-                        try
-                        {
-                            socket = CreateBoundSocket(localIp, ifIndex);
-                            using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                            attempt.CancelAfter(TimeSpan.FromSeconds(3));
-                            await socket.ConnectAsync(target, context.DnsEndPoint.Port, attempt.Token);
-                            return new NetworkStream(socket, ownsSocket: true);
-                        }
-                        catch (Exception ex) when (!cancellationToken.IsCancellationRequested &&
-                            ex is SocketException or OperationCanceledException)
-                        {
-                            socket?.Dispose();
-                            lastError = ex;
-                        }
-                        catch
-                        {
-                            socket?.Dispose();
-                            throw;
-                        }
+                        socket = CreateBoundSocket(localIp, ifIndex);
+                        using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                        attempt.CancelAfter(TimeSpan.FromSeconds(3));
+                        await socket.ConnectAsync(target, context.DnsEndPoint.Port, attempt.Token);
+                        return new NetworkStream(socket, ownsSocket: true);
                     }
-                    throw new HttpRequestException($"Could not connect to {context.DnsEndPoint.Host} through {adapter.Name}.", lastError);
-                },
-                ConnectTimeout = TimeSpan.FromSeconds(10),
-                // Closing a switched-off adapter's response must not drain it in the background.
-                MaxResponseDrainSize = 0,
-                PooledConnectionLifetime = TimeSpan.FromMinutes(5),
-                EnableMultipleHttp2Connections = true,
-                MaxConnectionsPerServer = 24
-            };
+                    catch (Exception ex) when (!cancellationToken.IsCancellationRequested &&
+                        ex is SocketException or OperationCanceledException)
+                    {
+                        socket?.Dispose();
+                        lastError = ex;
+                    }
+                    catch
+                    {
+                        socket?.Dispose();
+                        throw;
+                    }
+                }
+                throw new HttpRequestException($"Could not connect to {context.DnsEndPoint.Host} through {adapter.Name}.", lastError);
+            },
+            ConnectTimeout = TimeSpan.FromSeconds(10),
+            // Closing a switched-off adapter's response must not drain it in the background.
+            MaxResponseDrainSize = 0,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+            EnableMultipleHttp2Connections = true,
+            MaxConnectionsPerServer = 24
+        };
 
-            var client = new HttpClient(handler)
-            {
-                Timeout = TimeSpan.FromMinutes(10)
-            };
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
-            return client;
-        });
+        var client = new HttpClient(handler)
+        {
+            Timeout = TimeSpan.FromMinutes(10)
+        };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+        if (browserCookieHeader is not null)
+            client.DefaultRequestHeaders.TryAddWithoutValidation("Cookie", browserCookieHeader);
+        return client;
     }
 
     internal static Socket CreateBoundSocket(IPAddress localIp, int interfaceIndex)

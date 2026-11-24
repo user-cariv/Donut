@@ -2,7 +2,7 @@
   "latestVersion": "1.0.11",
   "minRequiredVersion": "1.0.0",
   "releaseDate": "2026-11-24",
-  "releaseNotes": "Adds restart recovery for compatible direct downloads, saved overall and per-adapter speed limits, and per-adapter data limits. Restart Donut Boost if it does not reopen automatically.",
+  "releaseNotes": "Adds optional Chrome and Edge download capture, site exclusions, a minimum file size, and explicit signed-in handoff for compatible HTTPS links. Restart Donut Boost if it does not reopen automatically, then reload the extension.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }

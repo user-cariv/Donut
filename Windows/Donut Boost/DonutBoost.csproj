@@ -14,6 +14,7 @@
     <Version>1.0.11</Version>
     <ApplicationIcon>Assets\Donut.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <StartupObject>DonutBoost.Bootstrap</StartupObject>
   </PropertyGroup>
 
   <ItemGroup>

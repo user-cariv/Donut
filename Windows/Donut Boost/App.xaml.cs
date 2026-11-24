@@ -52,6 +52,7 @@ public partial class App : Application
             _downloadPipeCancellation = new CancellationTokenSource();
             var token = _downloadPipeCancellation.Token;
             _ = Task.Run(() => ListenForDownloadLinksAsync(mainWindow, token), token);
+            _ = Task.Run(() => BrowserCapture.ListenAsync(mainWindow, token), token);
             mainWindow.Show();
             mainWindow.SetIncomingDownloadLink(link);
         }

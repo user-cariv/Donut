@@ -83,12 +83,13 @@ public class MultiChannelDownloader
         catch (Exception ex) { LogReceived?.Invoke($"Could not resume torrent cleanly: {ex.Message}"); }
     }
 
-    public async Task StartDownloadAsync(string url, string outputFolder, CancellationToken externalToken = default)
+    public async Task StartDownloadAsync(string url, string outputFolder, CancellationToken externalToken = default,
+        long? expectedBytes = null, string? browserCookieHeader = null)
     {
         await _downloadGate.WaitAsync(externalToken);
         try
         {
-            await StartDownloadCoreAsync(url, outputFolder, externalToken);
+            await StartDownloadCoreAsync(url, outputFolder, externalToken, expectedBytes, browserCookieHeader);
         }
         finally
         {
@@ -96,7 +97,8 @@ public class MultiChannelDownloader
         }
     }
 
-    private async Task StartDownloadCoreAsync(string url, string outputFolder, CancellationToken externalToken)
+    private async Task StartDownloadCoreAsync(string url, string outputFolder, CancellationToken externalToken,
+        long? expectedBytes, string? browserCookieHeader)
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(externalToken);
         var token = _cts.Token;
@@ -119,6 +121,21 @@ public class MultiChannelDownloader
         string? checkpointPath = null;
         DirectDownloadCheckpoint? checkpoint = null;
         string? partialPath = null;
+        var browserClients = new Dictionary<string, HttpClient>();
+
+        HttpClient GetClient(NetworkAdapterInfo adapter)
+        {
+            if (browserCookieHeader is null) return _bondingManager.GetOrCreateClient(adapter);
+            lock (browserClients)
+            {
+                if (!browserClients.TryGetValue(adapter.Id, out var client))
+                {
+                    client = _bondingManager.CreateBoundClient(adapter, browserCookieHeader);
+                    browserClients.Add(adapter.Id, client);
+                }
+                return client;
+            }
+        }
 
         void SaveCheckpoint()
         {
@@ -185,7 +202,10 @@ public class MultiChannelDownloader
             }
 
             string normalizedUrl = NormalizeDownloadUrl(url);
+            if (browserCookieHeader is not null && !normalizedUrl.StartsWith("https://", StringComparison.Ordinal))
+                throw new InvalidOperationException("Signed-in downloads require a direct HTTPS link.");
             session.Url = normalizedUrl;
+            bool requireFileResponse = browserCookieHeader is not null || expectedBytes.HasValue;
             // Check each adapter against this host. A failed Wi-Fi probe must not
             // force a range-capable mobile connection into single-stream mode.
             var probes = await Task.WhenAll(enabledAdapters.OrderByDescending(a => a.IsWifi)
@@ -196,7 +216,7 @@ public class MultiChannelDownloader
                     probeTimeout.CancelAfter(TimeSpan.FromSeconds(16));
                     try
                     {
-                        var probe = await ProbeUrlAsync(_bondingManager.GetOrCreateClient(adapter), normalizedUrl, probeTimeout.Token);
+                        var probe = await ProbeUrlAsync(GetClient(adapter), normalizedUrl, probeTimeout.Token, requireFileResponse);
                         if (!probe.Reachable)
                             LogReceived?.Invoke($"[{adapter.Name}] The server did not accept the download probe.");
                         return (Adapter: adapter, Probe: probe);
@@ -208,9 +228,16 @@ public class MultiChannelDownloader
                         return (Adapter: adapter, Probe: (FileName: string.Empty, TotalSize: -1L, SupportsRanges: false, Reachable: false, EntityTag: (string?)null));
                     }
                 }));
-            var reachable = probes.Where(p => p.Probe.Reachable).ToList();
+            var reachable = probes.Where(p => p.Probe.Reachable &&
+                (!expectedBytes.HasValue || expectedBytes.Value == p.Probe.TotalSize)).ToList();
             if (reachable.Count == 0)
+            {
+                if (expectedBytes.HasValue)
+                    throw new IOException("Donut Boost could not verify the browser's file. Continue the download in the browser.");
+                if (browserCookieHeader is not null)
+                    throw new IOException("Donut Boost could not receive the signed-in file. Use the direct HTTPS file link or download it in the browser.");
                 throw new IOException("No selected adapter could open this download. If the server generated a temporary URL, try a fresh direct link.");
+            }
 
             var selected = reachable.FirstOrDefault(p => p.Probe.SupportsRanges && p.Probe.TotalSize > 0);
             if (selected.Adapter == null)
@@ -287,12 +314,13 @@ public class MultiChannelDownloader
             // caused Wi-Fi to keep downloading in Mobile Data Only mode.
             if (supportsRanges && totalSize > 0)
             {
-                await DownloadMultiChannelAsync(session, rangeAdapters, enabledAdapters, entityTag, SaveCheckpoint, token);
+                await DownloadMultiChannelAsync(session, rangeAdapters, enabledAdapters, entityTag,
+                    SaveCheckpoint, GetClient, requireFileResponse, token);
             }
             else
             {
                 LogReceived?.Invoke($"Server did not confirm byte-range support. Using a single stream on {selected.Adapter.Name}.");
-                await DownloadSingleStreamAsync(session, selected.Adapter, token);
+                await DownloadSingleStreamAsync(session, selected.Adapter, token, expectedBytes, GetClient, requireFileResponse);
             }
 
             if (session.Status == DownloadStatus.Failed)
@@ -346,7 +374,11 @@ public class MultiChannelDownloader
         {
             try { SaveCheckpoint(); CloseDownloadFile(); }
             catch (IOException ex) { LogReceived?.Invoke($"Could not finish writing the partial file: {ex.Message}"); }
-            finally { Interlocked.Exchange(ref _cts, null)?.Dispose(); }
+            finally
+            {
+                foreach (var client in browserClients.Values) client.Dispose();
+                Interlocked.Exchange(ref _cts, null)?.Dispose();
+            }
         }
     }
 
@@ -617,7 +649,8 @@ public class MultiChannelDownloader
     }
 
     private async Task DownloadMultiChannelAsync(DownloadSession session, List<NetworkAdapterInfo> adapters,
-        List<NetworkAdapterInfo> probedAdapters, string? entityTag, Action saveCheckpoint, CancellationToken token)
+        List<NetworkAdapterInfo> probedAdapters, string? entityTag, Action saveCheckpoint,
+        Func<NetworkAdapterInfo, HttpClient> getClient, bool requireFileResponse, CancellationToken token)
     {
         // Compute chunk size: between 2 MB and 16 MB depending on total size
         long chunkSize = Math.Clamp(session.TotalBytes / (adapters.Count * 12), 2 * 1024 * 1024, 16 * 1024 * 1024);
@@ -695,7 +728,7 @@ public class MultiChannelDownloader
 
         void SpawnWorkersForAdapter(NetworkAdapterInfo adp)
         {
-            var client = _bondingManager.GetOrCreateClient(adp);
+            var client = getClient(adp);
             lock (workerLock) workerAdapters.Add(adp);
             int workersCount = adp.IsMobilePhone ? 12 : 8;
             for (int w = 0; w < workersCount; w++)
@@ -750,7 +783,8 @@ public class MultiChannelDownloader
                             using var adapterTransfer = new AdapterTransferCancellation(adp, token);
                             try
                             {
-                                interrupted = await DownloadChunkWithClientAsync(client, session.Url, chunk, adp, session, entityTag, adapterTransfer.Token);
+                                interrupted = await DownloadChunkWithClientAsync(client, session.Url, chunk, adp, session, entityTag,
+                                    requireFileResponse, adapterTransfer.Token);
                                 success = chunk.IsCompleted;
                             }
                             catch (Exception) when (adapterTransfer.Token.IsCancellationRequested)
@@ -891,7 +925,8 @@ public class MultiChannelDownloader
         ProgressUpdated?.Invoke(session);
     }
 
-    private async Task<bool> DownloadChunkWithClientAsync(HttpClient client, string url, DownloadChunk chunk, NetworkAdapterInfo adapter, DownloadSession session, string? entityTag, CancellationToken token)
+    private async Task<bool> DownloadChunkWithClientAsync(HttpClient client, string url, DownloadChunk chunk, NetworkAdapterInfo adapter,
+        DownloadSession session, string? entityTag, bool requireFileResponse, CancellationToken token)
     {
         // Support resuming chunk from exact downloaded offset
         long startFrom = chunk.StartOffset + chunk.BytesDownloaded;
@@ -915,7 +950,8 @@ public class MultiChannelDownloader
         }
 
         var contentRange = response.Content.Headers.ContentRange;
-        if ((entityTag is not null && response.Headers.ETag is { } responseTag && responseTag.ToString() != entityTag) ||
+        if ((requireFileResponse && IsHtmlResponse(response)) ||
+            (entityTag is not null && response.Headers.ETag is { } responseTag && responseTag.ToString() != entityTag) ||
             contentRange?.Unit != "bytes" || contentRange.From != startFrom || contentRange.To is null || contentRange.To < startFrom || contentRange.To > chunk.EndOffset ||
             (session.TotalBytes > 0 && contentRange.Length != session.TotalBytes) ||
             (response.Content.Headers.ContentLength.HasValue &&
@@ -969,7 +1005,8 @@ public class MultiChannelDownloader
         return false;
     }
 
-    private async Task DownloadSingleStreamAsync(DownloadSession session, NetworkAdapterInfo preferredAdapter, CancellationToken token)
+    private async Task DownloadSingleStreamAsync(DownloadSession session, NetworkAdapterInfo preferredAdapter, CancellationToken token,
+        long? expectedBytes, Func<NetworkAdapterInfo, HttpClient> getClient, bool requireFileResponse)
     {
         int consecutiveFailures = 0;
         NetworkAdapterInfo? lastAdapter = null;
@@ -1011,7 +1048,7 @@ public class MultiChannelDownloader
 
             using var adapterTransfer = new AdapterTransferCancellation(adapter, token);
             var transferToken = adapterTransfer.Token;
-            var client = _bondingManager.GetOrCreateClient(adapter);
+            var client = getClient(adapter);
 
             using var request = new HttpRequestMessage(HttpMethod.Get, session.Url);
             if (session.DownloadedBytes > 0)
@@ -1026,6 +1063,8 @@ public class MultiChannelDownloader
                 if (IsPermanentHttpFailure(response.StatusCode))
                     throw new HttpRequestException($"The download server returned HTTP {(int)response.StatusCode}.", null, response.StatusCode);
                 response.EnsureSuccessStatusCode();
+                if (requireFileResponse && IsHtmlResponse(response))
+                    throw new InvalidDataException("The server returned a web page instead of the signed-in file.");
 
                 long requestedOffset = session.DownloadedBytes;
                 long? responseEnd;
@@ -1052,6 +1091,9 @@ public class MultiChannelDownloader
                 }
                 else
                     throw new InvalidDataException("The server did not return a downloadable file.");
+
+                if (expectedBytes.HasValue && session.TotalBytes != expectedBytes.Value)
+                    throw new InvalidDataException("The response no longer matches the file reported by the browser.");
 
                 using var contentStream = await response.Content.ReadAsStreamAsync(transferToken);
                 using var readTimeout = CancellationTokenSource.CreateLinkedTokenSource(transferToken);
@@ -1180,7 +1222,8 @@ public class MultiChannelDownloader
         }
     }
 
-    private async Task<(string FileName, long TotalSize, bool SupportsRanges, bool Reachable, string? EntityTag)> ProbeUrlAsync(HttpClient client, string url, CancellationToken token)
+    private async Task<(string FileName, long TotalSize, bool SupportsRanges, bool Reachable, string? EntityTag)> ProbeUrlAsync(
+        HttpClient client, string url, CancellationToken token, bool requireFileResponse)
     {
         string rawFileName = string.Empty;
         try
@@ -1202,6 +1245,7 @@ public class MultiChannelDownloader
             using var rangeReq = new HttpRequestMessage(HttpMethod.Get, url);
             rangeReq.Headers.Range = new RangeHeaderValue(0, 0);
             using var rangeRes = await client.SendAsync(rangeReq, HttpCompletionOption.ResponseHeadersRead, rangeTimeout.Token);
+            if (requireFileResponse && IsHtmlResponse(rangeRes)) return (fileName, -1, false, false, null);
             if (rangeRes.StatusCode == System.Net.HttpStatusCode.PartialContent &&
                 rangeRes.Content.Headers.ContentRange is { Unit: "bytes", From: 0, To: 0, Length: > 0 } range)
                 return (GetFileName(rangeRes, fileName), range.Length.Value, true, true,
@@ -1223,7 +1267,7 @@ public class MultiChannelDownloader
         try
         {
             using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, token);
-            if (response.StatusCode == System.Net.HttpStatusCode.OK)
+            if (response.StatusCode == System.Net.HttpStatusCode.OK && (!requireFileResponse || !IsHtmlResponse(response)))
                 return (GetFileName(response, fileName), response.Content.Headers.ContentLength ?? -1, false, true, null);
 
             LogReceived?.Invoke($"The download server returned HTTP {(int)response.StatusCode}.");
@@ -1235,6 +1279,10 @@ public class MultiChannelDownloader
 
         return (fileName, -1, false, false, null);
     }
+
+    private static bool IsHtmlResponse(HttpResponseMessage response) =>
+        string.Equals(response.Content.Headers.ContentType?.MediaType, "text/html", StringComparison.OrdinalIgnoreCase) &&
+        !string.Equals(response.Content.Headers.ContentDisposition?.DispositionType, "attachment", StringComparison.OrdinalIgnoreCase);
 
     private static string GetFileName(HttpResponseMessage response, string fallback)
     {

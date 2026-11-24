@@ -111,7 +111,7 @@ jobs:
           if ($extension.manifest_version -ne 3 -or $extension.version -notmatch '^\d+\.\d+\.\d+$') {
             throw 'Invalid Donut Boost extension manifest'
           }
-          $requiredExtensionFiles = @($extension.background.service_worker, $extension.action.default_popup, 'handoff.js', 'popup.js', 'popup.css')
+          $requiredExtensionFiles = @($extension.background.service_worker, $extension.action.default_popup, 'handoff.js', 'capture.js', 'popup.js', 'popup.css')
           $requiredExtensionFiles += $extension.icons.PSObject.Properties.Value
           $requiredExtensionFiles += $extension.action.default_icon.PSObject.Properties.Value
           foreach ($file in $requiredExtensionFiles) {
