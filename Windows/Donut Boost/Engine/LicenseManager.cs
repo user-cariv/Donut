@@ -47,11 +47,11 @@ public class LicenseInfo
 
     public string BadgeText => Tier switch
     {
-        LicenseTier.Lifetime => "⚡ PRO: LIFETIME",
-        LicenseTier.OneDay => $"⏳ PRO: {FormatRemainingHours()}",
-        LicenseTier.SevenDays => $"⏳ PRO: {FormatRemainingDays()}",
-        LicenseTier.OneMonth => $"⏳ PRO: {FormatRemainingDays()}",
-        LicenseTier.FreeTrial => $"🎁 TRIAL: {FormatRemainingHours()}",
+        LicenseTier.Lifetime => "Pro · Lifetime",
+        LicenseTier.OneDay => $"Pro · {FormatRemainingHours()}",
+        LicenseTier.SevenDays => $"Pro · {FormatRemainingDays()}",
+        LicenseTier.OneMonth => $"Pro · {FormatRemainingDays()}",
+        LicenseTier.FreeTrial => $"Trial · {FormatRemainingHours()}",
         _ => "🔒 UNLICENSED"
     };
 
@@ -59,15 +59,15 @@ public class LicenseInfo
     {
         if (!ExpiresAtUtc.HasValue) return "Active";
         var span = ExpiresAtUtc.Value - DateTime.UtcNow;
-        if (span.TotalDays >= 1) return $"{(int)Math.Ceiling(span.TotalDays)}d Left";
-        return $"{(int)Math.Max(1, span.TotalHours)}h Left";
+        if (span.TotalDays >= 1) return $"{(int)Math.Ceiling(span.TotalDays)}d left";
+        return $"{(int)Math.Max(1, span.TotalHours)}h left";
     }
 
     private string FormatRemainingHours()
     {
         if (!ExpiresAtUtc.HasValue) return "Active";
         var span = ExpiresAtUtc.Value - DateTime.UtcNow;
-        if (span.TotalHours >= 1) return $"{(int)Math.Ceiling(span.TotalHours)}h Left";
+        if (span.TotalHours >= 1) return $"{(int)Math.Ceiling(span.TotalHours)}h left";
         return $"{(int)Math.Max(1, span.TotalMinutes)}m Left";
     }
 }

@@ -17,40 +17,22 @@ public partial class MainWindow
         ContentRendered -= StartSystemMergeOnFirstRender;
         if (_windowClosed) return;
 
-        string status = "System merge stopped";
-        string hint = "Reopen Donut Boost to restart automatic system merging.";
         try
         {
             await RunSystemMergeAsync();
         }
         catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
         {
-            status = "Merge approval declined";
-            hint = "Reopen Donut Boost and approve the Windows administrator prompt to start System merge.";
+            if (!_windowClosed) OnLogReceived("Windows administrator approval was declined.");
         }
         catch (Exception ex)
         {
-            status = "System merge unavailable";
-            hint = ex.Message;
-            if (!_windowClosed) OnLogReceived($"System merge: {hint}");
-        }
-        finally
-        {
-            _stopSystemMerge = null;
-            _systemMergeActive = false;
-            _speedTestCancellation?.Cancel();
-            if (!_windowClosed)
-            {
-                SystemMergeStatus.Text = status;
-                SystemMergeStatus.ToolTip = hint;
-                LauncherRoutingHint.Text = hint;
-            }
+            if (!_windowClosed) OnLogReceived($"System merge: {ex.Message}");
         }
     }
 
     private async Task RunSystemMergeAsync()
     {
-        SystemMergeStatus.Text = "Starting system merge…";
         string session = Guid.NewGuid().ToString("N");
         using var ready = new EventWaitHandle(false, EventResetMode.ManualReset, $@"Local\DonutBoostMerge-{session}-Ready");
         using var stop = new EventWaitHandle(false, EventResetMode.ManualReset, $@"Local\DonutBoostMerge-{session}-Stop");
@@ -79,9 +61,6 @@ public partial class MainWindow
             bool started = await startup;
             if (started && !worker.HasExited && !_windowClosed)
             {
-                _systemMergeActive = true;
-                LauncherRoutingHint.Text = "System merge is on. Start or resume a launcher download to open new connections across available links.";
-                SystemMergeStatus.Text = "System merge on";
                 await exited;
             }
             else

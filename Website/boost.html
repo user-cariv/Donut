@@ -58,7 +58,7 @@
       <p class="boost-note"><strong>In the app:</strong> choose Combine Both, Home Wi-Fi Only, or Mobile Data Only; set custom download speed limits (or uncapped); toggle individual connections; pause, resume, or cancel a download; and choose its save folder.</p>
       <p class="boost-note"><strong>Torrents:</strong> paste a magnet link or choose a <code>.torrent</code> file. <strong>Combine connections for torrent peers</strong> lets outgoing peers use the selected Wi-Fi and tethered connections. Clear the option to use the Windows route with incoming peers and HTTP web seeds. Donut Boost stops the torrent when it completes.</p>
       <p class="boost-note"><strong>Download queue:</strong> add direct links, magnets, or torrent files to download them one at a time. Enter a time to start a queued download later while Donut Boost is open.</p>
-      <p class="boost-note">Live adapter rates include all Windows traffic. <strong>System merge</strong> starts automatically after Windows administrator approval and distributes new connections across Wi-Fi and phone tethering. Run the <strong>Combined speed test</strong> to measure download throughput. The test can use up to 160 MB.</p>
+      <p class="boost-note">Live adapter rates include all Windows traffic. <strong>System merge</strong> starts automatically after Windows administrator approval and distributes new connections across Wi-Fi and phone tethering. The dashboard shows combined and per-adapter live receive rates.</p>
       <p class="boost-note">Setup help: <a href="https://support.google.com/android/answer/9059108" target="_blank" rel="noopener">Android USB tethering</a> · <a href="https://support.apple.com/en-gb/111785" target="_blank" rel="noopener">iPhone Personal Hotspot on Windows</a>. Multi-connection speed depends on the server supporting byte-range downloads. Links without that support may not benefit from combined connections and can fail.</p>
       <section class="boost-extension-guide" id="chrome-extension" aria-labelledby="boost-extension-title">
         <h3 id="boost-extension-title">Donut Boost Chrome extension</h3>
@@ -66,24 +66,24 @@
         <ol>
           <li><strong>Find the bundled extension.</strong> Install Donut Boost for Windows and click <strong>Browser extension</strong> in the app to open its folder.</li>
           <li><strong>Add it to Chrome.</strong> Open <code>chrome://extensions</code>, turn on <strong>Developer mode</strong>, and click <strong>Load unpacked</strong>. Select the extension folder. In Edge, use <code>edge://extensions</code>.</li>
-          <li><strong>Send a link.</strong> Right-click a direct download or magnet link, then choose <strong>Send link to Donut Boost</strong>. In the app, click <strong>Boost Download</strong>.</li>
+          <li><strong>Send a link.</strong> Right-click a direct download or magnet link, then choose <strong>Send link to Donut Boost</strong>. In the app, click <strong>Download</strong>.</li>
         </ol>
         <p>You can also paste a link into the pinned extension. When Donut Boost updates, the bundled extension files update with it. Click <strong>Reload</strong> on the extension card to apply the changes.</p>
-        <p>Already have a <code>.torrent</code> file? Click <strong>Torrent</strong> in the app, select the file, and click <strong>Boost Download</strong>.</p>
+        <p>Already have a <code>.torrent</code> file? Click <strong>Torrent</strong> in the app, select the file, and click <strong>Download</strong>.</p>
       </section>
 
       <article class="boost-game-card">
         <div class="boost-game-copy">
           <p class="hub-eyebrow"><span class="boost-kicker-dot"></span> Included in Donut Boost for Windows</p>
           <div class="boost-game-heading">
-            <h3>Launcher activity,<br><em>clearly shown.</em></h3>
-            <span class="boost-live-status"><i></i> Monitor</span>
+            <h3>More links for<br><em>game downloads.</em></h3>
+            <span class="boost-live-status"><i></i> System merge</span>
           </div>
           <p class="boost-game-intro">With System merge on, Donut Boost can spread new game download connections across your available links. Start or resume the download once System merge is running. Each connection uses one link, so combined speeds depend on the launcher opening multiple connections.</p>
           <div class="boost-launcher-list" aria-label="Supported game launchers">
             <span>Steam</span><span>Epic Games</span><span>Riot Client</span><span>Microsoft Store</span><span>Unity</span><span>Xbox</span><span>EA App</span><span>Rockstar</span><span>Battle.net</span><span>Ubisoft Connect</span><span>GOG Galaxy</span>
           </div>
-          <p class="boost-game-footnote"><strong>Honest download status.</strong> The app reports exact game progress and ETA only when it can read reliable launcher counters (currently Steam). Other launchers may show activity and adapter receive rates without a verified game size, progress bar, or ETA.</p>
+          <p class="boost-game-footnote">Use the live adapter panel to see traffic on each connection. Your launcher shows game progress and ETA.</p>
         </div>
         <div class="boost-game-visual" aria-hidden="true">
           <svg viewBox="0 0 260 220" fill="none">
@@ -98,8 +98,8 @@
           <div class="boost-visual-node node-wifi"><span>Wi-Fi</span><small>Home</small></div>
           <div class="boost-visual-node node-phone"><span>USB</span><small>Phone</small></div>
           <div class="boost-visual-core"><span class="boost-visual-bolt" aria-hidden="true"></span><small>BOOST</small></div>
-          <div class="boost-visual-node node-steam"><span>11+ Platforms</span><small>Detected</small></div>
-          <div class="boost-visual-node node-speed"><span>LIVE</span><small>Activity</small></div>
+          <div class="boost-visual-node node-steam"><span>Windows apps</span><small>Shared routing</small></div>
+          <div class="boost-visual-node node-speed"><span>LIVE</span><small>Receive rate</small></div>
         </div>
       </article>
     </section>
@@ -155,7 +155,7 @@
           </div>
           <ul class="boost-plan-features">
             <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Donut Boost access for 24 hours</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Game launcher activity detection</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> System-wide connection merging</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> See Wi-Fi and mobile adapter speeds</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> One-device activation code</li>
           </ul>
@@ -176,7 +176,7 @@
           </div>
           <ul class="boost-plan-features">
             <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Donut Boost access for 7 days</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Game launcher activity detection</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> System-wide connection merging</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Live speed for each adapter</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> One-device activation code</li>
           </ul>
@@ -196,7 +196,7 @@
           </div>
           <ul class="boost-plan-features">
             <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Donut Boost access for 30 days</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Game launcher activity detection</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> System-wide connection merging</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Live speed for each adapter</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> One-device activation code</li>
           </ul>
@@ -217,7 +217,7 @@
           </div>
           <ul class="boost-plan-features">
             <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Donut Boost lifetime access</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Game launcher activity detection</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> System-wide connection merging</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Future Donut Boost updates</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> One-device activation code</li>
           </ul>

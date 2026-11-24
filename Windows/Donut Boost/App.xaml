@@ -69,8 +69,8 @@
                         <Border x:Name="btnBorder" CornerRadius="10" Padding="{TemplateBinding Padding}">
                             <Border.Background>
                                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                    <GradientStop Color="#FFB340" Offset="0.0"/>
-                                    <GradientStop Color="#FF9F0A" Offset="1.0"/>
+                                    <GradientStop Color="#78E2DB" Offset="0.0"/>
+                                    <GradientStop Color="#82ACF3" Offset="1.0"/>
                                 </LinearGradientBrush>
                             </Border.Background>
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -80,8 +80,8 @@
                                 <Setter TargetName="btnBorder" Property="Background">
                                     <Setter.Value>
                                         <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                            <GradientStop Color="#FFC266" Offset="0.0"/>
-                                            <GradientStop Color="#FFAA20" Offset="1.0"/>
+                                            <GradientStop Color="#A0F0E7" Offset="0.0"/>
+                                            <GradientStop Color="#A1C5FF" Offset="1.0"/>
                                         </LinearGradientBrush>
                                     </Setter.Value>
                                 </Setter>
@@ -169,7 +169,7 @@
         <Style x:Key="ModernToggleSwitchStyle" TargetType="ToggleButton">
             <Setter Property="Width" Value="48"/>
             <Setter Property="Height" Value="26"/>
-            <Setter Property="Background" Value="#39393D"/>
+            <Setter Property="Background" Value="#344054"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
@@ -186,7 +186,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="track" Property="Background" Value="#30D158"/>
+                                <Setter TargetName="track" Property="Background" Value="#59BDCD"/>
                                 <Setter TargetName="onKnob" Property="Visibility" Value="Visible"/>
                                 <Setter TargetName="offKnob" Property="Visibility" Value="Collapsed"/>
                             </Trigger>

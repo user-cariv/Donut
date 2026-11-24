@@ -3,6 +3,7 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <DefaultItemExcludesInProjectFolder>$(DefaultItemExcludesInProjectFolder);publish/**</DefaultItemExcludesInProjectFolder>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>DonutBoost</AssemblyName>

@@ -1,10 +1,13 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Net.NetworkInformation;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using DonutBoost.Engine;
 using DonutBoost.Models;
@@ -15,7 +18,6 @@ public partial class MainWindow : Window
 {
     private readonly NetworkBondingManager _bondingManager;
     private readonly MultiChannelDownloader _downloader;
-    private readonly GameBoostProxyServer _gameBoostProxy;
     private readonly LicenseManager _licenseManager;
     private readonly System.Windows.Threading.DispatcherTimer _licenseTimer;
     private UpdateManifest? _availableUpdate;
@@ -31,12 +33,10 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, double> _savedAdapterLimits = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, long> _savedAdapterDataLimits = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, long> _dailyAdapterLimits = new(StringComparer.OrdinalIgnoreCase);
-    private TimeOnly? _queueWindowStart;
-    private TimeOnly? _queueWindowEnd;
     private static readonly string SpeedLimitsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DonutBoost", "speed-limits.json");
-    private sealed record SpeedLimits(double Overall, Dictionary<string, double> Adapters, Dictionary<string, long>? DataLimits,
-        Dictionary<string, long>? DailyLimits, TimeOnly? QueueStart, TimeOnly? QueueEnd);
+    private sealed record SpeedLimits(Dictionary<string, double> Adapters, Dictionary<string, long>? DataLimits,
+        Dictionary<string, long>? DailyLimits);
 
     public MainWindow()
     {
@@ -49,29 +49,32 @@ public partial class MainWindow : Window
             MaximizeIconText.Text = WindowState == WindowState.Maximized ? "🗗" : "🗖";
         };
 
+        Loaded += (_, _) => FitDashboardCardsToWorkArea();
+        SizeChanged += (_, _) => FitDashboardCardsToWorkArea();
+        LocationChanged += (_, _) => FitDashboardCardsToWorkArea();
+
         _outputFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "DonutBoost");
         OutputFolderTextBlock.Text = _outputFolder;
         if (WifiRoutePreferenceManager.HasSavedMetrics)
+        {
             WifiRoutePreferenceText.Text = "Restore route settings";
+            WifiRoutePreferenceButton.Visibility = Visibility.Visible;
+        }
 
         _licenseManager = new LicenseManager();
         _bondingManager = new NetworkBondingManager();
         _downloader = new MultiChannelDownloader(_bondingManager, _licenseManager);
         LoadSpeedLimits();
-        _gameBoostProxy = new GameBoostProxyServer(_bondingManager, _licenseManager);
 
         _bondingManager.AdaptersChanged += OnAdaptersChanged;
         _bondingManager.AdapterRatesUpdated += OnAdapterRatesUpdated;
         _downloader.ProgressUpdated += OnProgressUpdated;
         _downloader.StatusChanged += OnStatusChanged;
         _downloader.LogReceived += OnLogReceived;
-        DownloadQueueList.ItemsSource = _downloadQueue.Entries;
         try { _downloadQueue.Load(); }
         catch (Exception ex) { OnLogReceived($"Could not load the download queue: {ex.Message}"); }
         _downloadQueueTimer.Tick += DownloadQueueTimer_Tick;
 
-        _gameBoostProxy.LogReceived += OnLogReceived;
-        _gameBoostProxy.ProxyMetricsUpdated += OnGameProxyMetricsUpdated;
 
         UpdateLicenseUI();
         UpdateAdaptersUI();
@@ -88,7 +91,6 @@ public partial class MainWindow : Window
 
             if (wasActive && !isNowActive)
             {
-                DisableGameBoost();
                 _downloader.Cancel();
                 OnLogReceived("⏳ Your 24-hour pass has expired. Please enter a new redeem code to continue boosting.");
             }
@@ -99,13 +101,62 @@ public partial class MainWindow : Window
 
     }
 
+    private void FitDashboardCardsToWorkArea()
+    {
+        if (WindowState == WindowState.Minimized || Content is not FrameworkElement layout ||
+            PresentationSource.FromVisual(layout) is not HwndSource source)
+            return;
+
+        const double bottomGap = 8;
+        double overlap = 0;
+        if (WindowState == WindowState.Maximized)
+        {
+            const uint nearestMonitor = 2;
+            nint monitor = MonitorFromWindow(source.Handle, nearestMonitor);
+            var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+            if (monitor != 0 && GetMonitorInfo(monitor, ref info))
+            {
+                double workBottom = layout.PointFromScreen(new Point(info.WorkArea.Left, info.WorkArea.Bottom)).Y;
+                overlap = Math.Max(0, layout.ActualHeight - workBottom);
+            }
+        }
+
+        var margin = new Thickness(0, 0, 0, bottomGap + overlap);
+        if (NetworkAdaptersCard.Margin != margin)
+            NetworkAdaptersCard.Margin = margin;
+        if (SystemLogCard.Margin != margin)
+            SystemLogCard.Margin = margin;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MonitorRect
+    {
+        public int Left, Top, Right, Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MonitorInfo
+    {
+        public int Size;
+        public MonitorRect MonitorArea, WorkArea;
+        public uint Flags;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern nint MonitorFromWindow(nint window, uint flags);
+
+    [DllImport("user32.dll", EntryPoint = "GetMonitorInfoW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetMonitorInfo(nint monitor, ref MonitorInfo info);
+
     public void SetIncomingDownloadLink(string? link)
     {
         if (string.IsNullOrWhiteSpace(link)) return;
         UrlTextBox.Text = link;
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();
-        OnLogReceived("Browser link received. Review it, then select BOOST DOWNLOAD to start.");
+        UrlTextBox.Focus();
+        OnLogReceived("Browser link received. Review it, then select Download to start.");
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -115,7 +166,6 @@ public partial class MainWindow : Window
         StartBoostButton.IsEnabled = false;
         RedeemCodeButton.IsEnabled = false;
         ActivateTrialButton.IsEnabled = false;
-        GameBoostToggle.IsEnabled = false;
         try
         {
             if (_licenseManager.CurrentLicense.IsActive)
@@ -136,10 +186,6 @@ public partial class MainWindow : Window
             }
 
             UpdateLicenseUI();
-            if (_licenseManager.CurrentLicense.IsActive)
-                EnableGameBoost();
-            else
-                GameBoostToggle.IsChecked = false;
 
             _licenseTimer.Start();
             _downloadQueueTimer.Start();
@@ -169,7 +215,6 @@ public partial class MainWindow : Window
             StartBoostButton.IsEnabled = _updateCancellation == null;
             RedeemCodeButton.IsEnabled = true;
             ActivateTrialButton.IsEnabled = true;
-            GameBoostToggle.IsEnabled = true;
         }
     }
     private void UpdateLicenseUI()
@@ -183,9 +228,8 @@ public partial class MainWindow : Window
             CloseActivationSheetButton.Visibility = Visibility.Visible;
 
             TitleBarLicenseText.Text = _licenseManager.CurrentLicense.BadgeText;
-            TitleBarLicenseBadge.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(24, 42, 28));
-            TitleBarLicenseBadge.BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88));
-            TitleBarLicenseText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88));
+            TitleBarLicenseBadge.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(23, 44, 49));
+            TitleBarLicenseText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(88, 225, 208));
 
             FooterLicenseText.Text = $"⚡ License: {_licenseManager.CurrentLicense.TierDisplayName}";
             FooterLicenseText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88));
@@ -197,7 +241,6 @@ public partial class MainWindow : Window
 
             TitleBarLicenseText.Text = "🔒 UNLICENSED";
             TitleBarLicenseBadge.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(45, 20, 20));
-            TitleBarLicenseBadge.BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 69, 58));
             TitleBarLicenseText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 69, 58));
 
             FooterLicenseText.Text = "🔒 Unlicensed (Redeem Code Required)";
@@ -242,10 +285,6 @@ public partial class MainWindow : Window
 
             OnLogReceived($"✓ [LICENSE] Successfully redeemed {result.Info.TierDisplayName}!");
             UpdateLicenseUI();
-            if (GameBoostToggle.IsChecked == true)
-            {
-                EnableGameBoost();
-            }
         }
         else
         {
@@ -268,10 +307,6 @@ public partial class MainWindow : Window
 
             OnLogReceived("✓ [LICENSE] 24-Hour Free Pass activated! Enjoy unlimited speed bonding.");
             UpdateLicenseUI();
-            if (GameBoostToggle.IsChecked == true)
-            {
-                EnableGameBoost();
-            }
         }
         else
         {
@@ -396,101 +431,6 @@ public partial class MainWindow : Window
         Close();
     }
 
-    private void ModeCombineBoth_Click(object sender, RoutedEventArgs e)
-    {
-        _bondingManager.SetMode(BondingMode.CombineAll);
-        OnLogReceived("Selected all available adapters for Donut's own direct downloads. Windows' default route is unchanged.");
-        UpdateAdaptersUI();
-    }
-
-    private void ModeWifiOnly_Click(object sender, RoutedEventArgs e)
-    {
-        _bondingManager.SetMode(BondingMode.WifiOnly);
-        OnLogReceived("Selected home adapters for Donut's own direct downloads. Other apps and Windows routing are unchanged.");
-        UpdateAdaptersUI();
-    }
-
-    private void ModeMobileOnly_Click(object sender, RoutedEventArgs e)
-    {
-        _bondingManager.SetMode(BondingMode.MobileDataOnly);
-        OnLogReceived("Selected mobile adapters for Donut's own direct downloads. Other apps and Windows routing are unchanged.");
-        UpdateAdaptersUI();
-    }
-
-    private static readonly System.Text.RegularExpressions.Regex _digitsOnly = new(@"^[0-9]+$", System.Text.RegularExpressions.RegexOptions.Compiled);
-
-    private void CustomSpeedLimitTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
-    {
-        e.Handled = !_digitsOnly.IsMatch(e.Text);
-    }
-
-    private void CustomSpeedLimitTextBox_Pasting(object sender, DataObjectPastingEventArgs e)
-    {
-        if (e.DataObject.GetDataPresent(DataFormats.Text))
-        {
-            string text = ((string)e.DataObject.GetData(DataFormats.Text))?.Trim() ?? string.Empty;
-            if (!_digitsOnly.IsMatch(text))
-            {
-                e.CancelCommand();
-            }
-        }
-        else
-        {
-            e.CancelCommand();
-        }
-    }
-
-    private void SpeedLimitUnlimited_Click(object sender, RoutedEventArgs e)
-    {
-        _downloader.Throttler.SetLimitMbps(0);
-        CustomSpeedLimitTextBox.Text = string.Empty;
-        OnLogReceived("⚡ Donut direct-download cap: Unlimited (Both Home Wi-Fi & Mobile 5G uncapped).");
-        UpdateFooterSpeedLimitText();
-    }
-
-    private void SpeedLimit50_Click(object sender, RoutedEventArgs e)
-    {
-        _downloader.Throttler.SetLimitMbps(50);
-        CustomSpeedLimitTextBox.Text = string.Empty;
-        OnLogReceived("⚡ Donut direct-download cap: Capped at 50 Mbps (mobile adapters are not capped by Donut).");
-        UpdateFooterSpeedLimitText();
-    }
-
-    private void SpeedLimit100_Click(object sender, RoutedEventArgs e)
-    {
-        _downloader.Throttler.SetLimitMbps(100);
-        CustomSpeedLimitTextBox.Text = string.Empty;
-        OnLogReceived("⚡ Donut direct-download cap: Capped at 100 Mbps (mobile adapters are not capped by Donut).");
-        UpdateFooterSpeedLimitText();
-    }
-
-    private void SpeedLimit200_Click(object sender, RoutedEventArgs e)
-    {
-        _downloader.Throttler.SetLimitMbps(200);
-        CustomSpeedLimitTextBox.Text = string.Empty;
-        OnLogReceived("⚡ Donut direct-download cap: Capped at 200 Mbps (mobile adapters are not capped by Donut).");
-        UpdateFooterSpeedLimitText();
-    }
-
-    private void ApplyCustomSpeedLimit_Click(object sender, RoutedEventArgs e)
-    {
-        string text = CustomSpeedLimitTextBox.Text.Trim();
-        if (double.TryParse(text, out double mbps) && mbps > 0)
-        {
-            _downloader.Throttler.SetLimitMbps(mbps);
-            SpeedLimitUnlimitedRadio.IsChecked = false;
-            SpeedLimit50Radio.IsChecked = false;
-            SpeedLimit100Radio.IsChecked = false;
-            SpeedLimit200Radio.IsChecked = false;
-            OnLogReceived($"⚡ Donut direct-download cap: Custom cap set to {mbps:F0} Mbps (mobile adapters are not capped by Donut).");
-            UpdateFooterSpeedLimitText();
-        }
-        else
-        {
-            MessageBox.Show("Please enter a valid positive number in Mbps (e.g. 75).", "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-    }
-
     private void UpdateFooterSpeedLimitText()
     {
         double cap = _downloader.Throttler.CurrentLimitMbps;
@@ -504,45 +444,6 @@ public partial class MainWindow : Window
         }) + capText;
     }
 
-    private void ApplyOverallSpeedLimit_Click(object sender, RoutedEventArgs e)
-    {
-        if (!TryReadNetworkSpeedLimit(OverallSpeedLimitTextBox, out double mbps)) return;
-        _downloader.OverallThrottler.SetLimitMbps(mbps);
-        SaveSpeedLimits();
-        OnLogReceived(mbps == 0 ? "Overall download speed limit cleared." : $"Overall download speed limited to {mbps:0.##} Mbps.");
-    }
-
-    private bool TryReadNetworkSpeedLimit(TextBox input, out double mbps)
-    {
-        if (double.TryParse(input.Text, NumberStyles.AllowDecimalPoint, CultureInfo.CurrentCulture, out mbps) &&
-            IsValidNetworkSpeedLimit(mbps))
-            return true;
-
-        MessageBox.Show(this, "Enter a speed from 0.1 to 100,000 Mbps, or 0 for unlimited.",
-            "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Information);
-        input.Focus();
-        return false;
-    }
-
-    private void ApplyQueueWindow_Click(object sender, RoutedEventArgs e)
-    {
-        string input = QueueWindowTextBox.Text.Trim();
-        var parts = input.Split('-', StringSplitOptions.TrimEntries);
-        if (input.Length == 0)
-            (_queueWindowStart, _queueWindowEnd) = (null, null);
-        else if (parts.Length == 2 &&
-            TimeOnly.TryParseExact(parts[0], "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var start) &&
-            TimeOnly.TryParseExact(parts[1], "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var end) && start != end)
-            (_queueWindowStart, _queueWindowEnd) = (start, end);
-        else
-        {
-            MessageBox.Show(this, "Enter a daily start window such as 22:00-06:00, or leave it blank for any time.",
-                "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-        SaveSpeedLimits();
-    }
-
     private static bool IsValidNetworkSpeedLimit(double mbps) => mbps == 0 || mbps is >= 0.1 and <= 100000;
 
     private void LoadSpeedLimits()
@@ -552,11 +453,6 @@ public partial class MainWindow : Window
             if (!File.Exists(SpeedLimitsPath)) return;
             var settings = JsonSerializer.Deserialize<SpeedLimits>(File.ReadAllText(SpeedLimitsPath));
             if (settings is null) return;
-            if (IsValidNetworkSpeedLimit(settings.Overall))
-            {
-                _downloader.OverallThrottler.SetLimitMbps(settings.Overall);
-                OverallSpeedLimitTextBox.Text = settings.Overall.ToString("0.##", CultureInfo.CurrentCulture);
-            }
             if (settings.Adapters is not null)
                 foreach (var (adapter, limit) in settings.Adapters.Where(entry => IsValidNetworkSpeedLimit(entry.Value)))
                     _savedAdapterLimits[adapter] = limit;
@@ -566,10 +462,6 @@ public partial class MainWindow : Window
             if (settings.DailyLimits is not null)
                 foreach (var (adapter, limit) in settings.DailyLimits.Where(entry => entry.Value is > 0 and <= 10_000_000))
                     _dailyAdapterLimits[adapter] = limit;
-            (_queueWindowStart, _queueWindowEnd) = (settings.QueueStart, settings.QueueEnd);
-            if (_queueWindowStart is { } start && _queueWindowEnd is { } end)
-                QueueWindowTextBox.Text = start.ToString("HH:mm", CultureInfo.InvariantCulture) + "-" +
-                    end.ToString("HH:mm", CultureInfo.InvariantCulture);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -584,8 +476,7 @@ public partial class MainWindow : Window
             Directory.CreateDirectory(Path.GetDirectoryName(SpeedLimitsPath)!);
             string pending = SpeedLimitsPath + ".tmp";
             File.WriteAllText(pending, JsonSerializer.Serialize(new SpeedLimits(
-                _downloader.OverallThrottler.CurrentLimitMbps, _savedAdapterLimits, _savedAdapterDataLimits,
-                _dailyAdapterLimits, _queueWindowStart, _queueWindowEnd)));
+                _savedAdapterLimits, _savedAdapterDataLimits, _dailyAdapterLimits)));
             File.Move(pending, SpeedLimitsPath, overwrite: true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -614,17 +505,14 @@ public partial class MainWindow : Window
 
         if (wifiActive && mobileActive)
         {
-            ModeCombineBothRadio.IsChecked = true;
             _bondingManager.CurrentMode = BondingMode.CombineAll;
         }
         else if (wifiActive && !mobileActive)
         {
-            ModeWifiOnlyRadio.IsChecked = true;
             _bondingManager.CurrentMode = BondingMode.WifiOnly;
         }
         else if (!wifiActive && mobileActive)
         {
-            ModeMobileOnlyRadio.IsChecked = true;
             _bondingManager.CurrentMode = BondingMode.MobileDataOnly;
         }
 
@@ -668,36 +556,15 @@ public partial class MainWindow : Window
         FooterActiveConnectionsText.Text = $"{activeCount} selected ({string.Join(" + ", activeNames)})";
         UpdateFooterSpeedLimitText();
 
-        // Summary pills in left speedometer card (Green for ON, Gray for OFF)
-        ActiveAdaptersSummaryPanel.Children.Clear();
-        foreach (var adp in adapters)
-        {
-            bool isAdpOn = adp.IsEnabled && adp.IsOnline;
-            var pill = new Border
-            {
-                Background = isAdpOn 
-                    ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 48, 209, 88))
-                    : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(30, 113, 113, 122)),
-                BorderBrush = isAdpOn 
-                    ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88))
-                    : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(113, 113, 122)),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(12),
-                Padding = new Thickness(8, 3, 8, 3),
-                Margin = new Thickness(3, 0, 3, 0)
-            };
-            var text = new TextBlock
-            {
-                Text = $"{adp.IconGlyph} {adp.Name}: {(isAdpOn ? "ON" : "OFF")}",
-                FontSize = 10,
-                FontWeight = FontWeights.SemiBold,
-                Foreground = isAdpOn 
-                    ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88))
-                    : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(161, 161, 170))
-            };
-            pill.Child = text;
-            ActiveAdaptersSummaryPanel.Children.Add(pill);
-        }
+        bool wifiOn = adapters.Any(adapter => adapter.IsWifi && adapter.IsEnabled && adapter.IsOnline);
+        bool ethernetOn = adapters.Any(adapter => adapter.IsEnabled && adapter.IsOnline &&
+            (adapter.InterfaceType is NetworkInterfaceType.Ethernet or NetworkInterfaceType.Ethernet3Megabit
+                or NetworkInterfaceType.FastEthernetT or NetworkInterfaceType.FastEthernetFx or NetworkInterfaceType.GigabitEthernet ||
+             (adapter.IsMobilePhone && !adapter.IsWifi)));
+        WifiSummaryText.Text = $"Wi-Fi: {(wifiOn ? "On" : "Off")}";
+        TetherSummaryText.Text = $"Ethernet: {(ethernetOn ? "On" : "Off")}";
+        TetherSummaryText.SetResourceReference(TextBlock.ForegroundProperty,
+            ethernetOn ? "EthernetOnlineBrush" : "TextSecondaryBrush");
     }
 
     private void OnProgressUpdated(DownloadSession session)
@@ -812,7 +679,8 @@ public partial class MainWindow : Window
     {
         PostToUi(() =>
         {
-            LogOutputTextBlock.Text = $"{message}\n{LogOutputTextBlock.Text}";
+            string history = LogOutputTextBlock.Text;
+            LogOutputTextBlock.Text = $"{DateTime.Now:HH:mm:ss}  {message}\n{history[..Math.Min(history.Length, 12000)]}";
         });
     }
 
@@ -851,9 +719,7 @@ public partial class MainWindow : Window
     {
         _runningTransfer = true;
         StartBoostButton.IsEnabled = false;
-        BondTorrentsCheckBox.IsEnabled = false;
-        _downloader.BondTorrentPeers = BondTorrentsCheckBox.IsChecked == true;
-        LogOutputTextBlock.Text = "Preparing download...";
+        OnLogReceived("Preparing download?");
         try { await _downloader.StartDownloadAsync(input, folder, expectedBytes: expectedBytes, browserCookieHeader: browserCookieHeader); }
         finally
         {
@@ -861,43 +727,8 @@ public partial class MainWindow : Window
             if (!_windowClosed)
             {
                 StartBoostButton.IsEnabled = _updateCancellation == null && !_checkingStartupLicense;
-                BondTorrentsCheckBox.IsEnabled = true;
             }
         }
-    }
-
-    private void QueueDownloadButton_Click(object sender, RoutedEventArgs e)
-    {
-        string input = UrlTextBox.Text.Trim();
-        bool validUrl = Uri.TryCreate(input, UriKind.Absolute, out var uri) &&
-            uri.Scheme is "http" or "https" or "magnet";
-        bool validFile = File.Exists(input) && Path.GetExtension(input).Equals(".torrent", StringComparison.OrdinalIgnoreCase);
-        if (!validUrl && !validFile)
-        {
-            MessageBox.Show("Enter a direct download link, a magnet link, or choose a .torrent file.", "Download queue");
-            return;
-        }
-
-        DateTimeOffset? scheduledAt = null;
-        string schedule = QueueTimeTextBox.Text.Trim();
-        if (schedule.Length > 0)
-        {
-            if (!TimeOnly.TryParseExact(schedule, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var startTime))
-            {
-                MessageBox.Show("Use a 24-hour time such as 22:30, or leave it blank to start when the queue is free.", "Download queue");
-                return;
-            }
-            var next = DateTime.Today + startTime.ToTimeSpan();
-            if (next <= DateTime.Now) next = next.AddDays(1);
-            scheduledAt = new DateTimeOffset(next);
-        }
-
-        string name = validFile ? Path.GetFileName(input) : uri!.Scheme == "magnet" ? "Magnet download"
-            : Path.GetFileName(uri.LocalPath.TrimEnd('/'));
-        if (string.IsNullOrWhiteSpace(name)) name = uri?.Host ?? "Download";
-        _downloadQueue.Entries.Add(new(Guid.NewGuid(), input, _outputFolder, name, scheduledAt, QueueEntryStatus.Queued));
-        QueueTimeTextBox.Clear();
-        SaveDownloadQueue();
     }
 
     internal BrowserCaptureReply HandleBrowserCapture(BrowserCaptureRequest request)
@@ -951,8 +782,6 @@ public partial class MainWindow : Window
         if (_windowClosed || _checkingStartupLicense || _updateCancellation != null || _runningTransfer ||
             !_licenseManager.CurrentLicense.IsActive || _bondingManager.GetActiveEnabledAdapters().Count == 0) return;
 
-        if (_queueWindowStart is { } start && _queueWindowEnd is { } end &&
-            !TimeOnly.FromDateTime(DateTime.Now).IsBetween(start, end)) return;
         var entry = _downloadQueue.Entries.FirstOrDefault(item => item.Status == QueueEntryStatus.Queued &&
             (item.ScheduledAt == null || item.ScheduledAt <= now));
         if (entry == null) return;
@@ -994,32 +823,6 @@ public partial class MainWindow : Window
             if (_windowClosed) return;
             _downloadQueue.Replace(entry with { Status = QueueEntryStatus.Failed, Detail = ex.Message });
             OnLogReceived($"Queued download error: {ex.Message}");
-        }
-        SaveDownloadQueue();
-    }
-
-    private void RetryQueuedDownloadButton_Click(object sender, RoutedEventArgs e)
-    {
-        var entries = DownloadQueueList.SelectedItems.OfType<QueuedDownload>()
-            .Where(entry => !entry.RequiresBrowserSession &&
-                entry.Status is QueueEntryStatus.Failed or QueueEntryStatus.Cancelled or QueueEntryStatus.Interrupted)
-            .ToArray();
-        if (entries.Length == 0) return;
-        foreach (var entry in entries)
-            _downloadQueue.Replace(entry with { Status = QueueEntryStatus.Queued, ScheduledAt = null, Detail = null });
-        SaveDownloadQueue();
-    }
-
-    private void RemoveQueuedDownloadButton_Click(object sender, RoutedEventArgs e)
-    {
-        var entries = DownloadQueueList.SelectedItems.OfType<QueuedDownload>()
-            .Where(entry => entry.Status != QueueEntryStatus.Downloading)
-            .ToArray();
-        if (entries.Length == 0) return;
-        foreach (var entry in entries)
-        {
-            _downloadQueue.Entries.Remove(entry);
-            _browserSessions.Remove(entry.Id);
         }
         SaveDownloadQueue();
     }
@@ -1114,29 +917,18 @@ public partial class MainWindow : Window
 
     private async void PreferWifiRouteButton_Click(object sender, RoutedEventArgs e)
     {
-        var wifi = _bondingManager.Adapters.FirstOrDefault(a => a.IsOnline && a.IsWifi && a.InterfaceIndex > 0);
-        var mobileIndexes = _bondingManager.Adapters.Where(a => a.IsOnline && a.IsMobilePhone && a.InterfaceIndex > 0)
-            .Select(a => a.InterfaceIndex).Distinct().ToArray();
-        if (wifi == null || mobileIndexes.Length == 0)
-        {
-            MessageBox.Show("Connect home Wi-Fi and a phone tether first, then rescan connections.", "Prefer Home Wi-Fi", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
-        bool restore = WifiRoutePreferenceManager.HasSavedMetrics;
-        string action = restore ? "restore the Windows network metrics saved before this change" : "make Windows prefer Wi-Fi over phone tethering until you restore the setting or restart Windows";
-        if (MessageBox.Show($"Donut will {action}. Windows will ask for administrator approval. Game launchers will continue to use Windows networking. Continue?", "Windows Network Preference", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        if (!WifiRoutePreferenceManager.HasSavedMetrics) return;
+        if (MessageBox.Show(this, "Restore the Windows network settings Donut saved? Windows will ask for administrator approval.",
+                "Restore network settings", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
 
         WifiRoutePreferenceButton.IsEnabled = false;
         try
         {
-            if (!await WifiRoutePreferenceManager.RunAsync(restore, wifi.InterfaceIndex, mobileIndexes))
+            if (!await WifiRoutePreferenceManager.RunAsync(restore: true, wifiIndex: 0, mobileIndexes: Array.Empty<int>()))
                 throw new InvalidOperationException("Windows did not apply the requested interface metrics.");
-            WifiRoutePreferenceText.Text = restore ? "Prefer Wi-Fi" : "Restore route settings";
-            OnLogReceived(restore
-                ? "Restored the Windows interface metrics saved before the Wi-Fi preference was applied."
-                : $"Windows now prefers Wi-Fi (interface {wifi.InterfaceIndex}) over phone tethering for the normal system route. Donut direct downloads can still use selected adapters.");
+            WifiRoutePreferenceButton.Visibility = Visibility.Collapsed;
+            OnLogReceived("Restored the saved Windows network settings.");
         }
         catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
         {
@@ -1154,63 +946,6 @@ public partial class MainWindow : Window
         UpdateAdaptersUI();
     }
 
-    private void GameBoostToggle_Click(object sender, RoutedEventArgs e)
-    {
-        if (!_licenseManager.CurrentLicense.IsActive)
-        {
-            GameBoostToggle.IsChecked = false;
-            ActivationOverlayGrid.Visibility = Visibility.Visible;
-            ActivationStatusTextBlock.Text = "Please enter a valid redeem code to use Game Launcher Monitor.";
-            ActivationStatusTextBlock.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 69, 58));
-            ActivationStatusTextBlock.Visibility = Visibility.Visible;
-            return;
-        }
-
-        if (GameBoostToggle.IsChecked == true)
-        {
-            EnableGameBoost();
-        }
-        else
-        {
-            DisableGameBoost();
-        }
-    }
-
-    private void EnableGameBoost()
-    {
-        if (_gameBoostProxy.Start(9090))
-        {
-            GameBoostToggle.IsChecked = true;
-            GameBoostBadgeBorder.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(10, 45, 27));
-            GameBoostBadgeBorder.BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88));
-            GameBoostBadgeText.Text = "🟢 MONITORING";
-            GameBoostBadgeText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(48, 209, 88));
-            OnLogReceived("Game launcher activity monitor active. Adapter rates are measured; launcher-specific progress is shown only when the launcher exposes it.");
-        }
-        else
-        {
-            GameBoostToggle.IsChecked = false;
-            OnLogReceived("✕ Failed to start Game Launcher Monitor.");
-        }
-    }
-
-    private void DisableGameBoost()
-    {
-        _gameBoostProxy.Stop();
-        GameBoostToggle.IsChecked = false;
-        GameBoostBadgeBorder.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(35, 35, 45));
-        GameBoostBadgeBorder.BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(113, 113, 122));
-        GameBoostBadgeText.Text = "⚪ OFF (Disabled)";
-        GameBoostBadgeText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(161, 161, 170));
-        GameBoostStreamsText.Text = "• 0 active game streams";
-        OnLogReceived("🛑 Game Launcher Monitor turned OFF.");
-    }
-
-    private double _smoothedGameSpeedBps = 0;
-    private string _lastGameEstimateKey = "";
-    private long _lastGameProgressBytes = -1;
-    private DateTime _lastGameProgressAt = DateTime.MinValue;
-
     private void OnAdapterRatesUpdated(double combinedReceiveBps)
     {
         PostToUi(() =>
@@ -1218,7 +953,8 @@ public partial class MainWindow : Window
             // The gauge always shows physical adapter receive rates, even during file transfers.
             double mbps = combinedReceiveBps * 8 / 1_000_000.0;
             string speedText = mbps >= 1000 ? $"{(mbps / 1000):F2} Gbps" : $"{mbps:F1} Mbps";
-            CombinedSpeedTextBlock.Text = speedText;
+            CombinedSpeedTextBlock.Text = mbps >= 1000 ? $"{mbps / 1000:F2}" : $"{mbps:F1}";
+            CombinedSpeedUnitTextBlock.Text = mbps >= 1000 ? "GBPS" : "MBPS";
 
             bool isDirectDownloadActive = _downloader.CurrentSession != null &&
                 (_downloader.CurrentSession.Status == DownloadStatus.Downloading ||
@@ -1239,140 +975,6 @@ public partial class MainWindow : Window
         });
     }
 
-    private void OnGameProxyMetricsUpdated(long gameBytes, long gameSizeBytes, double adapterReceiveBps, bool hasLauncherActivity, bool hasReliableProgress, bool isEstimated, string lastHost)
-    {
-        PostToUi(() =>
-        {
-            double mbps = adapterReceiveBps * 8 / 1_000_000.0;
-            string speedText = mbps >= 1000 ? $"{(mbps / 1000):F2} Gbps" : $"{mbps:F1} Mbps";
-
-            // Build per-adapter speed breakdown string (📶300.0 + 📱500.0 = 800.0 Mbps)
-            var adapters = _bondingManager.Adapters;
-            var parts = adapters
-                .Where(a => a.IsOnline && a.CurrentSpeedBps > 0)
-                .Select(a => $"{a.IconGlyph}{(a.CurrentSpeedBps * 8 / 1_000_000.0):F1}")
-                .ToList();
-            string breakdownText = parts.Count > 1
-                ? $" ({string.Join(" + ", parts)})"
-                : "";
-
-            if (hasLauncherActivity && hasReliableProgress)
-                GameBoostStreamsText.Text = $"• Verified download: {lastHost}";
-            else if (hasLauncherActivity)
-                GameBoostStreamsText.Text = $"• Possible {lastHost} activity · download not verified";
-            else if (!string.IsNullOrEmpty(lastHost) && !lastHost.Equals("Ready", StringComparison.OrdinalIgnoreCase))
-                GameBoostStreamsText.Text = $"• {lastHost} detected · waiting for activity";
-            else
-                GameBoostStreamsText.Text = "• Waiting for game launcher activity";
-
-            bool isDirectDownloadActive = _downloader.CurrentSession != null &&
-                (_downloader.CurrentSession.Status == DownloadStatus.Downloading ||
-                 _downloader.CurrentSession.Status == DownloadStatus.Probing ||
-                 _downloader.CurrentSession.Status == DownloadStatus.Paused);
-
-            if (isDirectDownloadActive) return;
-
-                if (hasLauncherActivity)
-            {
-                bool hasSize = gameSizeBytes > 0;
-                bool canShowProgress = hasSize && hasReliableProgress;
-                string estimateKey = $"{lastHost}|{gameSizeBytes}";
-                if (!string.Equals(estimateKey, _lastGameEstimateKey, StringComparison.Ordinal))
-                {
-                    _lastGameEstimateKey = estimateKey;
-                    _smoothedGameSpeedBps = 0;
-                    _lastGameProgressBytes = -1;
-                    _lastGameProgressAt = DateTime.MinValue;
-                }
-
-                if (canShowProgress && gameBytes >= 0 && gameBytes != _lastGameProgressBytes)
-                {
-                    DateTime now = DateTime.UtcNow;
-                    if (_lastGameProgressBytes >= 0 && gameBytes > _lastGameProgressBytes && _lastGameProgressAt != DateTime.MinValue)
-                    {
-                        double elapsed = (now - _lastGameProgressAt).TotalSeconds;
-                        if (elapsed > 0)
-                        {
-                            double measuredRate = (gameBytes - _lastGameProgressBytes) / elapsed;
-                            _smoothedGameSpeedBps = _smoothedGameSpeedBps <= 0
-                                ? measuredRate
-                                : (_smoothedGameSpeedBps * 0.65) + (measuredRate * 0.35);
-                        }
-                    }
-                    else if (_lastGameProgressBytes >= 0 && gameBytes < _lastGameProgressBytes)
-                    {
-                        _smoothedGameSpeedBps = 0;
-                    }
-
-                    _lastGameProgressBytes = gameBytes;
-                    _lastGameProgressAt = now;
-                }
-
-                long remaining = canShowProgress ? Math.Max(0, gameSizeBytes - gameBytes) : 0;
-                bool hasFreshProgressRate = _lastGameProgressAt != DateTime.MinValue &&
-                    (DateTime.UtcNow - _lastGameProgressAt).TotalSeconds <= 5;
-                double etaRate = isEstimated ? adapterReceiveBps : hasFreshProgressRate ? _smoothedGameSpeedBps : 0;
-                string eta = !canShowProgress
-                    ? "Unavailable from this launcher"
-                    : remaining == 0
-                        ? "Finished"
-                        : etaRate > 0
-                            ? DownloadSession.FormatETAFromSeconds(remaining / etaRate)
-                            : "Waiting for progress";
-                double percent = canShowProgress ? Math.Clamp((double)gameBytes / gameSizeBytes * 100.0, 0.0, 100.0) : 0;
-                string progressLabel = isEstimated ? $"~{Math.Min(percent, 99.9):F1}%" : $"{percent:F1}%";
-                string estimatePrefix = isEstimated ? "~" : "";
-
-                StatusBadgeTextBlock.Text = canShowProgress ? "VERIFIED DOWNLOAD" : "UNVERIFIED ACTIVITY";
-                FileNameTextBlock.Text = $"Detected: {lastHost}";
-                FileSizeTextBlock.Text = canShowProgress
-                    ? $"{estimatePrefix}{DownloadSession.FormatBytes(gameBytes)} / {DownloadSession.FormatBytes(gameSizeBytes)}"
-                    : hasSize
-                        ? $"Size {DownloadSession.FormatBytes(gameSizeBytes)} · progress unavailable"
-                        : "Game size unavailable from this launcher";
-
-                DownloadProgressBar.IsIndeterminate = false;
-                DownloadProgressBar.Value = percent;
-                ProgressPercentTextBlock.Text = canShowProgress ? progressLabel : "Progress unavailable";
-                EtaTextBlock.Text = $"ETA: {estimatePrefix}{eta}";
-
-                TitleBarLiveStatusPanel.Visibility = Visibility.Visible;
-                TitleBarSpeedTextBlock.Text = speedText;
-                TitleBarStatusBadge.Text = canShowProgress ? "VERIFIED DOWNLOAD" : "UNVERIFIED";
-                TitleBarProgressText.Text = canShowProgress
-                    ? $"{lastHost} · {progressLabel} · ETA {estimatePrefix}{eta}"
-                    : $"{lastHost} · adapter traffic {speedText} · progress unavailable";
-                FooterProgressText.Text = canShowProgress
-                    ? $"{lastHost} · {estimatePrefix}{DownloadSession.FormatBytes(gameBytes)} / {DownloadSession.FormatBytes(gameSizeBytes)} · ETA {estimatePrefix}{eta}{breakdownText}"
-                    : $"{lastHost} · game progress/ETA not exposed; combined adapter receive rate {speedText}{breakdownText}";
-            }
-            else
-            {
-                _smoothedGameSpeedBps = 0;
-                _lastGameProgressBytes = -1;
-                _lastGameProgressAt = DateTime.MinValue;
-                TitleBarLiveStatusPanel.Visibility = Visibility.Collapsed;
-                DownloadProgressBar.IsIndeterminate = false;
-                DownloadProgressBar.Value = 0;
-                ProgressPercentTextBlock.Text = "";
-                EtaTextBlock.Text = "";
-                FileSizeTextBlock.Text = "--";
-
-                if (!string.IsNullOrEmpty(lastHost) && !lastHost.Equals("Ready", StringComparison.OrdinalIgnoreCase))
-                {
-                    StatusBadgeTextBlock.Text = "READY";
-                    FileNameTextBlock.Text = $"Launcher detected: {lastHost}";
-                    FooterProgressText.Text = $"{lastHost} is idle · combined receive rate {speedText}{breakdownText}";
-                }
-                else
-                {
-                    StatusBadgeTextBlock.Text = "NETWORK MONITORING";
-                    FileNameTextBlock.Text = "No active launcher download detected";
-                    FooterProgressText.Text = $"Combined receive rate {speedText}{breakdownText}";
-                }
-            }
-        });
-    }
     private async Task CheckForAppUpdatesAsync(bool silent)
     {
         try
@@ -1523,13 +1125,11 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _windowClosed = true;
-        _speedTestCancellation?.Cancel();
         _stopSystemMerge?.Set();
         _downloadQueueTimer.Stop();
         _updateCancellation?.Cancel();
         _autoUpdateTimer?.Stop();
         _licenseTimer?.Stop();
-        _gameBoostProxy.Dispose();
         _downloader.Cancel();
         _bondingManager.FlushDailyUsage();
         _bondingManager.Dispose();

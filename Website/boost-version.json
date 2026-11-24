@@ -2,7 +2,7 @@
   "latestVersion": "1.0.11",
   "minRequiredVersion": "1.0.0",
   "releaseDate": "2026-11-24",
-  "releaseNotes": "System merge now starts automatically when Donut Boost opens, after Windows administrator approval. Restart Donut Boost to finish applying the update.",
+  "releaseNotes": "Redesigned the Windows dashboard with a larger receive-rate display, Wi-Fi and Ethernet status, a simpler download toolbar, and an always-visible system log. Restart Donut Boost to finish applying the update.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }
