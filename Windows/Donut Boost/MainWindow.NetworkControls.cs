@@ -1,9 +1,12 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.IO.MemoryMappedFiles;
 using System.Globalization;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using DonutBoost.Models;
 
 namespace DonutBoost;
@@ -36,6 +39,25 @@ public partial class MainWindow
         string session = Guid.NewGuid().ToString("N");
         using var ready = new EventWaitHandle(false, EventResetMode.ManualReset, $@"Local\DonutBoostMerge-{session}-Ready");
         using var stop = new EventWaitHandle(false, EventResetMode.ManualReset, $@"Local\DonutBoostMerge-{session}-Stop");
+        using var report = MemoryMappedFile.CreateNew($@"Local\DonutBoostMerge-{session}-Report", 4096, MemoryMappedFileAccess.ReadWrite);
+        using var view = report.CreateViewAccessor(0, 4096, MemoryMappedFileAccess.Read);
+        int lastReport = 0;
+        string? latestReport = null;
+        void ReadWorkerReport()
+        {
+            int sequence = view.ReadInt32(0);
+            int length = view.ReadInt32(4);
+            if (sequence == lastReport || (sequence & 1) != 0 || length is <= 0 or > 4088) return;
+            var bytes = new byte[length];
+            view.ReadArray(8, bytes, 0, length);
+            if (view.ReadInt32(0) != sequence) return;
+            lastReport = sequence;
+            latestReport = Encoding.UTF8.GetString(bytes);
+            if (!_windowClosed) OnLogReceived($"[Merge] {latestReport}");
+        }
+
+        var reportTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        reportTimer.Tick += (_, _) => ReadWorkerReport();
         _stopSystemMerge = stop;
         try
         {
@@ -54,8 +76,9 @@ public partial class MainWindow
             launch.ArgumentList.Add(Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
             launch.ArgumentList.Add(session);
             using var worker = Process.Start(launch) ?? throw new InvalidOperationException("The System merge engine could not start.");
+            reportTimer.Start();
             Task exited = worker.WaitForExitAsync();
-            Task<bool> startup = Task.Run(() => WaitHandle.WaitAny(new[] { ready, stop }, TimeSpan.FromSeconds(20)) == 0);
+            Task<bool> startup = Task.Run(() => WaitHandle.WaitAny(new[] { ready, stop }, TimeSpan.FromSeconds(45)) == 0);
             await Task.WhenAny(exited, startup);
             if (exited.IsCompleted) stop.Set();
             bool started = await startup;
@@ -67,14 +90,17 @@ public partial class MainWindow
             {
                 stop.Set();
                 await exited;
+                ReadWorkerReport();
                 if (!_windowClosed)
-                    throw new InvalidOperationException("System merge could not start. Check that your network adapters are connected and try again.");
+                    throw new InvalidOperationException(latestReport ?? "System merge could not start. Check your network adapters and reopen Donut Boost.");
             }
+            ReadWorkerReport();
             if (worker.ExitCode != 0 && !_windowClosed)
                 throw new InvalidOperationException("System merge stopped unexpectedly.");
         }
         finally
         {
+            reportTimer.Stop();
             stop.Set();
             _stopSystemMerge = null;
         }

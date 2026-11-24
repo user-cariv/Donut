@@ -3,10 +3,13 @@ package main
 import (
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 	"net-merge/internal/engine"
@@ -25,7 +28,7 @@ func main() {
 	}
 }
 
-func run() error {
+func run() (runErr error) {
 	if len(os.Args) != 3 || !windows.GetCurrentProcessToken().IsElevated() {
 		return fmt.Errorf("start System merge from Donut Boost")
 	}
@@ -57,6 +60,17 @@ func run() error {
 	}
 	defer windows.CloseHandle(ready)
 
+	report, closeReport, err := openReport(session)
+	if err != nil {
+		return err
+	}
+	defer closeReport()
+	defer func() {
+		if runErr != nil {
+			report(runErr.Error())
+		}
+	}()
+
 	mutex, err := windows.CreateMutex(nil, false, windows.StringToUTF16Ptr("Global\\DonutBoostSystemMerge"))
 	if mutex != 0 {
 		defer windows.CloseHandle(mutex)
@@ -65,37 +79,49 @@ func run() error {
 		return err
 	}
 
-	if _, err := net.InterfaceByName("net-merge"); err == nil {
-		return fmt.Errorf("another system merge tunnel is active")
+	if upstreamTunnelActive() {
+		return fmt.Errorf("Net Merge is active. Turn it off, then reopen Donut Boost.")
 	}
 
-	adapters, err := nics.DiscoverNics(nil, nil)
-	if err != nil {
-		return err
-	}
-	if len(adapters) == 0 {
-		return fmt.Errorf("no usable network adapters")
+	handles := []windows.Handle{stop, parent}
+	report("Waiting for a network adapter.")
+	var adapters []nics.Nic
+	var skipped []nics.Skip
+	for len(adapters) == 0 {
+		adapters, skipped, err = nics.DiscoverNicsDetailed(nil, nil)
+		if err != nil {
+			return err
+		}
+		if len(adapters) != 0 {
+			break
+		}
+		report(summarizeLinks(nil, skipped))
+		result, err := windows.WaitForMultipleObjects(handles, false, 1000)
+		if err != nil || result != uint32(windows.WAIT_TIMEOUT) {
+			return err
+		}
 	}
 	scheduler := engine.NewScheduler(adapters)
 	scheduler.SetAuto(true)
 	balancer := engine.NewBalancer(scheduler)
 	balancer.SetV6Mode(engine.V6Auto)
+	done := make(chan struct{})
+	defer close(done)
+	go scheduler.RunProbes(done)
 	tunnel := tun.New(balancer)
 	if err := tunnel.On(); err != nil {
 		return err
 	}
 	defer tunnel.Close()
 
-	done := make(chan struct{})
-	defer close(done)
-	go scheduler.RunProbes(done)
+	report(summarizeLinks(scheduler.Snapshot(), skipped))
 	if err := windows.SetEvent(ready); err != nil {
 		return err
 	}
 	last := time.Now()
 	nextScan := last.Add(3 * time.Second)
 	for {
-		result, err := windows.WaitForMultipleObjects([]windows.Handle{stop, parent}, false, 1000)
+		result, err := windows.WaitForMultipleObjects(handles, false, 1000)
 		if err != nil {
 			return err
 		}
@@ -104,12 +130,86 @@ func run() error {
 		}
 		now := time.Now()
 		if !now.Before(nextScan) {
-			if adapters, err := nics.DiscoverNics(nil, nil); err == nil {
+			if adapters, excluded, err := nics.DiscoverNicsDetailed(nil, nil); err == nil {
 				scheduler.Update(adapters)
+				skipped = excluded
 			}
 			nextScan = now.Add(3 * time.Second)
 		}
 		scheduler.Tick(now.Sub(last))
+		report(summarizeLinks(scheduler.Snapshot(), skipped))
 		last = now
 	}
+}
+
+func upstreamTunnelActive() bool {
+	iface, err := net.InterfaceByName("net-merge")
+	if err != nil || iface.Flags&net.FlagUp == 0 {
+		return false
+	}
+	addresses, err := iface.Addrs()
+	if err != nil {
+		return true
+	}
+	captureRange := netip.MustParsePrefix("198.18.0.0/15")
+	for _, address := range addresses {
+		prefix, err := netip.ParsePrefix(address.String())
+		if err == nil && captureRange.Contains(prefix.Addr()) {
+			return true
+		}
+	}
+	return false
+}
+
+func summarizeLinks(slots []engine.SlotStats, skipped []nics.Skip) string {
+	var lines []string
+	for _, slot := range slots {
+		if !slot.Present {
+			continue
+		}
+		traffic := ""
+		if slot.BytesIn > 0 {
+			traffic = ", data received"
+		}
+		lines = append(lines, fmt.Sprintf("%s (IPv4 %s, IPv6 %s%s)", slot.Name, slot.State, slot.State6, traffic))
+	}
+	if len(lines) == 0 {
+		lines = append(lines, "No eligible network links")
+	}
+	for _, adapter := range skipped {
+		if strings.HasPrefix(adapter.Reason, "no default gateway") || adapter.Reason == "no usable IP address" {
+			lines = append(lines, fmt.Sprintf("%s excluded (%s)", adapter.Name, adapter.Reason))
+		}
+	}
+	return "Links: " + strings.Join(lines, "; ")
+}
+
+func openReport(session string) (func(string), func(), error) {
+	const size = 4096
+	name := windows.StringToUTF16Ptr("Local\\DonutBoostMerge-" + session + "-Report")
+	kernel := windows.NewLazySystemDLL("kernel32.dll")
+	handle, _, callErr := kernel.NewProc("OpenFileMappingW").Call(windows.FILE_MAP_WRITE, 0, uintptr(unsafe.Pointer(name)))
+	if handle == 0 {
+		return nil, nil, callErr
+	}
+	defer windows.CloseHandle(windows.Handle(handle))
+	address, err := windows.MapViewOfFile(windows.Handle(handle), windows.FILE_MAP_WRITE, 0, 0, size)
+	if err != nil {
+		return nil, nil, err
+	}
+	buffer := unsafe.Slice((*byte)(unsafe.Pointer(address)), size)
+	sequence := (*uint32)(unsafe.Pointer(address))
+	length := (*uint32)(unsafe.Pointer(address + 4))
+	var previous string
+	write := func(message string) {
+		if message == previous {
+			return
+		}
+		previous = message
+		atomic.AddUint32(sequence, 1)
+		n := copy(buffer[8:], message)
+		atomic.StoreUint32(length, uint32(n))
+		atomic.AddUint32(sequence, 1)
+	}
+	return write, func() { _ = windows.UnmapViewOfFile(address) }, nil
 }

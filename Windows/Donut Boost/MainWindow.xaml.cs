@@ -153,8 +153,7 @@ public partial class MainWindow : Window
     {
         if (string.IsNullOrWhiteSpace(link)) return;
         UrlTextBox.Text = link;
-        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
-        Activate();
+        RestoreFromBackground();
         UrlTextBox.Focus();
         OnLogReceived("Browser link received. Review it, then select Download to start.");
     }
@@ -428,7 +427,7 @@ public partial class MainWindow : Window
 
     private void CloseButton_Click(object sender, RoutedEventArgs e)
     {
-        Close();
+        HideToNotificationArea();
     }
 
     private void UpdateFooterSpeedLimitText()
@@ -1125,6 +1124,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _windowClosed = true;
+        DisposeNotificationArea();
         _stopSystemMerge?.Set();
         _downloadQueueTimer.Stop();
         _updateCancellation?.Cancel();

@@ -3,6 +3,7 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
     <DefaultItemExcludesInProjectFolder>$(DefaultItemExcludesInProjectFolder);publish/**</DefaultItemExcludesInProjectFolder>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -19,6 +20,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
     <PackageReference Include="MonoTorrent" Version="3.0.2" />
   </ItemGroup>
 

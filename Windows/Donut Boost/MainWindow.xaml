@@ -166,7 +166,7 @@
                     <Button x:Name="MaximizeButton" Click="MaximizeRestoreButton_Click" Style="{StaticResource WindowControlButtonStyle}" ToolTip="Maximize / Restore">
                         <TextBlock x:Name="MaximizeIconText" Text="🗖" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
                     </Button>
-                    <Button Click="CloseButton_Click" Style="{StaticResource WindowCloseButtonStyle}" ToolTip="Close">
+                    <Button Click="CloseButton_Click" Style="{StaticResource WindowCloseButtonStyle}" ToolTip="Keep Donut Boost running in the notification area">
                         <TextBlock Text="✕" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
                     </Button>
                 </StackPanel>

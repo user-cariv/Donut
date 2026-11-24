@@ -14,7 +14,7 @@ Expand-Archive $archive $work
 $source = Join-Path $work 'net-merge-0.3.7'
 $command = Join-Path $source 'cmd/donut-system-merge'
 New-Item -ItemType Directory $command | Out-Null
-Copy-Item (Join-Path $PSScriptRoot 'main_windows.go') $command
+Copy-Item (Join-Path $PSScriptRoot '*.go') $command
 
 # Give Donut its own tunnel identity. Keep changes to physical adapter settings in memory.
 $tun = Join-Path $source 'internal/tun/tun.go'
@@ -47,7 +47,7 @@ func systemDirectory() string {
 
 Push-Location $source
 try {
-    go test ./internal/engine ./internal/nics ./internal/tun
+    go test ./cmd/donut-system-merge ./internal/engine ./internal/nics ./internal/tun
     if ($LASTEXITCODE -ne 0) { throw 'System Merge engine tests failed.' }
     go build -trimpath -o (Join-Path $destination 'DonutBoost.SystemMerge.exe') ./cmd/donut-system-merge
     if ($LASTEXITCODE -ne 0) { throw 'System Merge engine build failed.' }

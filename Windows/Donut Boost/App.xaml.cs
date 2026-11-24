@@ -13,6 +13,7 @@ public partial class App : Application
     private static Mutex? _singleInstanceMutex;
     private bool _ownsInstanceMutex;
     private const string DownloadPipeName = "DonutBoost.DownloadLink.v1";
+    private const string ShowWindowCommand = "show-window";
     private const int MaxHandoffLength = 8192;
     private CancellationTokenSource? _downloadPipeCancellation;
 
@@ -27,7 +28,7 @@ public partial class App : Application
 
             if (!TryAcquireInstance())
             {
-                if (link != null && await TryForwardDownloadLinkAsync(link))
+                if ((link != null || !ActivateVisibleInstance()) && await TryForwardHandoffAsync(link ?? ShowWindowCommand))
                 {
                     ActivateVisibleInstance();
                     Shutdown();
@@ -98,7 +99,10 @@ public partial class App : Application
                 readTimeout.CancelAfter(TimeSpan.FromSeconds(3));
                 using var reader = new StreamReader(pipe, Encoding.UTF8, false, 1024, leaveOpen: true);
                 string? message = await ReadHandoffAsync(reader, readTimeout.Token);
-                if (TryGetDownloadLink(message, out string? link) && !window.Dispatcher.HasShutdownStarted)
+                if (window.Dispatcher.HasShutdownStarted) continue;
+                if (message == ShowWindowCommand)
+                    _ = window.Dispatcher.BeginInvoke(window.RestoreFromBackground);
+                else if (TryGetDownloadLink(message, out string? link))
                     _ = window.Dispatcher.BeginInvoke(() => window.SetIncomingDownloadLink(link));
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested) { break; }
@@ -131,10 +135,10 @@ public partial class App : Application
         return null;
     }
 
-    private static async Task<bool> TryForwardDownloadLinkAsync(string link)
+    private static async Task<bool> TryForwardHandoffAsync(string message)
     {
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        byte[] payload = Encoding.UTF8.GetBytes(link + "\n");
+        byte[] payload = Encoding.UTF8.GetBytes(message + "\n");
         for (int attempt = 0; attempt < 15; attempt++)
         {
             try
