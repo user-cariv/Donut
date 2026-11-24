@@ -156,7 +156,7 @@ public class MultiChannelDownloader
                 {
                     using var adapterTransfer = new AdapterTransferCancellation(adapter, token);
                     using var probeTimeout = CancellationTokenSource.CreateLinkedTokenSource(adapterTransfer.Token);
-                    probeTimeout.CancelAfter(TimeSpan.FromSeconds(8));
+                    probeTimeout.CancelAfter(TimeSpan.FromSeconds(16));
                     try
                     {
                         var probe = await ProbeUrlAsync(_bondingManager.GetOrCreateClient(adapter), normalizedUrl, probeTimeout.Token);
@@ -173,7 +173,7 @@ public class MultiChannelDownloader
                 }));
             var reachable = probes.Where(p => p.Probe.Reachable).ToList();
             if (reachable.Count == 0)
-                throw new IOException("The download server could not be reached on any selected adapter.");
+                throw new IOException("No selected adapter could open this download. If the server generated a temporary URL, try a fresh direct link.");
 
             var selected = reachable.FirstOrDefault(p => p.Probe.SupportsRanges && p.Probe.TotalSize > 0);
             if (selected.Adapter == null)
@@ -1055,77 +1055,51 @@ public class MultiChannelDownloader
         }
         string fileName = SanitizeFileName(rawFileName);
 
-        long totalSize = -1;
-        bool supportsRanges = false;
-        bool reachable = false;
-
-        // Use a single-byte range probe to confirm range support without reading a large test body.
+        using var rangeTimeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        rangeTimeout.CancelAfter(TimeSpan.FromSeconds(8));
         try
         {
             using var rangeReq = new HttpRequestMessage(HttpMethod.Get, url);
             rangeReq.Headers.Range = new RangeHeaderValue(0, 0);
-            using var rangeRes = await client.SendAsync(rangeReq, HttpCompletionOption.ResponseHeadersRead, token);
-            reachable = rangeRes.IsSuccessStatusCode;
+            using var rangeRes = await client.SendAsync(rangeReq, HttpCompletionOption.ResponseHeadersRead, rangeTimeout.Token);
+            if (rangeRes.StatusCode == System.Net.HttpStatusCode.PartialContent &&
+                rangeRes.Content.Headers.ContentRange is { From: 0, To: 0, Length: > 0 } range)
+                return (GetFileName(rangeRes, fileName), range.Length.Value, true, true);
 
-            if (rangeRes.StatusCode == System.Net.HttpStatusCode.PartialContent)
-            {
-                supportsRanges = rangeRes.Content.Headers.ContentRange is { From: 0, To: 0 };
-                if (rangeRes.Content.Headers.ContentRange?.Length.HasValue == true)
-                {
-                    totalSize = rangeRes.Content.Headers.ContentRange.Length.Value;
-                }
-
-                if (rangeRes.Content.Headers.ContentDisposition?.FileName != null)
-                {
-                    fileName = SanitizeFileName(rangeRes.Content.Headers.ContentDisposition.FileName.Trim('"', '\''));
-                }
-            }
-            else if (rangeRes.IsSuccessStatusCode)
-            {
-                if (rangeRes.Content.Headers.ContentLength.HasValue)
-                {
-                    totalSize = rangeRes.Content.Headers.ContentLength.Value;
-                }
-                // The server ignored the actual range request (200 OK). Do not
-                // infer support from Accept-Ranges; this can corrupt chunks.
-                supportsRanges = false;
-                if (rangeRes.Content.Headers.ContentDisposition?.FileName != null)
-                {
-                    fileName = SanitizeFileName(rangeRes.Content.Headers.ContentDisposition.FileName.Trim('"', '\''));
-                }
-            }
+            if (rangeRes.StatusCode == System.Net.HttpStatusCode.OK)
+                return (GetFileName(rangeRes, fileName), rangeRes.Content.Headers.ContentLength ?? -1, false, true);
+        }
+        catch (OperationCanceledException) when (!token.IsCancellationRequested)
+        {
+            LogReceived?.Invoke("Byte-range probe timed out. Checking whether a regular download is available.");
         }
         catch (HttpRequestException ex)
         {
             LogReceived?.Invoke($"[Notice] Range probe check: {ex.Message}");
         }
 
-        // Secondary fallback if size still not known: send HEAD request
-        if (totalSize <= 0)
+        // Some download servers accept a regular GET without accepting ranged GETs or HEAD.
+        try
         {
-            try
-            {
-                using var headReq = new HttpRequestMessage(HttpMethod.Head, url);
-                using var headRes = await client.SendAsync(headReq, token);
-                if (headRes.IsSuccessStatusCode)
-                {
-                    reachable = true;
-                    if (headRes.Content.Headers.ContentLength.HasValue)
-                    {
-                        totalSize = headRes.Content.Headers.ContentLength.Value;
-                    }
-                    // HEAD may reveal total size, but only a ranged GET returning
-                    // 206 proves byte-range support.
-                    if (headRes.Content.Headers.ContentDisposition?.FileName != null)
-                    {
-                        fileName = SanitizeFileName(headRes.Content.Headers.ContentDisposition.FileName.Trim('"', '\''));
-                    }
-                }
-            }
-            catch (HttpRequestException) { }
+            using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, token);
+            if (response.StatusCode == System.Net.HttpStatusCode.OK)
+                return (GetFileName(response, fileName), response.Content.Headers.ContentLength ?? -1, false, true);
+
+            LogReceived?.Invoke($"The download server returned HTTP {(int)response.StatusCode}.");
+        }
+        catch (HttpRequestException ex)
+        {
+            LogReceived?.Invoke($"[Notice] Regular download probe: {ex.Message}");
         }
 
-        return (fileName, totalSize, supportsRanges, reachable);
+        return (fileName, -1, false, false);
+    }
+
+    private static string GetFileName(HttpResponseMessage response, string fallback)
+    {
+        var disposition = response.Content.Headers.ContentDisposition;
+        string? name = disposition?.FileNameStar ?? disposition?.FileName;
+        return string.IsNullOrWhiteSpace(name) ? fallback : SanitizeFileName(name.Trim('"', '\''));
     }
 
     private static string SanitizeFileName(string name)
