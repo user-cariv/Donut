@@ -37,7 +37,7 @@ public class GameBoostProxyServer : IDisposable
     public bool HasReliableGameProgress => _hasReliableGameProgress;
     public string DetectedGameName => _detectedGameName;
 
-    public event Action<long, long, double, bool, bool, string>? ProxyMetricsUpdated;
+    public event Action<long, long, double, bool, bool, bool, string>? ProxyMetricsUpdated;
     public event Action<string>? LogReceived;
 
     public GameBoostProxyServer(NetworkBondingManager bondingManager, LicenseManager? licenseManager = null)
@@ -289,6 +289,10 @@ public class GameBoostProxyServer : IDisposable
     {
         var processCheckStopwatch = Stopwatch.StartNew();
         var sizeDetectionStopwatch = Stopwatch.StartNew();
+        string lastSteamAppId = "";
+        long lastSteamCheckpoint = -1;
+        double steamProgressEstimate = 0;
+        bool steamProgressEstimated = false;
 
         bool isGameActive = false;
         while (!token.IsCancellationRequested && _isRunning)
@@ -371,14 +375,24 @@ public class GameBoostProxyServer : IDisposable
                 // Refresh Steam's verified transfer counters every three seconds.
                 if (sizeDetectionStopwatch.ElapsedMilliseconds >= 3000)
                 {
+                    double elapsedSeconds = sizeDetectionStopwatch.Elapsed.TotalSeconds;
                     sizeDetectionStopwatch.Restart();
                     if (_detectedLauncher == "Steam")
                     {
-                        var (steamName, steamBytes, steamProgress) = DetectSteamDownloadSize();
+                        var (steamName, steamBytes, steamProgress, appId, isDownloading) = DetectSteamDownloadSize();
                         _detectedGameSizeBytes = steamBytes;
                         _detectedGameName = steamName;
-                        _detectedGameProgressBytes = steamProgress;
                         _hasReliableGameProgress = steamBytes > 0 && !string.IsNullOrWhiteSpace(steamName);
+                        steamProgressEstimated = _hasReliableGameProgress && isDownloading;
+                        // Steam writes its manifest at checkpoints. Estimate between
+                        // them only while Steam reports this title is downloading.
+                        if (!steamProgressEstimated || appId != lastSteamAppId || steamProgress != lastSteamCheckpoint)
+                            steamProgressEstimate = steamProgress;
+                        else if (elapsedSeconds <= 6)
+                            steamProgressEstimate = Math.Min(steamBytes - 1, steamProgressEstimate + reportSpeed * elapsedSeconds);
+                        _detectedGameProgressBytes = (long)steamProgressEstimate;
+                        lastSteamAppId = appId;
+                        lastSteamCheckpoint = steamProgress;
                     }
                     else
                     {
@@ -388,6 +402,8 @@ public class GameBoostProxyServer : IDisposable
                         _detectedGameProgressBytes = 0;
                         _detectedGameName = "";
                         _hasReliableGameProgress = false;
+                        lastSteamAppId = "";
+                        steamProgressEstimated = false;
                     }
                 }
 
@@ -396,7 +412,7 @@ public class GameBoostProxyServer : IDisposable
                     : _detectedLauncher;
 
                 long displayedBytes = _hasReliableGameProgress ? _detectedGameProgressBytes : 0;
-                ProxyMetricsUpdated?.Invoke(displayedBytes, _detectedGameSizeBytes, reportSpeed, launcherActivityDetected, _hasReliableGameProgress, displayLabel);
+                ProxyMetricsUpdated?.Invoke(displayedBytes, _detectedGameSizeBytes, reportSpeed, launcherActivityDetected, _hasReliableGameProgress, steamProgressEstimated, displayLabel);
             }
             else
             {
@@ -405,17 +421,19 @@ public class GameBoostProxyServer : IDisposable
                 _detectedGameSizeBytes = 0;
                 _detectedGameProgressBytes = 0;
                 _hasReliableGameProgress = false;
+                lastSteamAppId = "";
+                steamProgressEstimated = false;
                 foreach (var adapter in _bondingManager.Adapters)
                 {
                     adapter.NotifyMetricsChanged();
                 }
-                ProxyMetricsUpdated?.Invoke(0, 0, totalInstantBps, false, false, _summaryLauncherLabel);
+                ProxyMetricsUpdated?.Invoke(0, 0, totalInstantBps, false, false, false, _summaryLauncherLabel);
             }
         }
     }
 
 
-    private static (string GameName, long TotalBytes, long CurrentDownloaded) DetectSteamDownloadSize()
+    private static (string GameName, long TotalBytes, long CurrentDownloaded, string AppId, bool IsDownloading) DetectSteamDownloadSize()
     {
         try
         {
@@ -437,7 +455,7 @@ public class GameBoostProxyServer : IDisposable
             searchPaths.Add(@"C:\Program Files\Steam");
 
             string? steamRoot = searchPaths.FirstOrDefault(Directory.Exists);
-            if (string.IsNullOrEmpty(steamRoot)) return ("", 0, 0);
+            if (string.IsNullOrEmpty(steamRoot)) return ("", 0, 0, "", false);
 
             // 2. Discover all Steam library folders from libraryfolders.vdf
             var libraryFolders = new List<string> { Path.Combine(steamRoot, "steamapps") };
@@ -493,7 +511,7 @@ public class GameBoostProxyServer : IDisposable
                     {
                         var res = ParseSteamManifest(acf);
                         if (res.TotalBytes > 0)
-                            return res;
+                            return (res.GameName, res.TotalBytes, res.CurrentDownloaded, appid, IsSteamDownloading(steamRoot, appid));
                     }
                 }
 
@@ -510,16 +528,37 @@ public class GameBoostProxyServer : IDisposable
                         if (appId == "228980" || !Directory.Exists(Path.Combine(downloadingDir, appId))) continue;
                         var res = ParseSteamManifest(file.FullName);
                         if (res.TotalBytes > 0)
-                            return res;
+                            return (res.GameName, res.TotalBytes, res.CurrentDownloaded, appId, IsSteamDownloading(steamRoot, appId));
                     }
                 }
                 catch { }
             }
 
-            // Steam content log entries do not expose authoritative current progress.
         }
         catch { }
-        return ("", 0, 0);
+        return ("", 0, 0, "", false);
+    }
+
+    private static bool IsSteamDownloading(string steamRoot, string appId)
+    {
+        try
+        {
+            using var stream = File.Open(Path.Combine(steamRoot, "logs", "content_log.txt"), FileMode.Open,
+                FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            stream.Position = Math.Max(0, stream.Length - 256 * 1024);
+            using var reader = new StreamReader(stream);
+            string marker = $"AppID {appId} App update changed :";
+            string? latestState = null;
+            while (reader.ReadLine() is { } line)
+            {
+                int index = line.IndexOf(marker, StringComparison.Ordinal);
+                if (index >= 0) latestState = line[(index + marker.Length)..];
+            }
+            return latestState?.Contains("Downloading,", StringComparison.Ordinal) == true &&
+                   !latestState.Contains("Stopping,", StringComparison.Ordinal);
+        }
+        catch (IOException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
     }
 
     private static (string GameName, long TotalBytes, long CurrentDownloaded) ParseSteamManifest(string acfPath)

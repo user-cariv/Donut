@@ -1060,7 +1060,7 @@ public partial class MainWindow : Window
         });
     }
 
-    private void OnGameProxyMetricsUpdated(long gameBytes, long gameSizeBytes, double adapterReceiveBps, bool hasLauncherActivity, bool hasReliableProgress, string lastHost)
+    private void OnGameProxyMetricsUpdated(long gameBytes, long gameSizeBytes, double adapterReceiveBps, bool hasLauncherActivity, bool hasReliableProgress, bool isEstimated, string lastHost)
     {
         PostToUi(() =>
         {
@@ -1134,36 +1134,39 @@ public partial class MainWindow : Window
                 long remaining = canShowProgress ? Math.Max(0, gameSizeBytes - gameBytes) : 0;
                 bool hasFreshProgressRate = _lastGameProgressAt != DateTime.MinValue &&
                     (DateTime.UtcNow - _lastGameProgressAt).TotalSeconds <= 5;
+                double etaRate = isEstimated ? adapterReceiveBps : hasFreshProgressRate ? _smoothedGameSpeedBps : 0;
                 string eta = !canShowProgress
                     ? "Unavailable from this launcher"
                     : remaining == 0
                         ? "Finished"
-                        : hasFreshProgressRate && _smoothedGameSpeedBps > 0
-                            ? DownloadSession.FormatETAFromSeconds(remaining / _smoothedGameSpeedBps)
+                        : etaRate > 0
+                            ? DownloadSession.FormatETAFromSeconds(remaining / etaRate)
                             : "Waiting for progress";
                 double percent = canShowProgress ? Math.Clamp((double)gameBytes / gameSizeBytes * 100.0, 0.0, 100.0) : 0;
+                string progressLabel = isEstimated ? $"~{Math.Min(percent, 99.9):F1}%" : $"{percent:F1}%";
+                string estimatePrefix = isEstimated ? "~" : "";
 
                 StatusBadgeTextBlock.Text = canShowProgress ? "VERIFIED DOWNLOAD" : "UNVERIFIED ACTIVITY";
                 FileNameTextBlock.Text = $"Detected: {lastHost}";
                 FileSizeTextBlock.Text = canShowProgress
-                    ? $"{DownloadSession.FormatBytes(gameBytes)} / {DownloadSession.FormatBytes(gameSizeBytes)}"
+                    ? $"{estimatePrefix}{DownloadSession.FormatBytes(gameBytes)} / {DownloadSession.FormatBytes(gameSizeBytes)}"
                     : hasSize
                         ? $"Size {DownloadSession.FormatBytes(gameSizeBytes)} · progress unavailable"
                         : "Game size unavailable from this launcher";
 
                 DownloadProgressBar.IsIndeterminate = false;
                 DownloadProgressBar.Value = percent;
-                ProgressPercentTextBlock.Text = canShowProgress ? $"{percent:F1}%" : "Progress unavailable";
-                EtaTextBlock.Text = $"ETA: {eta}";
+                ProgressPercentTextBlock.Text = canShowProgress ? progressLabel : "Progress unavailable";
+                EtaTextBlock.Text = $"ETA: {estimatePrefix}{eta}";
 
                 TitleBarLiveStatusPanel.Visibility = Visibility.Visible;
                 TitleBarSpeedTextBlock.Text = speedText;
                 TitleBarStatusBadge.Text = canShowProgress ? "VERIFIED DOWNLOAD" : "UNVERIFIED";
                 TitleBarProgressText.Text = canShowProgress
-                    ? $"{lastHost} · {percent:F1}% · ETA {eta}"
+                    ? $"{lastHost} · {progressLabel} · ETA {estimatePrefix}{eta}"
                     : $"{lastHost} · adapter traffic {speedText} · progress unavailable";
                 FooterProgressText.Text = canShowProgress
-                    ? $"{lastHost} · {DownloadSession.FormatBytes(gameBytes)} / {DownloadSession.FormatBytes(gameSizeBytes)} · ETA {eta}{breakdownText}"
+                    ? $"{lastHost} · {estimatePrefix}{DownloadSession.FormatBytes(gameBytes)} / {DownloadSession.FormatBytes(gameSizeBytes)} · ETA {estimatePrefix}{eta}{breakdownText}"
                     : $"{lastHost} · game progress/ETA not exposed; combined adapter receive rate {speedText}{breakdownText}";
             }
             else
