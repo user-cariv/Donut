@@ -30,11 +30,19 @@
 .account-primary:focus-visible,.account-secondary:focus-visible{outline:3px solid #ed955f;outline-offset:3px}
 .account-message{min-height:21px;margin:12px 0 0;color:#42704c;font-size:12px;line-height:1.5}
 .account-message[data-kind="error"]{color:#a23f32}
-.hub-support{width:min(920px,calc(100% - 48px));margin:0 auto 120px;padding:42px;border:1px solid #fff;border-radius:30px;background:#fff8;box-shadow:var(--hub-shadow);backdrop-filter:blur(18px)}
+.hub-support{width:min(920px,calc(100% - 48px));margin:0 auto 120px;padding:clamp(28px,5vw,52px);display:grid;grid-template-columns:1.15fr minmax(0,1fr);align-items:center;gap:clamp(20px,5vw,56px);border:1px solid #e8cfc0;border-radius:30px;background:radial-gradient(ellipse at 95% 0%,#ffd1b9,transparent 59%),#fff7ef;box-shadow:var(--hub-shadow)}
 .hub-support-copy h2{font-size:clamp(40px,5vw,58px)}
-.hub-support-copy>p:last-child{overflow-wrap:anywhere;color:var(--hub-muted);font-size:14px;line-height:1.65}
-.hub-support-copy a{font-weight:700;text-decoration:underline;text-underline-offset:3px}
-body.dark-mode .hub-support{border-color:#ffffff2b;background:#211b17f2;box-shadow:0 25px 65px #0006}
+.hub-support-copy>p:last-child{max-width:34ch;margin:16px 0 0;color:var(--hub-muted);font-size:16px;line-height:1.65}
+.hub-support-contact{min-width:0;display:grid;justify-items:start;gap:14px;padding:clamp(18px,3vw,28px);border:1px solid #eacabc;border-radius:22px;background:#fffaf4;box-shadow:0 12px 32px #6a362515}
+.hub-support-mark{display:block}
+.hub-support-email{display:inline-flex;align-items:center;justify-content:center;min-height:48px;max-width:100%;padding:10px 18px;border-radius:13px;background:#ffab78;color:#32190e;font-size:16px;font-weight:800;text-align:center;transition:background-color .18s ease,transform .2s ease}
+.hub-support-email:hover{background:#ffc29a}
+.hub-support-email:focus-visible{outline:2px solid var(--hub-ink);outline-offset:4px}
+.hub-support-address{margin:0;color:var(--hub-muted);font-size:14px;overflow-wrap:anywhere}
+body.dark-mode .hub-support{border-color:#634536;background:radial-gradient(ellipse at 95% 0%,#532b1c,transparent 64%),#211b17;box-shadow:0 25px 65px #0006}
+body.dark-mode .hub-support-contact{border-color:#71503d;background:#2b211d;box-shadow:0 12px 32px #0003}
+body.dark-mode .hub-support-email:focus-visible{outline-color:#fff4eb}
+@media (hover:hover) and (prefers-reduced-motion:no-preference){.hub-support-email:hover{transform:translateY(-2px)}}
 .account-user-card{display:flex;align-items:center;gap:12px;margin:19px 0;padding:14px;border:1px solid #eee1d5;border-radius:16px;background:#fff}
 .account-avatar{display:grid;width:42px;height:42px;flex:none;place-items:center;border-radius:50%;background:linear-gradient(135deg,#ffa63d,#ff7552);color:#28190f;font-weight:800}
 .account-user-card strong,.account-user-card small{display:block;overflow:hidden;text-overflow:ellipsis}.account-user-card strong{font-size:14px}.account-user-card small{margin-top:3px;color:#81746c;font-size:12px}
@@ -49,7 +57,7 @@ body.dark-mode .account-secondary,:root[data-theme="dark"] .account-secondary{bo
 body.dark-mode .account-reset-link,:root[data-theme="dark"] .account-reset-link{color:#ffad7c}
 body.dark-mode .account-user-card,:root[data-theme="dark"] .account-user-card{border-color:#514137;background:#30261f}
 @media(max-width:760px){.account-trigger{min-height:36px;padding:0 12px;font-size:12px}.account-dialog{padding:26px 21px;border-radius:24px}.account-layer{padding:12px}.hub-nav{display:grid;height:auto;min-height:0;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"brand actions" "links links";align-items:center;gap:8px 10px}.hub-nav>.hub-brand{grid-area:brand;min-width:0}.hub-nav nav{grid-area:links;display:flex;width:100%;justify-content:space-between;gap:8px;padding:5px 0 2px;font-size:12px}.hub-nav>.account-actions{grid-area:actions}}
-@media(max-width:760px){.hub-support{width:min(100% - 32px,560px);margin-bottom:80px;padding:25px}}
+@media(max-width:760px){.hub-support{width:min(100% - 32px,560px);margin-bottom:80px;padding:25px;grid-template-columns:minmax(0,1fr)}}
 @media(prefers-reduced-motion:reduce){.account-dialog{animation:none}.account-trigger{transition:none}}
 
 /* Shared navigation sizing across the Donut pages. */
