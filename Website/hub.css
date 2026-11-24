@@ -114,6 +114,26 @@ body.dark-mode .hub-button span { color: #bd542b; }
 .hub-float.is-dragging { z-index: 2; }
 .hub-float.is-dragging > span { cursor: grabbing; }
 body.dark-mode .hub-float > span { border-color: #ffffff26; color: #fff7f0; background: #251a17e8; box-shadow: 0 10px 24px #0005; }
+body:not(.dark-mode) .hub-hero-glow {
+  inset: 10%;
+  background: radial-gradient(circle, #e0926538 29%, #e1a47624 51%, transparent 68%);
+  filter: blur(14px);
+}
+body:not(.dark-mode) .hub-hero-art::before {
+  content: "";
+  position: absolute;
+  inset: 21%;
+  border: 1px solid #fff9f2;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 25%, #fff9f1, #f3ddca);
+  box-shadow: 0 16px 40px #8c4a291c, inset 0 0 0 8px #ffffff52;
+}
+body:not(.dark-mode) .hub-orbit { border-color: #ad674b63; }
+body:not(.dark-mode) .hub-orbit-light { color: #b87513; box-shadow: 0 0 0 2px #fff7, 0 0 10px currentColor; }
+body:not(.dark-mode) .hub-orbit-pink { color: #cf5079; }
+body:not(.dark-mode) .hub-orbit-blue { color: #27869f; }
+body:not(.dark-mode) .hub-donut { filter: drop-shadow(0 10px 14px #95482a38); }
+body:not(.dark-mode) .hub-float > span { border-color: #b1775938; }
 @keyframes hub-orbit-spin { to { transform: rotate(1turn); } }
 @keyframes hub-glow-pulse { 0%, 100% { opacity: .6; scale: 1; } 50% { opacity: 1; scale: 1.17; } }
 @keyframes hub-donut-bob { 50% { translate: 0 -12px; } }
