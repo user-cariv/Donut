@@ -110,6 +110,7 @@ public partial class MainWindow : Window
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         Loaded -= MainWindow_Loaded;
+        StartSystemMergeMonitor();
         _checkingStartupLicense = true;
         StartBoostButton.IsEnabled = false;
         RedeemCodeButton.IsEnabled = false;
@@ -511,17 +512,6 @@ public partial class MainWindow : Window
         OnLogReceived(mbps == 0 ? "Overall download speed limit cleared." : $"Overall download speed limited to {mbps:0.##} Mbps.");
     }
 
-    private void ApplyAdapterSpeedLimit_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button { DataContext: NetworkAdapterInfo adapter, Tag: TextBox input } ||
-            !TryReadNetworkSpeedLimit(input, out double mbps)) return;
-        adapter.SetDownloadLimitMbps(mbps);
-        if (mbps == 0) _savedAdapterLimits.Remove(adapter.Id);
-        else _savedAdapterLimits[adapter.Id] = mbps;
-        SaveSpeedLimits();
-        OnLogReceived(mbps == 0 ? $"[{adapter.Name}] Download speed limit cleared." : $"[{adapter.Name}] Download speed limited to {mbps:0.##} Mbps.");
-    }
-
     private bool TryReadNetworkSpeedLimit(TextBox input, out double mbps)
     {
         if (double.TryParse(input.Text, NumberStyles.AllowDecimalPoint, CultureInfo.CurrentCulture, out mbps) &&
@@ -532,40 +522,6 @@ public partial class MainWindow : Window
             "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Information);
         input.Focus();
         return false;
-    }
-
-    private void ApplyAdapterDataLimit_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button { DataContext: NetworkAdapterInfo adapter, Tag: TextBox input }) return;
-        if (!long.TryParse(input.Text, NumberStyles.None, CultureInfo.CurrentCulture, out long limit) ||
-            limit is < 0 or > 10_000_000)
-        {
-            MessageBox.Show(this, "Enter a whole number from 1 to 10,000,000 MB, or 0 for unlimited.",
-                "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Information);
-            input.Focus();
-            return;
-        }
-        adapter.SetDownloadDataLimitMb(limit);
-        if (limit == 0) _savedAdapterDataLimits.Remove(adapter.Id);
-        else _savedAdapterDataLimits[adapter.Id] = limit;
-        SaveSpeedLimits();
-        OnLogReceived(limit == 0 ? $"[{adapter.Name}] Data limit cleared." : $"[{adapter.Name}] Data limited to {limit:N0} MB per transfer.");
-    }
-
-    private void ApplyDailyAdapterLimit_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button { DataContext: NetworkAdapterInfo adapter, Tag: TextBox input }) return;
-        if (!long.TryParse(input.Text, NumberStyles.None, CultureInfo.CurrentCulture, out long limit) ||
-            limit is < 0 or > 10_000_000)
-        {
-            MessageBox.Show(this, "Enter a whole number from 1 to 10,000,000 MB, or 0 for unlimited.",
-                "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-        adapter.SetDailyDownloadLimitMb(limit);
-        if (limit == 0) _dailyAdapterLimits.Remove(adapter.Id);
-        else _dailyAdapterLimits[adapter.Id] = limit;
-        SaveSpeedLimits();
     }
 
     private void ApplyQueueWindow_Click(object sender, RoutedEventArgs e)
@@ -1567,6 +1523,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _windowClosed = true;
+        _systemMergeTimer.Stop();
         _downloadQueueTimer.Stop();
         _updateCancellation?.Cancel();
         _autoUpdateTimer?.Stop();

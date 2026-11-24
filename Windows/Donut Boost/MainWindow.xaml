@@ -120,6 +120,7 @@
 
                 <!-- Right: Utility & Windows Window Controls -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Button x:Name="SystemMergeButton" Content="System merge" Click="SystemMerge_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="12,5" Margin="0,0,8,0" ToolTip="Use Net Merge to distribute browser and other Windows connections across available adapters."/>
                     <Button x:Name="WifiRoutePreferenceButton" Click="PreferWifiRouteButton_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="12,5" Margin="0,0,8,0" ToolTip="Set Windows to prefer home Wi-Fi over phone tethering until reboot or restore. Requires administrator approval.">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="📶" FontSize="11" Margin="0,0,6,0"/>
@@ -559,13 +560,15 @@
                                              Background="#121214" Foreground="{StaticResource TextPrimaryBrush}"/>
                                     <Button Content="Add to queue" Click="QueueDownloadButton_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                                 </WrapPanel>
-                                <WrapPanel Margin="0,0,0,8">
+                                <Expander Header="Daily schedule" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,8">
+                                    <WrapPanel Margin="0,6,0,0">
                                     <TextBlock Text="Daily queue window" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,8,0"/>
                                     <TextBox x:Name="QueueWindowTextBox" Width="105" Padding="4" Margin="0,0,8,0"
                                              Background="#121214" Foreground="{StaticResource TextPrimaryBrush}"
                                              AutomationProperties.Name="Daily queue window" ToolTip="Use HH:mm-HH:mm. Leave blank to start anytime."/>
                                     <Button Content="Apply" Click="ApplyQueueWindow_Click" Style="{StaticResource SecondaryButtonStyle}"/>
-                                </WrapPanel>
+                                    </WrapPanel>
+                                </Expander>
                                 <ListBox x:Name="DownloadQueueList" MaxHeight="174" Background="#121214"
                                          Foreground="{StaticResource TextPrimaryBrush}" BorderThickness="0"
                                          SelectionMode="Multiple" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -618,7 +621,7 @@
                                 <TextBlock x:Name="AdapterCountTextBlock" Grid.Column="1" Text="0 Detected" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
                             </Grid>
 
-                            <TextBlock Grid.Row="1" Text="Live receive rates include all Windows traffic. The switches control direct downloads and bonded torrent peers. Donut received shows bytes read through each adapter." FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                            <TextBlock Grid.Row="1" Text="Live rates show all Windows traffic on each physical connection. Switches and limits apply to Donut downloads." FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,0,0,10"/>
 
                             <!-- Adapters List -->
                             <ItemsControl Grid.Row="2" x:Name="AdaptersItemsControl">
@@ -650,28 +653,7 @@
                                                     </StackPanel>
                                                     <TextBlock Text="{Binding Description}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
                                                     <TextBlock Text="{Binding LocalIp}" FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
-                                                    <WrapPanel Margin="0,5,0,0">
-                                                        <TextBlock Text="Mbps limit" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" FontSize="10" Margin="0,0,5,0"/>
-                                                        <TextBox x:Name="AdapterLimitInput" Text="{Binding DownloadLimitMbps, Mode=OneWay, StringFormat={}{0:0.##}}"
-                                                                 Width="53" Padding="4,2" Margin="0,0,5,0"
-                                                                 Background="#121214" Foreground="{StaticResource TextPrimaryBrush}" AutomationProperties.Name="Adapter Mbps limit"
-                                                                 ToolTip="0 means unlimited on this adapter. Applies to direct downloads and bonded torrent peers."/>
-                                                        <Button Content="Apply" Tag="{Binding ElementName=AdapterLimitInput}" Click="ApplyAdapterSpeedLimit_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="7,2" FontSize="10"/>
-                                                    </WrapPanel>
-                                                    <WrapPanel Margin="0,4,0,0">
-                                                        <TextBlock Text="MB per transfer" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" FontSize="10" Margin="0,0,5,0"/>
-                                                        <TextBox x:Name="AdapterDataLimitInput" Text="{Binding DownloadDataLimitMb, Mode=OneWay}" Width="53" Padding="4,2" Margin="0,0,5,0"
-                                                                 Background="#121214" Foreground="{StaticResource TextPrimaryBrush}" AutomationProperties.Name="Adapter data limit in megabytes per transfer"
-                                                                 ToolTip="0 means unlimited. Counts bytes Donut reads through this adapter during a direct download or bonded torrent transfer."/>
-                                                        <Button Content="Apply" Tag="{Binding ElementName=AdapterDataLimitInput}" Click="ApplyAdapterDataLimit_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="7,2" FontSize="10"/>
-                                                    </WrapPanel>
-                                                    <WrapPanel Margin="0,4,0,0">
-                                                        <TextBlock Text="MB per day" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" FontSize="10" Margin="0,0,5,0"/>
-                                                        <TextBox x:Name="DailyAdapterLimitInput" Text="{Binding DailyDownloadLimitMb, Mode=OneWay}" Width="53" Padding="4,2" Margin="0,0,5,0"
-                                                                 Background="#121214" Foreground="{StaticResource TextPrimaryBrush}" AutomationProperties.Name="Daily adapter data budget in megabytes"
-                                                                 ToolTip="Shared across Donut downloads. Resets at local midnight. 0 means unlimited."/>
-                                                        <Button Content="Apply" Tag="{Binding ElementName=DailyAdapterLimitInput}" Click="ApplyDailyAdapterLimit_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="7,2" FontSize="10"/>
-                                                    </WrapPanel>
+                                                    <Button Content="Limits" Click="EditAdapterLimits_Click" Style="{StaticResource SecondaryButtonStyle}" HorizontalAlignment="Left" Padding="8,3" Margin="0,5,0,0" FontSize="10"/>
                                                 </StackPanel>
 
                                                 <!-- Speed & Apple iOS Toggle Switch -->

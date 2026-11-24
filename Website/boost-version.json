@@ -2,7 +2,7 @@
   "latestVersion": "1.0.11",
   "minRequiredVersion": "1.0.0",
   "releaseDate": "2026-11-24",
-  "releaseNotes": "Adds saved daily data budgets alongside per-transfer limits, plus daily start windows for queued downloads. Restart Donut Boost if it does not reopen automatically.",
+  "releaseNotes": "Adds an opt-in System merge control for the separately installed Net Merge companion, a compact adapter limits editor, and a collapsible daily queue schedule. Restart Donut Boost to finish applying the update.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }
