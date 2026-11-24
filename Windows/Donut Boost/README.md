@@ -54,6 +54,6 @@ Use **Add to queue** for a direct link, magnet link, or torrent file. Leave the 
 
 ## Send links from Chrome or Edge
 
-Click **Browser extension** in Donut Boost to open the folder bundled with the installed app. In Chrome or Edge, open `chrome://extensions` or `edge://extensions`, enable **Developer mode**, choose **Load unpacked**, and select that folder. App updates replace the bundled extension files. Use **Reload** on the extension card or **Reload extension** in the pinned toolbar panel to apply them.
+Click **Browser extension** in Donut Boost, then double-click **Open Chrome Extensions** in File Explorer. Turn on **Developer mode**, click **Load unpacked**, and select **Select this folder to unpack in chrome extension**. In Edge, open `edge://extensions` and select the same folder. After updating Donut Boost, use **Reload** on the extension card or **Reload extension** in the toolbar popup to load the new files.
 
 Right-click a direct download or magnet link, or paste it into the pinned panel. The extension opens Donut Boost and fills its download box. Review the link and press **Boost Download** to start. The handoff sends only the URL, so links that depend on browser cookies may fail.

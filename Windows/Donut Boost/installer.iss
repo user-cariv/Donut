@@ -5,6 +5,7 @@
 #define MyAppPublisher "Donut"
 #define MyAppURL "https://user-cariv.github.io/Donut/boost.html"
 #define MyAppExeName "DonutBoost.exe"
+#define ExtensionSetupFolder "Select this folder to unpack in chrome extension"
 #ifndef Runtime
   #define Runtime "win-x64"
 #endif
@@ -46,13 +47,19 @@ UninstallDisplayIcon={app}\{#MyAppExeName}
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"
 
+[Dirs]
+; Existing unpacked installations still load their files from this path.
+Name: "{app}\browser-extension\chrome"; Attribs: hidden
+
 [Files]
 Source: "publish\{#Runtime}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs uninsrestartdelete; Excludes: "*.old,*.old.*,*.pdb"
 ; Keep the brand icon available for the Start Menu and desktop shortcuts.
 Source: "Assets\Donut.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "browser-extension\chrome\*"; DestDir: "{app}\browser-extension\chrome"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "browser-extension\chrome\*"; DestDir: "{app}\browser-extension\{#ExtensionSetupFolder}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
+Name: "{app}\browser-extension\Open Chrome Extensions"; Filename: "{code:GetChromePath}"; Parameters: "chrome://extensions/"; Check: ChromeIsInstalled
 Name: "{autoprograms}\Donut Boost"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\Donut.ico"
 Name: "{autodesktop}\Donut Boost"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\Donut.ico"; Tasks: desktopicon
 
@@ -82,6 +89,22 @@ Type: filesandordirs; Name: "{localappdata}\Donut\TorrentCache"
 Type: filesandordirs; Name: "{localappdata}\Temp\DonutBoost_Update"
 
 [Code]
+function GetChromePath(Param: String): String;
+var
+  Key: String;
+begin
+  Key := 'Software\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe';
+  if RegQueryStringValue(HKCU, Key, '', Result) and FileExists(Result) then Exit;
+  if RegQueryStringValue(HKLM64, Key, '', Result) and FileExists(Result) then Exit;
+  if RegQueryStringValue(HKLM32, Key, '', Result) and FileExists(Result) then Exit;
+  Result := '';
+end;
+
+function ChromeIsInstalled(): Boolean;
+begin
+  Result := GetChromePath('') <> '';
+end;
+
 function InitializeUninstall(): Boolean;
 begin
   Result := False;

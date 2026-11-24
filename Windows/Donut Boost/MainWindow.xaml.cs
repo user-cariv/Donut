@@ -323,8 +323,9 @@ public partial class MainWindow : Window
 
     private void OpenBrowserExtensionButton_Click(object sender, RoutedEventArgs e)
     {
-        var folder = Path.Combine(AppContext.BaseDirectory, "browser-extension", "chrome");
-        if (!File.Exists(Path.Combine(folder, "manifest.json")))
+        var folder = Path.Combine(AppContext.BaseDirectory, "browser-extension");
+        var setupFolder = Path.Combine(folder, "Select this folder to unpack in chrome extension");
+        if (!File.Exists(Path.Combine(setupFolder, "manifest.json")))
         {
             MessageBox.Show("The bundled extension folder is missing. Select Check for Updates in Donut Boost to check for a newer installer.",
                 "Donut Boost browser extension", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -333,7 +334,7 @@ public partial class MainWindow : Window
         try
         {
             Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true });
-            OnLogReceived("In Chrome or Edge, select Load unpacked and choose the bundled folder. After an app update, click Reload on the extension card.");
+            OnLogReceived("Open the Chrome Extensions shortcut, turn on Developer mode, and click Load unpacked. Select the folder shown in File Explorer.");
         }
         catch (Exception ex)
         {
