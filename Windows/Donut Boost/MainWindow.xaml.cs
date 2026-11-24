@@ -188,6 +188,8 @@ public partial class MainWindow : Window
 
             _licenseTimer.Start();
             _downloadQueueTimer.Start();
+            _steamDownloadTimer.Tick += SteamDownloadTimer_Tick;
+            _steamDownloadTimer.Start();
             _ = Task.Run(async () =>
             {
                 await Task.Delay(2500);
@@ -717,6 +719,7 @@ public partial class MainWindow : Window
     private async Task RunDownloadAsync(string input, string folder, long? expectedBytes = null, string? browserCookieHeader = null)
     {
         _runningTransfer = true;
+        UpdateSteamTask(null);
         StartBoostButton.IsEnabled = false;
         OnLogReceived("Preparing download?");
         try { await _downloader.StartDownloadAsync(input, folder, expectedBytes: expectedBytes, browserCookieHeader: browserCookieHeader); }
@@ -945,11 +948,13 @@ public partial class MainWindow : Window
         UpdateAdaptersUI();
     }
 
-    private void OnAdapterRatesUpdated(double combinedReceiveBps)
+    private void OnAdapterRatesUpdated(IReadOnlyList<(NetworkAdapterInfo Adapter, double BytesPerSecond)> sample)
     {
         PostToUi(() =>
         {
-            // The gauge always shows physical adapter receive rates, even during file transfers.
+            foreach (var (adapter, bytesPerSecond) in sample)
+                adapter.CurrentSpeedBps = bytesPerSecond;
+            double combinedReceiveBps = sample.Sum(item => item.BytesPerSecond);
             double mbps = combinedReceiveBps * 8 / 1_000_000.0;
             string speedText = mbps >= 1000 ? $"{(mbps / 1000):F2} Gbps" : $"{mbps:F1} Mbps";
             CombinedSpeedTextBlock.Text = mbps >= 1000 ? $"{mbps / 1000:F2}" : $"{mbps:F1}";
@@ -1127,6 +1132,7 @@ public partial class MainWindow : Window
         DisposeNotificationArea();
         _stopSystemMerge?.Set();
         _downloadQueueTimer.Stop();
+        _steamDownloadTimer.Stop();
         _updateCancellation?.Cancel();
         _autoUpdateTimer?.Stop();
         _licenseTimer?.Stop();

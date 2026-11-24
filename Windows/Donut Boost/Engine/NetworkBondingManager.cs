@@ -39,7 +39,7 @@ public class NetworkBondingManager : IDisposable
     }
 
     public event Action? AdaptersChanged;
-    public event Action<double>? AdapterRatesUpdated;
+    public event Action<IReadOnlyList<(NetworkAdapterInfo Adapter, double BytesPerSecond)>>? AdapterRatesUpdated;
 
     public NetworkBondingManager()
     {
@@ -51,7 +51,7 @@ public class NetworkBondingManager : IDisposable
 
         // Poll every 3 seconds (was 2s — reduced frequency to avoid WMI contention during USB changes)
         _pollTimer = new Timer(_ => DebouncedRefreshAdapters(), null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3));
-        _speedTimer = new Timer(_ => RefreshAdapterRates(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(500));
+        _speedTimer = new Timer(_ => RefreshAdapterRates(), null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
     }
 
     /// <summary>
@@ -104,8 +104,7 @@ public class NetworkBondingManager : IDisposable
                             !IsVirtualOrOverlayAdapter(n))
                 .ToDictionary(n => n.Id, StringComparer.OrdinalIgnoreCase);
 
-            double combinedBytesPerSecond = 0;
-            long now = Stopwatch.GetTimestamp();
+            var sample = new List<(NetworkAdapterInfo Adapter, double BytesPerSecond)>();
             lock (_trafficLock)
             {
                 foreach (var adapter in Adapters)
@@ -119,6 +118,7 @@ public class NetworkBondingManager : IDisposable
                             // GetIPStatistics. One unsupported adapter must not
                             // stop measurements for the others.
                             long current = nic.GetIPStatistics().BytesReceived;
+                            long now = Stopwatch.GetTimestamp();
                             if (_trafficCounters.TryGetValue(adapter.Id, out var previous))
                             {
                                 double elapsed = (now - previous.Timestamp) / (double)Stopwatch.Frequency;
@@ -130,13 +130,11 @@ public class NetworkBondingManager : IDisposable
                         catch (NetworkInformationException) { _trafficCounters.Remove(adapter.Id); }
                     }
 
-                    adapter.CurrentSpeedBps = rate;
-                    adapter.NotifyMetricsChanged();
-                    combinedBytesPerSecond += rate;
+                    else _trafficCounters.Remove(adapter.Id);
+                    sample.Add((adapter, rate));
                 }
+                AdapterRatesUpdated?.Invoke(sample);
             }
-
-            AdapterRatesUpdated?.Invoke(combinedBytesPerSecond);
         }
         catch { }
     }

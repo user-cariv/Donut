@@ -273,6 +273,7 @@
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
                                         <TextBlock Text="COMBINED RECEIVE RATE" FontSize="19" FontWeight="Bold"
                                                    Foreground="#FFFFFF" TextWrapping="Wrap"/>
+                                        <TextBlock Text="All Windows traffic" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,3,0,0"/>
                                         <StackPanel Margin="0,12,0,0">
                                             <TextBlock x:Name="WifiSummaryText" Text="Wi-Fi: Off" FontSize="16" FontWeight="SemiBold" Foreground="#54DB87"/>
                                             <TextBlock x:Name="TetherSummaryText" Text="Ethernet: Off" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,10,0,0"/>
@@ -284,52 +285,64 @@
 
                         <!-- Active Task Card -->
                         <Border x:Name="ActiveTaskCard" Grid.Row="1" Background="#171A25" BorderBrush="#272B38" BorderThickness="1" CornerRadius="24" Padding="14,7" Margin="0,0,0,6">
-                            <DockPanel LastChildFill="True">
-                                <!-- Action Buttons -->
-                                <WrapPanel DockPanel.Dock="Bottom" HorizontalAlignment="Left" Margin="0,4,0,0">
-                                    <Button x:Name="PauseResumeButton" Click="PauseResumeButton_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="8,4" Margin="0,0,8,0" IsEnabled="False">
-                                        <TextBlock x:Name="PauseResumeButtonText" Text="⏸ Pause"/>
-                                    </Button>
-                                    <Button x:Name="CancelDownloadButton" Click="CancelDownloadButton_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="8,4" Margin="0,0,8,0" IsEnabled="False">
-                                        <TextBlock Text="✕ Cancel"/>
-                                    </Button>
-                                    <Button x:Name="OpenFolderButton" Click="OpenFolderButton_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="8,4" IsEnabled="False">
-                                        <TextBlock Text="📁 Open Folder"/>
-                                    </Button>
-                                </WrapPanel>
-                                <StackPanel>
-                                <!-- Active Task Header -->
-                                <Grid Margin="0,0,0,3">
-                                    <TextBlock Text="ACTIVE TASK" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"/>
-                                </Grid>
+                            <Grid>
+                                <DockPanel x:Name="DonutTaskPanel" LastChildFill="True">
+                                    <!-- Action Buttons -->
+                                    <WrapPanel DockPanel.Dock="Bottom" HorizontalAlignment="Left" Margin="0,4,0,0">
+                                        <Button x:Name="PauseResumeButton" Click="PauseResumeButton_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="8,4" Margin="0,0,8,0" IsEnabled="False">
+                                            <TextBlock x:Name="PauseResumeButtonText" Text="⏸ Pause"/>
+                                        </Button>
+                                        <Button x:Name="CancelDownloadButton" Click="CancelDownloadButton_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="8,4" Margin="0,0,8,0" IsEnabled="False">
+                                            <TextBlock Text="✕ Cancel"/>
+                                        </Button>
+                                        <Button x:Name="OpenFolderButton" Click="OpenFolderButton_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="8,4" IsEnabled="False">
+                                            <TextBlock Text="📁 Open Folder"/>
+                                        </Button>
+                                    </WrapPanel>
+                                    <StackPanel>
+                                    <!-- Active Task Header -->
+                                    <Grid Margin="0,0,0,3">
+                                        <TextBlock Text="ACTIVE TASK" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"/>
+                                    </Grid>
 
-                                <!-- File Name & Total Size -->
-                                <Grid Margin="0,0,0,4">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock x:Name="FileNameTextBlock" Text="No active download" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
-                                    <TextBlock x:Name="FileSizeTextBlock" Grid.Column="1" Text="-- / --" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,0,0,0"/>
-                                </Grid>
+                                    <!-- File Name & Total Size -->
+                                    <Grid Margin="0,0,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="FileNameTextBlock" Text="No active download" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock x:Name="FileSizeTextBlock" Grid.Column="1" Text="-- / --" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,0,0,0"/>
+                                    </Grid>
 
-                                <!-- Apple Pill Progress Bar -->
-                                <ProgressBar x:Name="DownloadProgressBar" Height="5" Value="0" Maximum="100" Background="#2A3346" Foreground="#78D9E4">
-                                    <ProgressBar.Resources>
-                                        <Style TargetType="{x:Type Border}">
-                                            <Setter Property="CornerRadius" Value="4"/>
-                                        </Style>
-                                    </ProgressBar.Resources>
-                                </ProgressBar>
+                                    <!-- Apple Pill Progress Bar -->
+                                    <ProgressBar x:Name="DownloadProgressBar" Height="5" Value="0" Maximum="100" Background="#2A3346" Foreground="#78D9E4">
+                                        <ProgressBar.Resources>
+                                            <Style TargetType="{x:Type Border}">
+                                                <Setter Property="CornerRadius" Value="4"/>
+                                            </Style>
+                                        </ProgressBar.Resources>
+                                    </ProgressBar>
 
-                                <Grid Margin="0,4,0,2">
-                                    <TextBlock x:Name="ProgressPercentTextBlock" Text="0%" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
-                                    <TextBlock x:Name="EtaTextBlock" Text="ETA: --:--" FontSize="12" FontWeight="SemiBold" Foreground="#78E2DB" HorizontalAlignment="Right"/>
-                                </Grid>
+                                    <Grid Margin="0,4,0,2">
+                                        <TextBlock x:Name="ProgressPercentTextBlock" Text="0%" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                                        <TextBlock x:Name="EtaTextBlock" Text="ETA: --:--" FontSize="12" FontWeight="SemiBold" Foreground="#78E2DB" HorizontalAlignment="Right"/>
+                                    </Grid>
 
+                                    </StackPanel>
+
+                                </DockPanel>
+                                <StackPanel x:Name="SteamTaskPanel" Visibility="Collapsed">
+                                    <TextBlock Text="STEAM DOWNLOAD" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock x:Name="SteamGameName" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"
+                                               Foreground="{StaticResource TextPrimaryBrush}" Margin="0,4,0,3"/>
+                                    <TextBlock x:Name="SteamGameSize" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <ProgressBar x:Name="SteamGameProgress" Height="5" Maximum="100" Margin="0,5,0,3"
+                                                 Background="#2A3346" Foreground="#78D9E4"/>
+                                    <TextBlock x:Name="SteamGameRate" FontSize="11" TextWrapping="Wrap" Foreground="#78E2DB"/>
+                                    <TextBlock x:Name="SteamGameEta" FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"/>
                                 </StackPanel>
-
-                            </DockPanel>
+                            </Grid>
                         </Border>
                         <Border x:Name="SystemLogCard" Grid.Row="2" Margin="0,0,0,8" Background="#0D0F16" BorderBrush="#232633" BorderThickness="1" CornerRadius="14"
                                 Padding="12,8">

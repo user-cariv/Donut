@@ -2,7 +2,7 @@
   "latestVersion": "1.0.11",
   "minRequiredVersion": "1.0.0",
   "releaseDate": "2026-11-24",
-  "releaseNotes": "System merge now rescans adapters independently and falls back to normal Windows routing if every link loses internet. Merging resumes when a link recovers. Restart Donut Boost to finish applying the update.",
+  "releaseNotes": "Active Task now shows Steam download progress, game name, size, and an estimated ETA when Steam provides a recent speed sample. The gauge and adapter rows now use the same Windows traffic sample. Restart Donut Boost to finish applying the update.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }
