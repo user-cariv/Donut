@@ -376,6 +376,7 @@ public class MultiChannelDownloader
             catch (IOException ex) { LogReceived?.Invoke($"Could not finish writing the partial file: {ex.Message}"); }
             finally
             {
+                _bondingManager.FlushDailyUsage();
                 foreach (var client in browserClients.Values) client.Dispose();
                 Interlocked.Exchange(ref _cts, null)?.Dispose();
             }

@@ -30,9 +30,13 @@ public partial class MainWindow : Window
     private readonly Dictionary<Guid, (string CookieHeader, DateTimeOffset Expiry)> _browserSessions = new();
     private readonly Dictionary<string, double> _savedAdapterLimits = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, long> _savedAdapterDataLimits = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, long> _dailyAdapterLimits = new(StringComparer.OrdinalIgnoreCase);
+    private TimeOnly? _queueWindowStart;
+    private TimeOnly? _queueWindowEnd;
     private static readonly string SpeedLimitsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DonutBoost", "speed-limits.json");
-    private sealed record SpeedLimits(double Overall, Dictionary<string, double> Adapters, Dictionary<string, long>? DataLimits);
+    private sealed record SpeedLimits(double Overall, Dictionary<string, double> Adapters, Dictionary<string, long>? DataLimits,
+        Dictionary<string, long>? DailyLimits, TimeOnly? QueueStart, TimeOnly? QueueEnd);
 
     public MainWindow()
     {
@@ -548,6 +552,41 @@ public partial class MainWindow : Window
         OnLogReceived(limit == 0 ? $"[{adapter.Name}] Data limit cleared." : $"[{adapter.Name}] Data limited to {limit:N0} MB per transfer.");
     }
 
+    private void ApplyDailyAdapterLimit_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { DataContext: NetworkAdapterInfo adapter, Tag: TextBox input }) return;
+        if (!long.TryParse(input.Text, NumberStyles.None, CultureInfo.CurrentCulture, out long limit) ||
+            limit is < 0 or > 10_000_000)
+        {
+            MessageBox.Show(this, "Enter a whole number from 1 to 10,000,000 MB, or 0 for unlimited.",
+                "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        adapter.SetDailyDownloadLimitMb(limit);
+        if (limit == 0) _dailyAdapterLimits.Remove(adapter.Id);
+        else _dailyAdapterLimits[adapter.Id] = limit;
+        SaveSpeedLimits();
+    }
+
+    private void ApplyQueueWindow_Click(object sender, RoutedEventArgs e)
+    {
+        string input = QueueWindowTextBox.Text.Trim();
+        var parts = input.Split('-', StringSplitOptions.TrimEntries);
+        if (input.Length == 0)
+            (_queueWindowStart, _queueWindowEnd) = (null, null);
+        else if (parts.Length == 2 &&
+            TimeOnly.TryParseExact(parts[0], "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var start) &&
+            TimeOnly.TryParseExact(parts[1], "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var end) && start != end)
+            (_queueWindowStart, _queueWindowEnd) = (start, end);
+        else
+        {
+            MessageBox.Show(this, "Enter a daily start window such as 22:00-06:00, or leave it blank for any time.",
+                "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        SaveSpeedLimits();
+    }
+
     private static bool IsValidNetworkSpeedLimit(double mbps) => mbps == 0 || mbps is >= 0.1 and <= 100000;
 
     private void LoadSpeedLimits()
@@ -568,6 +607,13 @@ public partial class MainWindow : Window
             if (settings.DataLimits is not null)
                 foreach (var (adapter, limit) in settings.DataLimits.Where(entry => entry.Value is > 0 and <= 10_000_000))
                     _savedAdapterDataLimits[adapter] = limit;
+            if (settings.DailyLimits is not null)
+                foreach (var (adapter, limit) in settings.DailyLimits.Where(entry => entry.Value is > 0 and <= 10_000_000))
+                    _dailyAdapterLimits[adapter] = limit;
+            (_queueWindowStart, _queueWindowEnd) = (settings.QueueStart, settings.QueueEnd);
+            if (_queueWindowStart is { } start && _queueWindowEnd is { } end)
+                QueueWindowTextBox.Text = start.ToString("HH:mm", CultureInfo.InvariantCulture) + "-" +
+                    end.ToString("HH:mm", CultureInfo.InvariantCulture);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -582,7 +628,8 @@ public partial class MainWindow : Window
             Directory.CreateDirectory(Path.GetDirectoryName(SpeedLimitsPath)!);
             string pending = SpeedLimitsPath + ".tmp";
             File.WriteAllText(pending, JsonSerializer.Serialize(new SpeedLimits(
-                _downloader.OverallThrottler.CurrentLimitMbps, _savedAdapterLimits, _savedAdapterDataLimits)));
+                _downloader.OverallThrottler.CurrentLimitMbps, _savedAdapterLimits, _savedAdapterDataLimits,
+                _dailyAdapterLimits, _queueWindowStart, _queueWindowEnd)));
             File.Move(pending, SpeedLimitsPath, overwrite: true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -654,6 +701,7 @@ public partial class MainWindow : Window
                 adapter.SetDownloadLimitMbps(limit);
             if (_savedAdapterDataLimits.TryGetValue(adapter.Id, out long dataLimit) && adapter.DownloadDataLimitMb != dataLimit)
                 adapter.SetDownloadDataLimitMb(dataLimit);
+            adapter.SetDailyDownloadLimitMb(_dailyAdapterLimits.GetValueOrDefault(adapter.Id));
         }
         AdaptersItemsControl.ItemsSource = adapters;
 
@@ -947,6 +995,8 @@ public partial class MainWindow : Window
         if (_windowClosed || _checkingStartupLicense || _updateCancellation != null || _runningTransfer ||
             !_licenseManager.CurrentLicense.IsActive || _bondingManager.GetActiveEnabledAdapters().Count == 0) return;
 
+        if (_queueWindowStart is { } start && _queueWindowEnd is { } end &&
+            !TimeOnly.FromDateTime(DateTime.Now).IsBetween(start, end)) return;
         var entry = _downloadQueue.Entries.FirstOrDefault(item => item.Status == QueueEntryStatus.Queued &&
             (item.ScheduledAt == null || item.ScheduledAt <= now));
         if (entry == null) return;
@@ -1523,6 +1573,7 @@ public partial class MainWindow : Window
         _licenseTimer?.Stop();
         _gameBoostProxy.Dispose();
         _downloader.Cancel();
+        _bondingManager.FlushDailyUsage();
         _bondingManager.Dispose();
         base.OnClosed(e);
     }

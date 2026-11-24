@@ -56,6 +56,8 @@ After a restart, use **Retry selected** on a queued transfer or submit the same 
 
 Use **Overall Mbps limit** to share a speed cap across Donut Boost transfers. Set **Mbps limit** on any adapter to cap that connection separately. Set **MB per transfer** to stop using an adapter after Donut Boost reads that amount through it. If another eligible adapter remains, ranged transfers can continue on it. These saved limits apply to direct downloads and bonded torrent peers, and measure traffic read by Donut Boost. Enter **0** to clear a cap.
 
+Set **MB per day** to share a data budget across that adapter’s transfers until local midnight. Donut Boost saves usage across restarts and applies the stricter of the daily and per-transfer limits. Use **Daily queue window** to restrict when queued downloads start, including windows that cross midnight such as `22:00-06:00`. Transfers already running can finish outside that window.
+
 ## Send links from Chrome or Edge
 
 Click **Browser extension** in Donut Boost, then double-click **Open Chrome Extensions** in File Explorer. Turn on **Developer mode**, click **Load unpacked**, and select **Select this folder to unpack in chrome extension**. In Edge, open `edge://extensions` and select the same folder. After updating Donut Boost, use **Reload** on the extension card or **Reload extension** in the toolbar popup to load the new files.

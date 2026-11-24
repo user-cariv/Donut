@@ -2,7 +2,7 @@
   "latestVersion": "1.0.11",
   "minRequiredVersion": "1.0.0",
   "releaseDate": "2026-11-24",
-  "releaseNotes": "Adds optional Chrome and Edge download capture, site exclusions, a minimum file size, and explicit signed-in handoff for compatible HTTPS links. Restart Donut Boost if it does not reopen automatically, then reload the extension.",
+  "releaseNotes": "Adds saved daily data budgets alongside per-transfer limits, plus daily start windows for queued downloads. Restart Donut Boost if it does not reopen automatically.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }

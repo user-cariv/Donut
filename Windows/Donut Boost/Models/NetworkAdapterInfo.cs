@@ -29,6 +29,16 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
     internal Engine.AdapterDataLimit TransferDataLimit { get; } = new();
     public double DownloadLimitMbps => DownloadThrottler.CurrentLimitMbps;
     public long DownloadDataLimitMb => TransferDataLimit.MaximumBytes / 1_000_000;
+    public long DailyDownloadLimitMb => TransferDataLimit.DailyMaximumBytes / 1_000_000;
+
+    internal void SetDailyDownloadLimitMb(long megabytes)
+    {
+        string key = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Id.ToUpperInvariant())));
+        string path = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "DonutBoost", "adapter-usage", key + ".json");
+        TransferDataLimit.SetDailyLimit(megabytes * 1_000_000, path);
+        OnPropertyChanged(nameof(DailyDownloadLimitMb));
+    }
 
     internal void SetDownloadLimitMbps(double mbps)
     {

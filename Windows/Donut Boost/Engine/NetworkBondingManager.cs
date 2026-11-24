@@ -417,6 +417,14 @@ public class NetworkBondingManager : IDisposable
         }
     }
 
+    internal void FlushDailyUsage()
+    {
+        NetworkAdapterInfo[] adapters;
+        lock (_lock) adapters = _knownAdapters.Values.ToArray();
+        foreach (var adapter in adapters)
+            adapter.TransferDataLimit.FlushDailyUsage();
+    }
+
     public void Dispose()
     {
         _pollTimer?.Dispose();
