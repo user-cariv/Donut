@@ -22,18 +22,14 @@
 .account-input,.account-textarea{width:100%;min-height:47px;padding:12px 14px;border:1px solid #e6d9cd;border-radius:13px;background:#fff;color:#211915;font:500 14px "DM Sans",sans-serif;outline:none;transition:border-color .15s,box-shadow .15s}
 .account-textarea{min-height:116px;resize:vertical;line-height:1.5}
 .account-input:focus,.account-textarea:focus{border-color:#ec8950;box-shadow:0 0 0 3px rgba(236,137,80,.15)}
-.account-primary,.account-google,.account-secondary{width:100%;min-height:47px;margin-top:14px;border:0;border-radius:13px;font:700 14px "DM Sans",sans-serif;cursor:pointer}
+.account-primary,.account-secondary{width:100%;min-height:47px;margin-top:14px;border:0;border-radius:13px;font:700 14px "DM Sans",sans-serif;cursor:pointer}
 .account-reset-link{display:block;margin:8px 0 0 auto;padding:4px 0;border:0;background:transparent;color:#a84c24;font:600 12px "DM Sans",sans-serif;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .account-primary{background:#211915;color:#fff}
-.account-google,.account-secondary{border:1px solid #e6d9cd;background:#fff;color:#29211c}
-.account-google{display:flex;align-items:center;justify-content:center;gap:10px}
-.account-google svg{width:22px;height:22px;flex:none;border-radius:50%}
-.account-google:disabled,.account-primary:disabled{opacity:.65;cursor:wait}
-.account-google:focus-visible,.account-primary:focus-visible,.account-secondary:focus-visible{outline:3px solid #ed955f;outline-offset:3px}
+.account-secondary{border:1px solid #e6d9cd;background:#fff;color:#29211c}
+.account-primary:disabled{opacity:.65;cursor:wait}
+.account-primary:focus-visible,.account-secondary:focus-visible{outline:3px solid #ed955f;outline-offset:3px}
 .account-message{min-height:21px;margin:12px 0 0;color:#42704c;font-size:12px;line-height:1.5}
 .account-message[data-kind="error"]{color:#a23f32}
-.account-divider{display:flex;align-items:center;gap:10px;margin:13px 0 0;color:#988b82;font-size:11px}.account-divider::before,.account-divider::after{content:"";height:1px;flex:1;background:#e9ddd2}
-.account-footnote{margin:17px 0 0;color:#8b7e75;font-size:11px;line-height:1.5;text-align:center}
 .hub-support{width:min(920px,calc(100% - 48px));margin:0 auto 120px;padding:42px;border:1px solid #fff;border-radius:30px;background:#fff8;box-shadow:var(--hub-shadow);backdrop-filter:blur(18px)}
 .hub-support-copy h2{font-size:clamp(40px,5vw,58px)}
 .hub-support-copy>p:last-child{overflow-wrap:anywhere;color:var(--hub-muted);font-size:14px;line-height:1.65}
@@ -49,7 +45,7 @@ body.dark-mode .account-copy,body.dark-mode .account-label,:root[data-theme="dar
 body.dark-mode .account-tabs,:root[data-theme="dark"] .account-tabs{background:#342a24}
 body.dark-mode .account-tab[aria-selected="true"],:root[data-theme="dark"] .account-tab[aria-selected="true"]{background:#49382c;color:#fff}
 body.dark-mode .account-input,body.dark-mode .account-textarea,:root[data-theme="dark"] .account-input,:root[data-theme="dark"] .account-textarea{border-color:#514137;background:#171310;color:#f7f0ea}
-body.dark-mode .account-google,body.dark-mode .account-secondary,:root[data-theme="dark"] .account-google,:root[data-theme="dark"] .account-secondary{border-color:#514137;background:#30261f;color:#f7f0ea}
+body.dark-mode .account-secondary,:root[data-theme="dark"] .account-secondary{border-color:#514137;background:#30261f;color:#f7f0ea}
 body.dark-mode .account-reset-link,:root[data-theme="dark"] .account-reset-link{color:#ffad7c}
 body.dark-mode .account-user-card,:root[data-theme="dark"] .account-user-card{border-color:#514137;background:#30261f}
 @media(max-width:760px){.account-trigger{min-height:36px;padding:0 12px;font-size:12px}.account-dialog{padding:26px 21px;border-radius:24px}.account-layer{padding:12px}.hub-nav{display:grid;height:auto;min-height:0;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"brand actions" "links links";align-items:center;gap:8px 10px}.hub-nav>.hub-brand{grid-area:brand;min-width:0}.hub-nav nav{grid-area:links;display:flex;width:100%;justify-content:space-between;gap:8px;padding:5px 0 2px;font-size:12px}.hub-nav>.account-actions{grid-area:actions}}
