@@ -597,7 +597,6 @@ public partial class MainWindow : Window
         {
             if (_downloader.CurrentSession?.Status == DownloadStatus.Cancelled) return;
 
-            CombinedSpeedTextBlock.Text = session.FormattedSpeed;
             DownloadProgressBar.Value = session.ProgressPercentage;
             ProgressPercentTextBlock.Text = $"{session.ProgressPercentage:F1}%";
             FileSizeTextBlock.Text = $"{session.FormattedDownloadedSize} / {session.FormattedTotalSize}";
@@ -606,12 +605,12 @@ public partial class MainWindow : Window
             // Live Sticky Title Bar Status (Always in view when scrolling down)
             TitleBarLiveStatusPanel.Visibility = (session.Status == DownloadStatus.Downloading || session.Status == DownloadStatus.Paused) 
                 ? Visibility.Visible : Visibility.Collapsed;
-            TitleBarSpeedTextBlock.Text = session.FormattedSpeed;
+            TitleBarSpeedTextBlock.Text = $"File speed {session.FormattedSpeed}";
             TitleBarStatusBadge.Text = session.Status == DownloadStatus.Paused ? "⏸ PAUSED" : "⚡ BOOSTING SPEED";
             TitleBarProgressText.Text = $"{session.ProgressPercentage:F1}% (ETA: {session.EstimatedTimeRemaining})";
 
             // Live Sticky Footer Status Strip (Always in view when scrolling down)
-            FooterLiveSpeedText.Text = session.FormattedSpeed;
+            FooterLiveSpeedText.Text = $"File speed {session.FormattedSpeed}";
             FooterProgressText.Text = $"{session.ProgressPercentage:F1}% • {session.FormattedDownloadedSize} / {session.FormattedTotalSize} (ETA: {session.EstimatedTimeRemaining})";
         });
     }
@@ -638,7 +637,6 @@ public partial class MainWindow : Window
                 FileSizeTextBlock.Text = "-- / --";
                 DownloadProgressBar.Value = 0;
                 ProgressPercentTextBlock.Text = "0%";
-                CombinedSpeedTextBlock.Text = "0.0 Mbps";
                 EtaTextBlock.Text = "Ready to Boost";
                 StatusBadgeTextBlock.Text = "Ready to Boost";
                 TitleBarLiveStatusPanel.Visibility = Visibility.Collapsed;
@@ -654,11 +652,11 @@ public partial class MainWindow : Window
             // Sticky Status update
             TitleBarLiveStatusPanel.Visibility = (session.Status == DownloadStatus.Downloading || session.Status == DownloadStatus.Paused) 
                 ? Visibility.Visible : Visibility.Collapsed;
-            TitleBarSpeedTextBlock.Text = session.FormattedSpeed;
+            TitleBarSpeedTextBlock.Text = $"File speed {session.FormattedSpeed}";
             TitleBarStatusBadge.Text = StatusBadgeTextBlock.Text;
             TitleBarProgressText.Text = $"{session.ProgressPercentage:F1}% (ETA: {session.EstimatedTimeRemaining})";
 
-            FooterLiveSpeedText.Text = session.FormattedSpeed;
+            FooterLiveSpeedText.Text = $"File speed {session.FormattedSpeed}";
             FooterProgressText.Text = $"{StatusBadgeTextBlock.Text} • {session.ProgressPercentage:F1}% (ETA: {session.EstimatedTimeRemaining})";
 
             bool isRunning = session.Status == DownloadStatus.Downloading;
@@ -675,7 +673,6 @@ public partial class MainWindow : Window
 
             if (session.Status == DownloadStatus.Completed)
             {
-                CombinedSpeedTextBlock.Text = "0.0 Mbps";
                 EtaTextBlock.Text = "Finished";
                 FooterProgressText.Text = "✓ Completed Successfully!";
             }
@@ -685,7 +682,6 @@ public partial class MainWindow : Window
                 FileSizeTextBlock.Text = "-- / --";
                 DownloadProgressBar.Value = 0;
                 ProgressPercentTextBlock.Text = "0%";
-                CombinedSpeedTextBlock.Text = "0.0 Mbps";
                 EtaTextBlock.Text = "Ready to Boost";
                 StatusBadgeTextBlock.Text = "Ready to Boost";
                 TitleBarLiveStatusPanel.Visibility = Visibility.Collapsed;
@@ -872,7 +868,6 @@ public partial class MainWindow : Window
         FileSizeTextBlock.Text = "-- / --";
         DownloadProgressBar.Value = 0;
         ProgressPercentTextBlock.Text = "0%";
-        CombinedSpeedTextBlock.Text = "0.0 Mbps";
         EtaTextBlock.Text = "Ready to Boost";
         StatusBadgeTextBlock.Text = "Ready to Boost";
         TitleBarLiveStatusPanel.Visibility = Visibility.Collapsed;
@@ -1039,15 +1034,17 @@ public partial class MainWindow : Window
     {
         PostToUi(() =>
         {
+            // The gauge always shows physical adapter receive rates, even during file transfers.
+            double mbps = combinedReceiveBps * 8 / 1_000_000.0;
+            string speedText = mbps >= 1000 ? $"{(mbps / 1000):F2} Gbps" : $"{mbps:F1} Mbps";
+            CombinedSpeedTextBlock.Text = speedText;
+
             bool isDirectDownloadActive = _downloader.CurrentSession != null &&
                 (_downloader.CurrentSession.Status == DownloadStatus.Downloading ||
                  _downloader.CurrentSession.Status == DownloadStatus.Probing ||
                  _downloader.CurrentSession.Status == DownloadStatus.Paused);
             if (isDirectDownloadActive) return;
 
-            double mbps = combinedReceiveBps * 8 / 1_000_000.0;
-            string speedText = mbps >= 1000 ? $"{(mbps / 1000):F2} Gbps" : $"{mbps:F1} Mbps";
-            CombinedSpeedTextBlock.Text = speedText;
             FooterLiveSpeedText.Text = speedText;
 
             // Show per-adapter speed breakdown in footer
@@ -1067,8 +1064,6 @@ public partial class MainWindow : Window
         {
             double mbps = adapterReceiveBps * 8 / 1_000_000.0;
             string speedText = mbps >= 1000 ? $"{(mbps / 1000):F2} Gbps" : $"{mbps:F1} Mbps";
-            CombinedSpeedTextBlock.Text = speedText;
-            FooterLiveSpeedText.Text = speedText;
 
             // Build per-adapter speed breakdown string (📶300.0 + 📱500.0 = 800.0 Mbps)
             var adapters = _bondingManager.Adapters;
