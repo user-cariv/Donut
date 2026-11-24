@@ -57,9 +57,10 @@ Source: "publish\{#Runtime}\*"; DestDir: "{app}"; Flags: ignoreversion recursesu
 Source: "Assets\Donut.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "browser-extension\chrome\*"; DestDir: "{app}\browser-extension\chrome"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "browser-extension\chrome\*"; DestDir: "{app}\browser-extension\{#ExtensionSetupFolder}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "browser-extension\Chrome Extensions link.txt"; DestDir: "{app}\browser-extension"; Flags: ignoreversion
 
 [Icons]
-Name: "{app}\browser-extension\Open Chrome Extensions"; Filename: "{code:GetChromePath}"; Parameters: "chrome://extensions/"; Check: ChromeIsInstalled
+Name: "{app}\browser-extension\Open Chrome Extensions"; Filename: "{code:GetChromePath}"; Parameters: "chrome://extensions/"; Comment: "chrome://extensions/"; Check: ChromeIsInstalled
 Name: "{autoprograms}\Donut Boost"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\Donut.ico"
 Name: "{autodesktop}\Donut Boost"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\Donut.ico"; Tasks: desktopicon
 

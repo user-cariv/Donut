@@ -1,0 +1,5 @@
+chrome://extensions/
+
+Paste this address into Chrome, or double-click Open Chrome Extensions.
+Turn on Developer mode, click Load unpacked, and select:
+Select this folder to unpack in chrome extension
