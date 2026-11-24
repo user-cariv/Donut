@@ -56,10 +56,10 @@
       <p class="account-copy">Use your Donut account across all Donut pages.</p>
       <p class="account-preview-note"></p>
       <div class="account-tabs" role="tablist" aria-label="Account options">
-        <button class="account-tab" id="account-tab-signin" type="button" role="tab" aria-selected="true" aria-controls="account-panel-signin">Sign in</button>
-        <button class="account-tab" id="account-tab-create" type="button" role="tab" aria-selected="false" aria-controls="account-panel-create">Create account</button>
+        <button class="account-tab" id="account-tab-create" type="button" role="tab" aria-selected="true" aria-controls="account-panel-create">Create account</button>
+        <button class="account-tab" id="account-tab-signin" type="button" role="tab" aria-selected="false" aria-controls="account-panel-signin" tabindex="-1">Sign in</button>
       </div>
-      <div class="account-panel" id="account-panel-signin" role="tabpanel" aria-labelledby="account-tab-signin">
+      <div class="account-panel" id="account-panel-signin" role="tabpanel" aria-labelledby="account-tab-signin" hidden>
         <form data-account-form="signin">
           <label class="account-label" for="account-email-signin">Email address</label>
           <input class="account-input" id="account-email-signin" name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
@@ -70,7 +70,7 @@
           <p class="account-message" aria-live="polite"></p>
         </form>
       </div>
-      <div class="account-panel" id="account-panel-create" role="tabpanel" aria-labelledby="account-tab-create" hidden>
+      <div class="account-panel" id="account-panel-create" role="tabpanel" aria-labelledby="account-tab-create">
         <form data-account-form="create">
           <label class="account-label" for="account-name-create">Full name</label>
           <input class="account-input" id="account-name-create" name="name" autocomplete="name" placeholder="Your name" required>
@@ -121,7 +121,7 @@
     });
     panels.forEach((panel) => { panel.hidden = panel.id !== `account-panel-${name}`; });
   };
-  const open = (tab = "signin") => {
+  const open = (tab = "create") => {
     layer.hidden = false;
     document.body.style.overflow = "hidden";
     setTab(readAccount() ? "signin" : tab);
@@ -171,7 +171,7 @@
     layer.querySelector(".account-copy").textContent = "Use your Donut account across all Donut pages.";
     layer.querySelector(".account-preview-note").textContent = "";
     layer.querySelector(".account-tabs").hidden = false;
-    panels.forEach((panel) => { panel.hidden = panel.id !== "account-panel-signin"; });
+    setTab("create");
   };
 
   trigger.addEventListener("click", () => open());
