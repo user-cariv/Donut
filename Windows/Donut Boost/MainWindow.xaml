@@ -179,6 +179,8 @@
                                 </Border>
                             </StackPanel>
                             <TextBlock x:Name="UpdateReleaseNotesText" Text="Keep Windows on home Wi-Fi, improve adapter monitoring, and show verified Steam download progress." FontSize="11" Foreground="#C4B5FD" TextWrapping="Wrap"/>
+                            <TextBlock Text="Donut Boost needs to restart after installing the update. If it doesn't reopen automatically, open it from the Windows Start menu."
+                                       Margin="0,6,0,0" FontSize="11" Foreground="#E9D5FF" TextWrapping="Wrap"/>
                             
                             <!-- Download Progress Strip -->
                             <Grid x:Name="UpdateProgressPanel" Visibility="Collapsed" Margin="0,8,0,0">

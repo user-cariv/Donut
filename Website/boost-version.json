@@ -2,7 +2,7 @@
   "latestVersion": "1.0.11",
   "minRequiredVersion": "1.0.0",
   "releaseDate": "2026-11-24",
-  "releaseNotes": "Improves Windows uninstall cleanup and adds a way to restore an existing activation on the same device.",
+  "releaseNotes": "Steam download progress and ETA now update between checkpoints. Restart Donut Boost after installing this update if it does not reopen automatically.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }
