@@ -12,20 +12,45 @@ public partial class MainWindow
 {
     private EventWaitHandle? _stopSystemMerge;
 
-    private async void SystemMerge_Click(object sender, RoutedEventArgs e)
+    private async void StartSystemMergeOnFirstRender(object? sender, EventArgs e)
     {
-        if (_stopSystemMerge is { } current)
-        {
-            _systemMergeActive = false;
-            SystemMergeButton.Content = "Stopping merge…";
-            SystemMergeButton.IsEnabled = false;
-            _speedTestCancellation?.Cancel();
-            current.Set();
-            return;
-        }
+        ContentRendered -= StartSystemMergeOnFirstRender;
+        if (_windowClosed) return;
 
-        SystemMergeButton.Content = "Starting merge…";
-        SystemMergeButton.IsEnabled = false;
+        string status = "System merge stopped";
+        string hint = "Reopen Donut Boost to restart automatic system merging.";
+        try
+        {
+            await RunSystemMergeAsync();
+        }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            status = "Merge approval declined";
+            hint = "Reopen Donut Boost and approve the Windows administrator prompt to start System merge.";
+        }
+        catch (Exception ex)
+        {
+            status = "System merge unavailable";
+            hint = ex.Message;
+            if (!_windowClosed) OnLogReceived($"System merge: {hint}");
+        }
+        finally
+        {
+            _stopSystemMerge = null;
+            _systemMergeActive = false;
+            _speedTestCancellation?.Cancel();
+            if (!_windowClosed)
+            {
+                SystemMergeStatus.Text = status;
+                SystemMergeStatus.ToolTip = hint;
+                LauncherRoutingHint.Text = hint;
+            }
+        }
+    }
+
+    private async Task RunSystemMergeAsync()
+    {
+        SystemMergeStatus.Text = "Starting system merge…";
         string session = Guid.NewGuid().ToString("N");
         using var ready = new EventWaitHandle(false, EventResetMode.ManualReset, $@"Local\DonutBoostMerge-{session}-Ready");
         using var stop = new EventWaitHandle(false, EventResetMode.ManualReset, $@"Local\DonutBoostMerge-{session}-Stop");
@@ -56,8 +81,7 @@ public partial class MainWindow
             {
                 _systemMergeActive = true;
                 LauncherRoutingHint.Text = "System merge is on. Start or resume a launcher download to open new connections across available links.";
-                SystemMergeButton.Content = "System merge on";
-                SystemMergeButton.IsEnabled = true;
+                SystemMergeStatus.Text = "System merge on";
                 await exited;
             }
             else
@@ -70,27 +94,10 @@ public partial class MainWindow
             if (worker.ExitCode != 0 && !_windowClosed)
                 throw new InvalidOperationException("System merge stopped unexpectedly.");
         }
-        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
-        {
-            // The user declined Windows elevation.
-        }
-        catch (Exception ex)
-        {
-            if (!_windowClosed)
-                MessageBox.Show(this, ex.Message, "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
         finally
         {
             stop.Set();
             _stopSystemMerge = null;
-            _systemMergeActive = false;
-            _speedTestCancellation?.Cancel();
-            if (!_windowClosed)
-            {
-                LauncherRoutingHint.Text = "Monitors supported launchers. Turn on System merge to route new launcher connections across available links.";
-                SystemMergeButton.Content = "System merge off";
-                SystemMergeButton.IsEnabled = true;
-            }
         }
     }
 

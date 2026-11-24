@@ -120,7 +120,7 @@
 
                 <!-- Right: Utility & Windows Window Controls -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" WindowChrome.IsHitTestVisibleInChrome="True">
-                    <Button x:Name="SystemMergeButton" Content="System merge off" Click="SystemMerge_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="12,5" Margin="0,0,8,0" ToolTip="Distribute new Windows connections across available network adapters."/>
+                    <TextBlock x:Name="SystemMergeStatus" Text="Starting system merge…" VerticalAlignment="Center" Margin="0,0,12,0" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" AutomationProperties.LiveSetting="Polite"/>
                     <Button x:Name="WifiRoutePreferenceButton" Click="PreferWifiRouteButton_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="12,5" Margin="0,0,8,0" ToolTip="Set Windows to prefer home Wi-Fi over phone tethering until reboot or restore. Requires administrator approval.">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="📶" FontSize="11" Margin="0,0,6,0"/>
@@ -416,7 +416,7 @@
                                     <TextBlock x:Name="GameBoostBadgeText" Text="🟢 MONITORING" FontSize="10" FontWeight="SemiBold" Foreground="#30D158"/>
                                 </Border>
                             </StackPanel>
-                            <TextBlock x:Name="LauncherRoutingHint" Text="Monitors supported launchers. Turn on System merge to route new launcher connections across available links." FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+                            <TextBlock x:Name="LauncherRoutingHint" Text="System merge starts automatically after Windows administrator approval." FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
 
                             <WrapPanel Orientation="Horizontal" Margin="0,5,0,0">
                                 <Border Background="#201E2E" CornerRadius="5" Padding="5,1" Margin="0,0,5,3">

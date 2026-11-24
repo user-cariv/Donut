@@ -95,6 +95,7 @@ public partial class MainWindow : Window
             UpdateLicenseUI();
         };
         Loaded += MainWindow_Loaded;
+        ContentRendered += StartSystemMergeOnFirstRender;
 
     }
 

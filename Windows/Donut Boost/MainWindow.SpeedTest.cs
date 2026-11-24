@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -20,7 +20,7 @@ public partial class MainWindow
         }
         if (!_systemMergeActive)
         {
-            CombinedSpeedTestResult.Text = "Turn on System merge before running the test.";
+            CombinedSpeedTestResult.Text = "System merge must be running. Check its status at the top of the window.";
             return;
         }
 
