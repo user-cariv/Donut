@@ -41,6 +41,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        InitializePreviewMotion();
 
         WindowState = WindowState.Maximized;
         MaximizeIconText.Text = "🗗";
@@ -121,7 +122,8 @@ public partial class MainWindow : Window
             }
         }
 
-        var margin = new Thickness(0, 0, 0, bottomGap + overlap);
+        PreviewFooter.Margin = new Thickness(0, 0, 0, overlap);
+        var margin = new Thickness(0, 0, 0, bottomGap);
         if (NetworkAdaptersCard.Margin != margin)
             NetworkAdaptersCard.Margin = margin;
         if (SystemLogCard.Margin != margin)
@@ -152,6 +154,8 @@ public partial class MainWindow : Window
     public void SetIncomingDownloadLink(string? link)
     {
         if (string.IsNullOrWhiteSpace(link)) return;
+        DownloadsNavigationButton.IsChecked = true;
+        ShowPreviewDownloads_Click(this, new RoutedEventArgs());
         UrlTextBox.Text = link;
         RestoreFromBackground();
         UrlTextBox.Focus();
@@ -434,6 +438,10 @@ public partial class MainWindow : Window
 
     private void UpdateFooterSpeedLimitText()
     {
+        PreviewBoth.IsChecked = _bondingManager.CurrentMode == BondingMode.CombineAll;
+        PreviewWifi.IsChecked = _bondingManager.CurrentMode == BondingMode.WifiOnly;
+        PreviewMobile.IsChecked = _bondingManager.CurrentMode == BondingMode.MobileDataOnly;
+        MovePreviewModePill();
         double cap = _downloader.Throttler.CurrentLimitMbps;
         string capText = cap > 0 ? $" • Donut download cap: {cap:F0} Mbps (mobile adapters uncapped)" : "";
         FooterStatusModeText.Text = (_bondingManager.CurrentMode switch
@@ -548,24 +556,24 @@ public partial class MainWindow : Window
                 adapter.SetDownloadDataLimitMb(dataLimit);
             adapter.SetDailyDownloadLimitMb(_dailyAdapterLimits.GetValueOrDefault(adapter.Id));
         }
-        AdaptersItemsControl.ItemsSource = adapters;
+        SyncPreviewAdapters(adapters.OrderBy(adapter => adapter.IsWifi ? 0 : adapter.IsMobilePhone ? 1 : 2).ToArray());
 
         int activeCount = adapters.Count(a => a.IsEnabled && a.IsOnline);
         AdapterCountTextBlock.Text = $"{activeCount} of {adapters.Count} Active";
 
         var activeNames = adapters.Where(a => a.IsEnabled && a.IsOnline).Select(a => $"{a.IconGlyph} {a.Name}");
-        FooterActiveConnectionsText.Text = $"{activeCount} selected ({string.Join(" + ", activeNames)})";
+        FooterActiveConnectionsText.Text = $"{activeCount} active connections";
         UpdateFooterSpeedLimitText();
 
         bool wifiOn = adapters.Any(adapter => adapter.IsWifi && adapter.IsEnabled && adapter.IsOnline);
-        bool ethernetOn = adapters.Any(adapter => adapter.IsEnabled && adapter.IsOnline &&
+        bool tetherOn = adapters.Any(adapter => adapter.IsEnabled && adapter.IsOnline && adapter.IsMobilePhone);
+        bool ethernetOn = adapters.Any(adapter => adapter.IsEnabled && adapter.IsOnline && !adapter.IsMobilePhone &&
             (adapter.InterfaceType is NetworkInterfaceType.Ethernet or NetworkInterfaceType.Ethernet3Megabit
-                or NetworkInterfaceType.FastEthernetT or NetworkInterfaceType.FastEthernetFx or NetworkInterfaceType.GigabitEthernet ||
-             (adapter.IsMobilePhone && !adapter.IsWifi)));
+                or NetworkInterfaceType.FastEthernetT or NetworkInterfaceType.FastEthernetFx or NetworkInterfaceType.GigabitEthernet));
         WifiSummaryText.Text = $"Wi-Fi: {(wifiOn ? "On" : "Off")}";
-        TetherSummaryText.Text = $"Ethernet: {(ethernetOn ? "On" : "Off")}";
+        TetherSummaryText.Text = tetherOn ? "Mobile data: On" : $"Ethernet: {(ethernetOn ? "On" : "Off")}";
         TetherSummaryText.SetResourceReference(TextBlock.ForegroundProperty,
-            ethernetOn ? "EthernetOnlineBrush" : "TextSecondaryBrush");
+            tetherOn || ethernetOn ? "EthernetOnlineBrush" : "TextSecondaryBrush");
     }
 
     private void OnProgressUpdated(DownloadSession session)
@@ -648,7 +656,6 @@ public partial class MainWindow : Window
             PauseResumeButtonText.Text = isPaused ? "▶ Resume" : "⏸ Pause";
 
             CancelDownloadButton.IsEnabled = isRunning || isPaused || isProbing;
-            OpenFolderButton.IsEnabled = session.Status == DownloadStatus.Completed;
 
             if (session.Status == DownloadStatus.Completed)
             {
@@ -861,22 +868,6 @@ public partial class MainWindow : Window
         FooterProgressText.Text = "Ready to Boost";
     }
 
-    private void OpenFolderButton_Click(object sender, RoutedEventArgs e)
-    {
-        var sessionPath = _downloader.CurrentSession?.DestinationPath;
-        var folderToOpen = !string.IsNullOrWhiteSpace(sessionPath) && Directory.Exists(sessionPath)
-            ? sessionPath
-            : _outputFolder;
-        if (Directory.Exists(folderToOpen))
-        {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = folderToOpen,
-                UseShellExecute = true
-            });
-        }
-    }
-
     private void BrowseFolderButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new Microsoft.Win32.OpenFolderDialog
@@ -943,6 +934,49 @@ public partial class MainWindow : Window
         finally { WifiRoutePreferenceButton.IsEnabled = true; }
     }
 
+    private async void PreferPreviewWifi_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.MenuItem command) return;
+        var adapters = _bondingManager.Adapters;
+        var wifi = adapters.FirstOrDefault(adapter => adapter.IsWifi && adapter.IsOnline && adapter.GatewayIp is not null);
+        var phones = adapters.Where(adapter => adapter.IsMobilePhone && adapter.IsOnline && adapter.InterfaceIndex > 0)
+            .Select(adapter => adapter.InterfaceIndex).ToArray();
+        if (wifi is null || phones.Length == 0)
+        {
+            MessageBox.Show("Connect Wi-Fi and USB tethering first.", "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (WifiRoutePreferenceManager.HasSavedMetrics)
+        {
+            MessageBox.Show("Restore the saved route settings before applying a new Wi-Fi preference.", "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        command.IsEnabled = false;
+        try
+        {
+            if (!await WifiRoutePreferenceManager.RunAsync(false, wifi.InterfaceIndex, phones))
+                throw new InvalidOperationException("Windows did not apply the interface metrics.");
+            OnLogReceived("Windows now prefers Wi-Fi over USB tethering for the normal default route.");
+        }
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            OnLogReceived("Administrator approval for the Wi-Fi preference was declined.");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            if (WifiRoutePreferenceManager.HasSavedMetrics)
+            {
+                WifiRoutePreferenceText.Text = "Restore route settings";
+                WifiRoutePreferenceButton.Visibility = Visibility.Visible;
+            }
+            command.IsEnabled = true;
+        }
+    }
+
     private void AdapterCheckBox_Changed(object sender, RoutedEventArgs e)
     {
         UpdateAdaptersUI();
@@ -954,6 +988,7 @@ public partial class MainWindow : Window
         {
             foreach (var (adapter, bytesPerSecond) in sample)
                 adapter.CurrentSpeedBps = bytesPerSecond;
+            UpdatePreviewGauge(sample);
             double combinedReceiveBps = sample.Sum(item => item.BytesPerSecond);
             double mbps = combinedReceiveBps * 8 / 1_000_000.0;
             string speedText = mbps >= 1000 ? $"{(mbps / 1000):F2} Gbps" : $"{mbps:F1} Mbps";
@@ -997,7 +1032,7 @@ public partial class MainWindow : Window
                 {
                     bool newVersion = _availableUpdate?.LatestVersion != manifest.LatestVersion;
                     _availableUpdate = manifest;
-                    if (newVersion || !silent) AppUpdateBanner.Visibility = Visibility.Visible;
+                    if (newVersion || !silent) ShowRealUpdateBanner();
                     TitleBarUpdateBadge.Visibility = Visibility.Visible;
                     UpdateVersionTag.Text = $"v{manifest.LatestVersion}";
                     UpdateReleaseNotesText.Text = string.IsNullOrWhiteSpace(manifest.ReleaseNotes)
@@ -1110,14 +1145,9 @@ public partial class MainWindow : Window
     }
 
 
-    private void DismissUpdateBanner_Click(object sender, RoutedEventArgs e)
-    {
-        AppUpdateBanner.Visibility = Visibility.Collapsed;
-    }
-
     private void TitleBarUpdateBadge_Click(object sender, RoutedEventArgs e)
     {
-        AppUpdateBanner.Visibility = Visibility.Visible;
+        ShowRealUpdateBanner();
     }
 
     private async void CheckForUpdatesButton_Click(object sender, RoutedEventArgs e)

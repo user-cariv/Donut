@@ -5,11 +5,11 @@
         Icon="Assets/Donut.ico"
         WindowState="Maximized"
         Height="800" Width="1100"
-        MinHeight="560" MinWidth="880"
+        MinHeight="560" MinWidth="960"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="False"
-        Background="#0F1119"
+        Background="#09080E"
         FontFamily="{StaticResource AppleFontFamily}"
         SnapsToDevicePixels="True"
         UseLayoutRounding="True"
@@ -19,7 +19,11 @@
 
     <Window.Resources>
         <SolidColorBrush x:Key="EthernetOnlineBrush" Color="#FFAB61"/>
-    </Window.Resources>
+        <LinearGradientBrush x:Key="PreviewCardBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#B0443C59" Offset="0"/><GradientStop Color="#92241F37" Offset="0.19"/>
+            <GradientStop Color="#771A1729" Offset="0.67"/><GradientStop Color="#92322A42" Offset="1"/>
+        </LinearGradientBrush>
+    <LinearGradientBrush x:Key="PreviewGlassEdge" StartPoint="0,0" EndPoint="0.75,1"><GradientStop Color="#A5B0A4CC"/><GradientStop Color="#4B544B63" Offset="0.30"/><GradientStop Color="#82796C92" Offset="1"/></LinearGradientBrush></Window.Resources>
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="46" ResizeBorderThickness="8" GlassFrameThickness="0" CornerRadius="0"/>
@@ -32,8 +36,23 @@
             <RowDefinition Height="Auto"/> <!-- Apple Status Bar (Row 2 - Fixed) -->
         </Grid.RowDefinitions>
 
+        <Grid x:Name="WallpaperViewport" Grid.RowSpan="3" ClipToBounds="True" IsHitTestVisible="False">
+            <Ellipse Width="940" Height="690" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Ellipse.CacheMode><BitmapCache/></Ellipse.CacheMode>
+                <Ellipse.RenderTransform><TranslateTransform x:Name="WallpaperTravel"/></Ellipse.RenderTransform>
+                <Ellipse.Fill>
+                    <RadialGradientBrush RadiusX="0.5" RadiusY="0.5">
+                        <GradientStop Color="#92552508"/>
+                        <GradientStop Color="#69582B0B" Offset="0.28"/>
+                        <GradientStop Color="#30582B0B" Offset="0.63"/>
+                        <GradientStop Color="#00582B0B" Offset="1"/>
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+            </Ellipse>
+        </Grid>
+
         <!-- Title bar -->
-        <Border Grid.Row="0" Background="#0F1119" Height="46" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+        <Border Grid.Row="0" Background="#A809080E" Height="46" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
             <Grid Margin="18,0,16,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/> <!-- Left: Traffic Lights & Brand -->
@@ -49,8 +68,8 @@
 
                     <!-- License Status Pill (Click to view details or renew) -->
                     <Button x:Name="TitleBarLicenseButton" Click="TitleBarLicenseButton_Click" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" Margin="10,0,0,0" ToolTip="Click to view license status or enter a new redeem code">
-                        <Border x:Name="TitleBarLicenseBadge" Background="#172C31" CornerRadius="12" Padding="10,4">
-                            <TextBlock x:Name="TitleBarLicenseText" Text="⚡ PRO: ACTIVE" FontSize="10" FontWeight="Bold" Foreground="#30D158"/>
+                        <Border x:Name="TitleBarLicenseBadge" Background="#251B0B" BorderBrush="#745019" BorderThickness="1" CornerRadius="12" Padding="10,4">
+                            <TextBlock x:Name="TitleBarLicenseText" Text="⚡ PRO: ACTIVE" FontSize="10" FontWeight="Bold" Foreground="#FFC256"/>
                         </Border>
                     </Button>
 
@@ -58,20 +77,20 @@
                     <Button Click="OpenWebsiteButton_Click" Cursor="Hand" Margin="10,0,0,0" ToolTip="Visit Official Donut Website (https://user-cariv.github.io/Donut/)">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
-                                <Border x:Name="WebBadgeBorder" CornerRadius="17" Padding="15,7" BorderThickness="1" SnapsToDevicePixels="True">
+                                <Border x:Name="WebBadgeBorder" CornerRadius="15" Padding="13,5" BorderThickness="1" SnapsToDevicePixels="True">
                                     <Border.Background>
                                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                            <GradientStop Color="#63DED5" Offset="0.0"/>
-                                            <GradientStop Color="#7CA4F3" Offset="1.0"/>
+                                            <GradientStop Color="#291D10" Offset="0.0"/>
+                                            <GradientStop Color="#211830" Offset="1.0"/>
                                         </LinearGradientBrush>
                                     </Border.Background>
                                     <Border.BorderBrush>
-                                        <SolidColorBrush Color="Transparent"/>
+                                        <LinearGradientBrush><GradientStop Color="#FFAC31"/><GradientStop Color="#9978EE" Offset="1"/></LinearGradientBrush>
                                     </Border.BorderBrush>
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                         <TextBlock Text="🌐" FontSize="11" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="Website" FontSize="12" FontWeight="SemiBold" Foreground="#102236" VerticalAlignment="Center"/>
-                                        <TextBlock Text="↗" FontSize="11" FontWeight="Black" Foreground="#17304A" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Website" FontSize="12" FontWeight="SemiBold" Foreground="#FFF0D8" VerticalAlignment="Center"/>
+                                        <TextBlock Text="↗" FontSize="11" FontWeight="Black" Foreground="#FFF0D8" Margin="6,0,0,0" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Border>
                                 <ControlTemplate.Triggers>
@@ -79,8 +98,8 @@
                                         <Setter TargetName="WebBadgeBorder" Property="Background">
                                             <Setter.Value>
                                                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                                    <GradientStop Color="#A0F0E7" Offset="0.0"/>
-                                                    <GradientStop Color="#A1C5FF" Offset="1.0"/>
+                                                    <GradientStop Color="#FFCB72" Offset="0.0"/>
+                                                    <GradientStop Color="#FFAA2C" Offset="1.0"/>
                                                 </LinearGradientBrush>
                                             </Setter.Value>
                                         </Setter>
@@ -150,12 +169,12 @@
                         </Button.Template>
                         <Button.ContextMenu>
                             <ContextMenu>
-                                <MenuItem Header="Check for updates" Click="CheckForUpdatesButton_Click"/>
+                                <MenuItem Header="Prefer Wi-Fi for Windows" Click="PreferPreviewWifi_Click"/><MenuItem Header="Check for updates" Click="CheckForUpdatesButton_Click"/>
                             </ContextMenu>
                         </Button.ContextMenu>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔄" FontSize="11" Margin="0,0,6,0"/>
-                            <TextBlock Text="Rescan Connections" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <TextBlock Text="Rescan connections" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
 
@@ -181,7 +200,7 @@
                 </Grid.RowDefinitions>
 
                 <!-- 0. In-App Auto-Update Notification Banner (Appears when new version is available) -->
-                <Border x:Name="AppUpdateBanner" Grid.Row="0" Visibility="Collapsed" Background="#1E192B" BorderBrush="#8B5CF6" BorderThickness="1.5" CornerRadius="12" Margin="0,0,0,8" Padding="16,8">
+                <Border x:Name="AppUpdateBanner" Grid.Row="0" Visibility="Collapsed" Background="{StaticResource PreviewCardBrush}" BorderBrush="#8B5CF6" BorderThickness="1.5" CornerRadius="12" Margin="0,0,0,8" Padding="16,8">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -225,152 +244,59 @@
                                     <TextBlock x:Name="UpdateNowButtonText" Text="Update Now" FontWeight="Bold"/>
                                 </StackPanel>
                             </Button>
-                            <Button Click="DismissUpdateBanner_Click" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="6" ToolTip="Dismiss for now">
-                                <TextBlock Text="✕" FontSize="13" Foreground="#8B5CF6"/>
-                            </Button>
                         </StackPanel>
                     </Grid>
                 </Border>
 
-                <!-- Download dashboard -->
-                <Grid Grid.Row="1">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="0.46*" MinWidth="278"/> <!-- Left: Speedometer & Active Task -->
-                        <ColumnDefinition Width="*"/>     <!-- Right: Connected Networks -->
-                    </Grid.ColumnDefinitions>
+                <Grid Grid.Row="1"><Grid.Background><RadialGradientBrush Center="0.94,0.12" GradientOrigin="0.94,0.12" RadiusX="0.46" RadiusY="0.75"><GradientStop Color="#592B2053"/><GradientStop Color="#002B2053" Offset="1"/></RadialGradientBrush></Grid.Background>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="69*"/><ColumnDefinition Width="30*"/></Grid.ColumnDefinitions>
 
-                    <!-- Speed, active download and system log -->
-                    <Grid Grid.Column="0" Margin="0,0,8,0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="1.25*" MinHeight="108" MaxHeight="258"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
+                    <StackPanel Margin="0,3,9,0">
+                        <StackPanel.Resources>
+                            <Style x:Key="RailGlass" TargetType="RadioButton">
+                                <Setter Property="Width" Value="45"/>
+                                <Setter Property="Height" Value="45"/>
+                                <Setter Property="Cursor" Value="Hand"/>
+                                <Setter Property="Foreground" Value="#D7D2E4"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="RadioButton">
+                                            <Border x:Name="Surface" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="13">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Surface" Property="Background" Value="#242030"/>
+                                                </Trigger>
+                                                <Trigger Property="IsChecked" Value="True">
+                                                    <Setter Property="Foreground" Value="#FFC256"/>
+                                                    <Setter TargetName="Surface" Property="BorderBrush" Value="#846023"/>
+                                                    <Setter TargetName="Surface" Property="Background">
+                                                        <Setter.Value><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#403019"/><GradientStop Color="#18120C" Offset="1"/></LinearGradientBrush></Setter.Value>
+                                                    </Setter>
+                                                </Trigger>
+                                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                                    <Setter TargetName="Surface" Property="BorderBrush" Value="#FFC256"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </StackPanel.Resources>
+                        <RadioButton x:Name="DownloadsNavigationButton" GroupName="PreviewNavigation" IsChecked="True" Click="ShowPreviewDownloads_Click" Style="{StaticResource RailGlass}" HorizontalAlignment="Left" ToolTip="Downloads" AutomationProperties.Name="Downloads">
+                            <Path Data="M12,3 L12,15 M7,10.5 L12,15.5 L17,10.5 M4.5,20 L19.5,20" Width="20" Height="20" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                        </RadioButton>
+                        <RadioButton GroupName="PreviewNavigation" Click="ShowPreviewLog_Click" Style="{StaticResource RailGlass}" HorizontalAlignment="Left" Margin="0,9,0,0" ToolTip="System log" AutomationProperties.Name="System log">
+                            <Path Data="M7.5,3 H16.5 A3,3 0 0 1 19.5,6 V18 A3,3 0 0 1 16.5,21 H7.5 A3,3 0 0 1 4.5,18 V6 A3,3 0 0 1 7.5,3 Z M8.5,8.5 H15.5 M8.5,12 H15.5 M8.5,15.5 H12.5" Width="20" Height="20" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                        </RadioButton>
+                    </StackPanel>
 
-                        <!-- Apple-Style Circular Activity Gauge Card -->
-                        <Border Grid.Row="0" Background="#171A25" BorderBrush="#272B38" BorderThickness="1" CornerRadius="24" Padding="14,8" Margin="0,0,0,8">
-                            <StackPanel>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel VerticalAlignment="Center" Width="110">
-                                        <Grid Width="110" Height="110">
-                                            <Border CornerRadius="55" BorderBrush="#344963" BorderThickness="4" Background="#171D2B"/>
-                                            <Border CornerRadius="55" BorderBrush="#80D9EF" BorderThickness="1" Margin="4" Opacity="0.52"/>
-                                            <Ellipse Width="9" Height="9" Fill="#80BBF3" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,3,0,0"/>
-                                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                <TextBlock x:Name="CombinedSpeedTextBlock" Text="0.0" FontSize="39" FontWeight="Bold"
-                                                           Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center"/>
-                                                <TextBlock x:Name="CombinedSpeedUnitTextBlock" Text="MBPS" FontSize="12" FontWeight="Bold"
-                                                           Foreground="#A3B1CC" HorizontalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Grid>
-                                        <TextBlock x:Name="StatusBadgeTextBlock" Text="Ready" FontSize="19" FontWeight="SemiBold"
-                                                   Foreground="#A4E5F3" TextWrapping="Wrap" TextAlignment="Center" Margin="0,5,0,0"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
-                                        <TextBlock Text="COMBINED RECEIVE RATE" FontSize="19" FontWeight="Bold"
-                                                   Foreground="#FFFFFF" TextWrapping="Wrap"/>
-                                        <TextBlock Text="All Windows traffic" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,3,0,0"/>
-                                        <StackPanel Margin="0,12,0,0">
-                                            <TextBlock x:Name="WifiSummaryText" Text="Wi-Fi: Off" FontSize="16" FontWeight="SemiBold" Foreground="#54DB87"/>
-                                            <TextBlock x:Name="TetherSummaryText" Text="Ethernet: Off" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,10,0,0"/>
-                                        </StackPanel>
-                                    </StackPanel>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
+                    <Grid x:Name="PreviewDownloadColumn" Grid.Column="1" Margin="0,0,28,0">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                        <Border>
 
-                        <!-- Active Task Card -->
-                        <Border x:Name="ActiveTaskCard" Grid.Row="1" Background="#171A25" BorderBrush="#272B38" BorderThickness="1" CornerRadius="24" Padding="14,7" Margin="0,0,0,6">
                             <Grid>
-                                <DockPanel x:Name="DonutTaskPanel" LastChildFill="True">
-                                    <!-- Action Buttons -->
-                                    <WrapPanel DockPanel.Dock="Bottom" HorizontalAlignment="Left" Margin="0,4,0,0">
-                                        <Button x:Name="PauseResumeButton" Click="PauseResumeButton_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="8,4" Margin="0,0,8,0" IsEnabled="False">
-                                            <TextBlock x:Name="PauseResumeButtonText" Text="⏸ Pause"/>
-                                        </Button>
-                                        <Button x:Name="CancelDownloadButton" Click="CancelDownloadButton_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="8,4" Margin="0,0,8,0" IsEnabled="False">
-                                            <TextBlock Text="✕ Cancel"/>
-                                        </Button>
-                                        <Button x:Name="OpenFolderButton" Click="OpenFolderButton_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="8,4" IsEnabled="False">
-                                            <TextBlock Text="📁 Open Folder"/>
-                                        </Button>
-                                    </WrapPanel>
-                                    <StackPanel>
-                                    <!-- Active Task Header -->
-                                    <Grid Margin="0,0,0,3">
-                                        <TextBlock Text="ACTIVE TASK" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"/>
-                                    </Grid>
-
-                                    <!-- File Name & Total Size -->
-                                    <Grid Margin="0,0,0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="FileNameTextBlock" Text="No active download" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
-                                        <TextBlock x:Name="FileSizeTextBlock" Grid.Column="1" Text="-- / --" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,0,0,0"/>
-                                    </Grid>
-
-                                    <!-- Apple Pill Progress Bar -->
-                                    <ProgressBar x:Name="DownloadProgressBar" Height="5" Value="0" Maximum="100" Background="#2A3346" Foreground="#78D9E4">
-                                        <ProgressBar.Resources>
-                                            <Style TargetType="{x:Type Border}">
-                                                <Setter Property="CornerRadius" Value="4"/>
-                                            </Style>
-                                        </ProgressBar.Resources>
-                                    </ProgressBar>
-
-                                    <Grid Margin="0,4,0,2">
-                                        <TextBlock x:Name="ProgressPercentTextBlock" Text="0%" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
-                                        <TextBlock x:Name="EtaTextBlock" Text="ETA: --:--" FontSize="12" FontWeight="SemiBold" Foreground="#78E2DB" HorizontalAlignment="Right"/>
-                                    </Grid>
-
-                                    </StackPanel>
-
-                                </DockPanel>
-                                <StackPanel x:Name="SteamTaskPanel" Visibility="Collapsed">
-                                    <TextBlock Text="STEAM DOWNLOAD" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}"/>
-                                    <TextBlock x:Name="SteamGameName" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"
-                                               Foreground="{StaticResource TextPrimaryBrush}" Margin="0,4,0,3"/>
-                                    <TextBlock x:Name="SteamGameSize" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
-                                    <ProgressBar x:Name="SteamGameProgress" Height="5" Maximum="100" Margin="0,5,0,3"
-                                                 Background="#2A3346" Foreground="#78D9E4"/>
-                                    <TextBlock x:Name="SteamGameRate" FontSize="11" TextWrapping="Wrap" Foreground="#78E2DB"/>
-                                    <TextBlock x:Name="SteamGameEta" FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"/>
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-                        <Border x:Name="SystemLogCard" Grid.Row="2" Margin="0,0,0,8" Background="#0D0F16" BorderBrush="#232633" BorderThickness="1" CornerRadius="14"
-                                Padding="12,8">
-                            <DockPanel>
-                                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
-                                    <TextBlock Text="SYSTEM LOG" FontSize="12" FontWeight="Bold" Foreground="#AABAD2"/>
-                                    <Ellipse Width="5" Height="5" Fill="#78E2DB" Margin="7,0,0,0" VerticalAlignment="Center"/>
-                                </StackPanel>
-                                <ScrollViewer x:Name="SystemLogViewport" VerticalScrollBarVisibility="Auto">
-                                    <TextBlock x:Name="LogOutputTextBlock" Text="Ready." FontSize="11" FontFamily="Consolas"
-                                               Foreground="#B1BED2" TextWrapping="Wrap"/>
-                                </ScrollViewer>
-                            </DockPanel>
-                        </Border>
-                    </Grid>
-
-                    <!-- Right Column: independently measured network adapters -->
-                    <Grid Grid.Column="1" Margin="4,0,0,0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-                        <Border Background="#1C2130" BorderBrush="#30384B" BorderThickness="1" CornerRadius="16" Padding="14,12" Margin="0,0,0,10">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/> <!-- Row 0: URL Input -->
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
 
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -383,11 +309,12 @@
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="🔗" FontSize="13" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="10,0,6,0"/>
-                                        <TextBox x:Name="UrlTextBox" Grid.Column="1" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" Background="Transparent" BorderThickness="0" Padding="4,7" VerticalContentAlignment="Center" AutomationProperties.Name="Download link" ToolTip="Direct HTTP(S) URL, magnet link, or path to a .torrent file"/>
-                                        <TextBlock Grid.Column="1" Text="Paste a download link" Margin="4,0,0,0" VerticalAlignment="Center"
+                                        <TextBlock Grid.Column="1" Text="1GB.bin" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="0,0,10,0" ToolTip="Example file name"/>
+                                        <TextBox x:Name="UrlTextBox" Grid.Column="2" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" Background="Transparent" BorderThickness="0" Padding="4,7" VerticalContentAlignment="Center" AutomationProperties.Name="Download link" ToolTip="Direct HTTP(S) URL, magnet link, or path to a .torrent file"/>
+                                        <TextBlock Grid.Column="2" Text="Paste a download link" Margin="4,0,0,0" VerticalAlignment="Center"
                                                    Foreground="{StaticResource TextMutedBrush}" IsHitTestVisible="False">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
@@ -415,24 +342,186 @@
                                     <TextBlock Text="Torrent"/>
                                 </Button>
 
-                                <Button x:Name="StartBoostButton" Grid.Column="3" MinHeight="36" Padding="14,5" Click="StartBoostButton_Click" Style="{StaticResource BoostButtonStyle}" Margin="8,0,0,0">
+                                <Button x:Name="StartBoostButton" Grid.Column="3" MinWidth="155" MinHeight="38" FontSize="15" Padding="14,5" Click="StartBoostButton_Click" Style="{StaticResource BoostButtonStyle}" Margin="8,0,0,0">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="⚡" FontSize="13" Margin="0,0,6,0"/>
                                         <TextBlock Text="Download"/>
                                     </StackPanel>
                                 </Button>
-                                <TextBlock x:Name="OutputFolderTextBlock" Grid.Row="1" Margin="0,9,4,0"
-                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontSize="11"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
-                                           ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
-                                <Button x:Name="BrowserExtensionButton" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
-                                        Content="Browser extension" HorizontalAlignment="Center" Margin="8,9,0,0"
-                                        Click="OpenBrowserExtensionButton_Click" Style="{StaticResource SecondaryButtonStyle}"/>
-                                <Button Grid.Row="1" Grid.Column="3" Content="Change folder" HorizontalAlignment="Right"
-                                        Margin="8,9,0,0" Click="BrowseFolderButton_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                             </Grid>
                         </Border>
-                        <Border x:Name="NetworkAdaptersCard" Grid.Row="1" Margin="0,0,0,8" Background="#171A25" BorderBrush="#272B38" BorderThickness="1" CornerRadius="24" Padding="14,12">
+                        <ScrollViewer x:Name="PreviewDownloadView" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel>
+                        <DockPanel Margin="0,5,0,0">
+                            <Button DockPanel.Dock="Right" VerticalAlignment="Center" Click="OpenBrowserExtensionButton_Click" Margin="10,0,0,0" Padding="12,4" Background="#211A12" BorderBrush="#826028" Foreground="#FFC466" Style="{StaticResource SecondaryButtonStyle}" Content="●  Browser extension"/>
+                        <Border x:Name="ActiveTaskCard" Padding="1,4,1,2">
+                            <Grid>
+                                <DockPanel x:Name="DonutTaskPanel" LastChildFill="True">
+                                    <!-- Action Buttons -->
+
+                                    <StackPanel>
+                                    <!-- Active Task Header -->
+
+
+                                    <!-- File Name & Total Size -->
+                                    <Grid Margin="0,0,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="FileNameTextBlock" Text="No active download" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock x:Name="FileSizeTextBlock" Grid.Column="1" Text="-- / --" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,0,0,0"/>
+                                    </Grid>
+
+                                    <!-- Apple Pill Progress Bar -->
+                                    <ProgressBar x:Name="DownloadProgressBar" Height="5" Value="0" Maximum="100" Background="#322A26" Foreground="#FF9A16" BorderThickness="0">
+                                        <ProgressBar.Resources>
+                                            <Style TargetType="{x:Type Border}">
+                                                <Setter Property="CornerRadius" Value="4"/>
+                                            </Style>
+                                        </ProgressBar.Resources>
+                                    </ProgressBar>
+
+                                    <Grid Margin="0,4,0,2">
+                                        <TextBlock x:Name="ProgressPercentTextBlock" Text="0%" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                                        <TextBlock x:Name="EtaTextBlock" Text="ETA: --:--" FontSize="12" FontWeight="SemiBold" Foreground="#78E2DB" HorizontalAlignment="Right"/>
+                                    </Grid>
+
+                                    </StackPanel>
+
+                                </DockPanel>
+                                <StackPanel x:Name="SteamTaskPanel" Visibility="Collapsed">
+                                    <TextBlock Text="STEAM DOWNLOAD" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock x:Name="SteamGameName" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"
+                                               Foreground="{StaticResource TextPrimaryBrush}" Margin="0,4,0,3"/>
+                                    <TextBlock x:Name="SteamGameSize" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <ProgressBar x:Name="SteamGameProgress" Height="5" Maximum="100" Margin="0,5,0,3"
+                                                 Background="#322A26" Foreground="#FF9A16" BorderThickness="0"/>
+                                    <TextBlock x:Name="SteamGameRate" FontSize="11" TextWrapping="Wrap" Foreground="#78E2DB"/>
+                                    <TextBlock x:Name="SteamGameEta" FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                                </DockPanel>
+                                <Grid>
+                                    <StackPanel>
+                                <Viewbox Height="284" MaxWidth="284" HorizontalAlignment="Center">
+                                    <Grid Width="280" Height="280">
+                                        <Ellipse Width="275" Height="275">
+                                            <Ellipse.Fill><RadialGradientBrush><GradientStop Color="#3CFF8A00"/><GradientStop Color="#00FF8A00" Offset="1"/></RadialGradientBrush></Ellipse.Fill>
+                                        </Ellipse>
+                                        <Path Data="M 140.0,12.0 L 140.0,4.0 M 156.7,13.1 L 157.2,9.1 M 173.1,16.4 L 174.2,12.5 M 189.0,21.7 L 190.5,18.0 M 204.0,29.1 L 208.0,22.2 M 217.9,38.5 L 220.4,35.3 M 230.5,49.5 L 233.3,46.7 M 241.5,62.1 L 244.7,59.6 M 250.9,76.0 L 257.8,72.0 M 258.3,91.0 L 262.0,89.5 M 263.6,106.9 L 267.5,105.8 M 266.9,123.3 L 270.9,122.8 M 268.0,140.0 L 276.0,140.0 M 266.9,156.7 L 270.9,157.2 M 263.6,173.1 L 267.5,174.2 M 258.3,189.0 L 262.0,190.5 M 250.9,204.0 L 257.8,208.0 M 241.5,217.9 L 244.7,220.4 M 230.5,230.5 L 233.3,233.3 M 217.9,241.5 L 220.4,244.7 M 204.0,250.9 L 208.0,257.8 M 189.0,258.3 L 190.5,262.0 M 173.1,263.6 L 174.2,267.5 M 156.7,266.9 L 157.2,270.9 M 140.0,268.0 L 140.0,276.0 M 123.3,266.9 L 122.8,270.9 M 106.9,263.6 L 105.8,267.5 M 91.0,258.3 L 89.5,262.0 M 76.0,250.9 L 72.0,257.8 M 62.1,241.5 L 59.6,244.7 M 49.5,230.5 L 46.7,233.3 M 38.5,217.9 L 35.3,220.4 M 29.1,204.0 L 22.2,208.0 M 21.7,189.0 L 18.0,190.5 M 16.4,173.1 L 12.5,174.2 M 13.1,156.7 L 9.1,157.2 M 12.0,140.0 L 4.0,140.0 M 13.1,123.3 L 9.1,122.8 M 16.4,106.9 L 12.5,105.8 M 21.7,91.0 L 18.0,89.5 M 29.1,76.0 L 22.2,72.0 M 38.5,62.1 L 35.3,59.6 M 49.5,49.5 L 46.7,46.7 M 62.1,38.5 L 59.6,35.3 M 76.0,29.1 L 72.0,22.2 M 91.0,21.7 L 89.5,18.0 M 106.9,16.4 L 105.8,12.5 M 123.3,13.1 L 122.8,9.1" Stroke="#78502A" Opacity="0.7"/>
+                                        <Ellipse Width="232" Height="232" Stroke="#51351D" StrokeThickness="12"/>
+                                        <Ellipse Width="191" Height="191" Stroke="#382D4D" StrokeThickness="11"/>
+                                        <Ellipse Width="162" Height="162" Fill="#100E19"/>
+                                        <Path x:Name="WifiRateArc" StrokeThickness="12" StrokeStartLineCap="Round" StrokeEndLineCap="Round">
+                                            <Path.Stroke><LinearGradientBrush StartPoint="0,1" EndPoint="1,0"><GradientStop Color="#FFD27B"/><GradientStop Color="#FF8508" Offset="1"/></LinearGradientBrush></Path.Stroke>
+                                            <Path.Effect><DropShadowEffect Color="#FF9500" BlurRadius="18" ShadowDepth="0" Opacity="0.65"/></Path.Effect>
+                                        </Path>
+                                        <Path x:Name="MobileRateArc" Stroke="#9783FF" StrokeThickness="11" StrokeStartLineCap="Round" StrokeEndLineCap="Round"><Path.Effect><DropShadowEffect Color="#8B7BFF" BlurRadius="14" ShadowDepth="0" Opacity="0.5"/></Path.Effect></Path>
+                                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock Text="C O M B I N E D" FontSize="10" Foreground="#B1A0E0" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="CombinedSpeedTextBlock" Text="0.0" FontSize="56" FontWeight="Bold" HorizontalAlignment="Center" Foreground="#F4EFE6"/>
+                                            <TextBlock x:Name="CombinedSpeedUnitTextBlock" Text="Mbps" FontSize="13" HorizontalAlignment="Center" Foreground="#B1A0E0"/>
+                                            <TextBlock Text="{Binding Text, ElementName=FileSizeTextBlock}" FontSize="10" ToolTip="Gauge measures all Windows receive traffic" Foreground="#A29ABA" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Viewbox>
+                                <TextBlock x:Name="StatusBadgeTextBlock" Text="Ready" Visibility="Collapsed" Foreground="#B9A7DE" HorizontalAlignment="Center" FontWeight="SemiBold"/>
+                                <WrapPanel HorizontalAlignment="Center" Margin="0,9,0,15">
+                                    <TextBlock x:Name="WifiSummaryText" Text="Wi-Fi: Off" FontSize="13" Foreground="#FFB63E" Margin="0,0,12,0"/>
+                                    <TextBlock x:Name="TetherSummaryText" Text="Ethernet: Off" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                </WrapPanel>
+                                <WrapPanel HorizontalAlignment="Center" Visibility="{Binding Visibility, ElementName=DonutTaskPanel}" Margin="0,4,0,0">
+                                        <Button x:Name="PauseResumeButton" Click="PauseResumeButton_Click" Style="{StaticResource BoostButtonStyle}" Width="174" Height="54" FontSize="18" FontWeight="Bold" Padding="15,8" Margin="0,0,8,0" IsEnabled="False">
+                                            <TextBlock x:Name="PauseResumeButtonText" Text="⏸ Pause"/>
+                                        </Button>
+                                        <Button Background="#382025" BorderBrush="#AE5151" Foreground="#FF8077" x:Name="CancelDownloadButton" Click="CancelDownloadButton_Click" Style="{StaticResource SecondaryButtonStyle}" Width="174" Height="54" FontSize="18" FontWeight="Bold" Padding="15,8" Margin="0,0,8,0" IsEnabled="False">
+                                            <TextBlock Text="✕ Cancel"/>
+                                        </Button>
+
+                                    </WrapPanel>
+                                <Border Width="356" Padding="4" Margin="0,10,0,0" Background="{StaticResource PreviewCardBrush}" BorderBrush="{StaticResource PreviewGlassEdge}" BorderThickness="1" CornerRadius="11">
+                                    <Grid x:Name="PreviewModeTrack" SizeChanged="PreviewModeTrack_SizeChanged" ClipToBounds="True">
+                                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                        <Border x:Name="PreviewModePill" CornerRadius="7" Background="{StaticResource PreviewCardBrush}" BorderBrush="{StaticResource PreviewGlassEdge}" BorderThickness="1" IsHitTestVisible="False">
+                                            <Border.RenderTransform><TranslateTransform/></Border.RenderTransform>
+                                        </Border>
+                                        <UniformGrid Grid.ColumnSpan="3" Columns="3">
+                                        <RadioButton x:Name="PreviewBoth" Content="Both" IsChecked="True" GroupName="PreviewMode" Tag="CombineAll" Click="PreviewMode_Click" Style="{StaticResource ModeRadioButtonStyle}"/>
+                                        <RadioButton x:Name="PreviewWifi" Content="Wi-Fi only" GroupName="PreviewMode" Tag="WifiOnly" Click="PreviewMode_Click" Style="{StaticResource ModeRadioButtonStyle}"/>
+                                        <RadioButton x:Name="PreviewMobile" Content="Mobile only" GroupName="PreviewMode" Tag="MobileDataOnly" Click="PreviewMode_Click" Style="{StaticResource ModeRadioButtonStyle}"/>
+                                    </UniformGrid></Grid>
+                                </Border>
+                                <Border Width="356" Padding="10" Margin="0,8,0,9" Background="{StaticResource PreviewCardBrush}" BorderBrush="{StaticResource PreviewGlassEdge}" BorderThickness="1" CornerRadius="11">
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Right" Content="Change" Click="BrowseFolderButton_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="8,0,0,0"/>
+                                        <StackPanel>
+                                            <TextBlock Text="Download destination" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="OutputFolderTextBlock" FontSize="10" Foreground="#ADA3C2" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                                </StackPanel></Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+                    <Border x:Name="SystemLogCard" Grid.Column="1" Grid.ColumnSpan="2" Visibility="Collapsed" Margin="0,0,0,8" Background="#13111D" BorderBrush="#232633" BorderThickness="1" CornerRadius="14"
+                                Padding="12,8">
+                            <DockPanel>
+                                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
+                                    <TextBlock Text="SYSTEM LOG" FontSize="12" FontWeight="Bold" Foreground="#AABAD2"/>
+                                    <Ellipse Width="5" Height="5" Fill="#78E2DB" Margin="7,0,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <ScrollViewer x:Name="SystemLogViewport" VerticalScrollBarVisibility="Auto">
+                                    <TextBlock x:Name="LogOutputTextBlock" Text="Ready." FontSize="11" FontFamily="Consolas"
+                                               Foreground="#B1BED2" TextWrapping="Wrap"/>
+                                </ScrollViewer>
+                            </DockPanel>
+                        </Border>
+                    <Grid x:Name="PreviewConnectionsColumn" Grid.Column="2">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                        <Border Background="{StaticResource PreviewCardBrush}" BorderBrush="{StaticResource PreviewGlassEdge}" BorderThickness="1" Padding="17,13" CornerRadius="20" Margin="0,0,0,11">
+                            <StackPanel>
+                                <DockPanel>
+                                    <TextBlock x:Name="PreviewWifiLimitText" DockPanel.Dock="Right" Text="Unlimited" Foreground="#FFB63E" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Wi-Fi speed limit" FontSize="15" Foreground="#F4EFE6" FontWeight="Bold"/>
+                                </DockPanel>
+                                <Slider x:Name="PreviewWifiLimit" Minimum="0" Maximum="3" Value="3" SmallChange="0.1" LargeChange="0.25" IsMoveToPointEnabled="True" ValueChanged="PreviewWifiLimit_Changed" Margin="2,9,2,5" Height="22" AutomationProperties.Name="Wi-Fi speed limit for Donut downloads">
+                                    <Slider.Template>
+                                        <ControlTemplate TargetType="Slider">
+                                            <Grid>
+                                                <Border Background="#413224" Height="6" CornerRadius="3" Margin="9,0"/>
+                                                <Track x:Name="PART_Track">
+                                                    <Track.DecreaseRepeatButton>
+                                                        <RepeatButton Command="Slider.DecreaseLarge" Focusable="False">
+                                                            <RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Grid Background="Transparent"><Border Height="6" CornerRadius="3" Background="#FF9D20" Margin="9,0,0,0"/></Grid></ControlTemplate></RepeatButton.Template>
+                                                        </RepeatButton>
+                                                    </Track.DecreaseRepeatButton>
+                                                    <Track.Thumb>
+                                                        <Thumb Width="22" Height="22">
+                                                            <Thumb.Template><ControlTemplate TargetType="Thumb"><Ellipse Stroke="#CC8C39" StrokeThickness="2"><Ellipse.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="White"/><GradientStop Color="#FFE6C4" Offset="1"/></LinearGradientBrush></Ellipse.Fill></Ellipse></ControlTemplate></Thumb.Template>
+                                                        </Thumb>
+                                                    </Track.Thumb>
+                                                    <Track.IncreaseRepeatButton>
+                                                        <RepeatButton Command="Slider.IncreaseLarge" Focusable="False">
+                                                            <RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template>
+                                                        </RepeatButton>
+                                                    </Track.IncreaseRepeatButton>
+                                                </Track>
+                                            </Grid>
+                                        </ControlTemplate>
+                                    </Slider.Template>
+                                </Slider>
+                                <UniformGrid Columns="4">
+                                    <TextBlock Text="50" Foreground="#ADA3C2"/>
+                                    <TextBlock Text="100" Foreground="#ADA3C2" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="200" Foreground="#ADA3C2" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Unlimited" Foreground="#FFB63E" HorizontalAlignment="Right"/>
+                                </UniformGrid>
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="NetworkAdaptersCard" Grid.Row="1">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -445,18 +534,16 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="NETWORK ADAPTERS  &#xB7;  LIVE" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}"/>
+                                    <TextBlock Text="Connections" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
                                     <TextBlock x:Name="AdapterCountTextBlock" Grid.Column="1" Text="0 Detected" FontSize="11" FontWeight="Bold" Foreground="#78E2DB"/>
                                 </Grid>
-
-                                <TextBlock Grid.Row="1" Text="Live rates show all Windows traffic on each physical connection. Switches and limits apply to Donut downloads." FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,0,0,10"/>
 
                                 <!-- Adapters List -->
                                 <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <ItemsControl x:Name="AdaptersItemsControl">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Border Background="#1D2130" CornerRadius="17" Padding="12" Margin="0,0,0,9">
+                                                <Border Background="{StaticResource PreviewCardBrush}" BorderBrush="{StaticResource PreviewGlassEdge}" BorderThickness="1" CornerRadius="18" Padding="13,10" MinHeight="68" Margin="0,0,0,10">
                                                     <Grid>
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="Auto"/>
@@ -465,30 +552,42 @@
                                                         </Grid.ColumnDefinitions>
 
                                                         <!-- Squircle Icon Container -->
-                                                        <Border Width="38" Height="38" CornerRadius="9" Background="#2A3149" Margin="0,0,10,0" VerticalAlignment="Center">
-                                                            <TextBlock Text="{Binding IconGlyph}" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        <Border Width="42" Height="42" CornerRadius="13" Background="#282044" Margin="0,0,10,0" VerticalAlignment="Center">
+                                                            <Path Width="20" Height="20" Stretch="Uniform" StrokeThickness="1.8"
+                                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                                                  HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                <Path.Style>
+                                                                    <Style TargetType="Path">
+                                                                        <Setter Property="Stroke" Value="#C1B8D7"/>
+                                                                        <Setter Property="Data" Value="M5,4 H19 V14 H15 V18 H9 V14 H5 Z M9,7 V10 M12,7 V10 M15,7 V10"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsWifi}" Value="True">
+                                                                                <Setter Property="Stroke" Value="#FFBA51"/>
+                                                                                <Setter Property="Data" Value="M2.5,8 A15,15 0 0 1 21.5,8 M5.5,12 A10,10 0 0 1 18.5,12 M9,16 A4.5,4.5 0 0 1 15,16 M11.8,19.5 H12.2"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding IsMobilePhone}" Value="True">
+                                                                                <Setter Property="Stroke" Value="#AC9BFF"/>
+                                                                                <Setter Property="Data" Value="M4,19 V15 M9,19 V12 M14,19 V8 M19,19 V4"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Path.Style>
+                                                            </Path>
                                                         </Border>
 
                                                         <!-- Info -->
                                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                             <WrapPanel>
-                                                                <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="16" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,6,0"/>
-                                                                <Border Background="#282830" CornerRadius="4" Padding="5,1">
-                                                                    <TextBlock Text="{Binding TypeLabel}" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
-                                                                </Border>
-                                                                <Border Background="#1A2520" BorderBrush="{Binding RoleBadgeColor}" BorderThickness="1" CornerRadius="4" Padding="5,1" Margin="6,0,0,0">
-                                                                    <TextBlock Text="{Binding RoleBadgeText}" FontSize="8.5" FontWeight="Bold" Foreground="{Binding RoleBadgeColor}"/>
-                                                                </Border>
+                                                                <TextBlock Text="{Binding PreviewDisplayName}" TextWrapping="Wrap" ToolTip="{Binding PreviewDisplayName}" FontWeight="Bold" FontSize="15" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,6,0"/>
                                                             </WrapPanel>
-                                                            <TextBlock Text="{Binding Description}" FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0"/>
-                                                            <TextBlock Text="{Binding LocalIp}" FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                                                            <TextBlock Text="{Binding TypeLabel}" FontSize="11" Foreground="#ADA3C2" TextWrapping="Wrap"/>
                                                         </StackPanel>
 
                                                         <!-- Live speed and adapter controls -->
                                                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
                                                             <StackPanel VerticalAlignment="Center">
-                                                                <TextBlock Text="{Binding DisplaySpeed}" FontWeight="Bold" FontSize="14" Foreground="{StaticResource SuccessBrush}" HorizontalAlignment="Right"/>
-                                                                <TextBlock Text="{Binding FormattedTotalBytes, StringFormat='Donut received: {0}'}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Right" Margin="0,1,0,3"/>
+                                                                <TextBlock Text="{Binding DisplaySpeed}" FontWeight="Bold" FontSize="17" Foreground="#F4EFE6" HorizontalAlignment="Right"/>
+                                                                <Polyline Points="{Binding PreviewSparkline}" Stroke="{Binding PreviewSparklineBrush}" StrokeThickness="1.4" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="74" Height="17" HorizontalAlignment="Right" Margin="0,3,0,0"/>
                                                             </StackPanel>
                                                             <Button Content="Limits" Click="EditAdapterLimits_Click" Style="{StaticResource SecondaryButtonStyle}" HorizontalAlignment="Left" Padding="8,3" Margin="10,0,10,0" VerticalAlignment="Center" FontSize="10"/>
                                                             <ToggleButton IsChecked="{Binding IsEnabled, Mode=TwoWay}"
@@ -510,34 +609,25 @@
         </Grid>
 
         <!-- Fixed Apple Bottom Status Bar -->
-        <Border Grid.Row="2" Visibility="Collapsed" Background="#161618" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="18,7">
+        <Border x:Name="PreviewFooter" Grid.Row="2" Background="#100E15" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="24,8">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Left: Mode and Connections -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock x:Name="FooterStatusModeText" Text="⚡ Donut downloads: all selected adapters" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,12,0"/>
-                    <TextBlock Text="•" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,12,0"/>
-                    <TextBlock x:Name="FooterActiveConnectionsText" Text="0 selected adapters" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,12,0"/>
-                    <TextBlock Text="•" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,12,0"/>
-                    <TextBlock x:Name="FooterLicenseText" Text="⚡ License: Lifetime" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" Margin="0,0,12,0"/>
-                    <TextBlock Text="•" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,12,0"/>
-
-                    <Button Click="CheckForUpdatesButton_Click" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="0" ToolTip="Check for app updates">
-                        <TextBlock x:Name="FooterUpdateCheckText" Text="Check for Updates" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" TextDecorations="Underline"/>
-                    </Button>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Ellipse Width="8" Height="8" Fill="#30D158" Margin="0,0,9,0"/>
+                    <TextBlock x:Name="FooterActiveConnectionsText" Foreground="#ACA4B5" FontSize="13"/>
                 </StackPanel>
-
-                <!-- Right: Speed & Overall Status -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock x:Name="FooterLiveSpeedText" Text="0.0 Mbps" FontWeight="Bold" FontSize="12" Foreground="{StaticResource SuccessBrush}" Margin="0,0,10,0"/>
-                    <TextBlock Text="•" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,10,0"/>
-                    <TextBlock x:Name="FooterProgressText" Text="Ready to Boost" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
-                </StackPanel>
-            </Grid>
+                <CheckBox Grid.Column="1" Content="Combine connections for torrent peers" IsChecked="True" Click="PreviewTorrentMode_Click" Foreground="#ACA4B5" VerticalAlignment="Center" FontSize="13"/>
+                <StackPanel Visibility="Collapsed">
+                    <TextBlock x:Name="FooterStatusModeText"/>
+                    <TextBlock x:Name="FooterLicenseText"/>
+                    <TextBlock x:Name="FooterUpdateCheckText"/>
+                    <TextBlock x:Name="FooterLiveSpeedText"/>
+                    <TextBlock x:Name="FooterProgressText"/>
+                </StackPanel></Grid>
         </Border>
 
         <!-- ============================================================== -->

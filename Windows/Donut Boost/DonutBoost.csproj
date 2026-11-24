@@ -13,7 +13,7 @@
     <Company>Donut</Company>
     <Authors>Donut</Authors>
     <Description>Donut Boost - Network Monitor and Direct Downloader</Description>
-    <Version>1.0.11</Version>
+    <Version>1.0.12</Version>
     <ApplicationIcon>Assets\Donut.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <StartupObject>DonutBoost.Bootstrap</StartupObject>

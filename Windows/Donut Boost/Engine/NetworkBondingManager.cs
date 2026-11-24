@@ -246,6 +246,7 @@ public class NetworkBondingManager : IDisposable
                     existing.GatewayIp = gateway;
                     existing.SpeedBitsPerSecond = nic.Speed;
                     existing.IsOnline = true;
+                    existing.PhoneDeviceName = existing.IsMobilePhone ? UsbPhoneDisplayName.Find(nic.Id) : null;
                     existing.NotifyAdapterMetadataChanged();
                     detected.Add(existing);
                 }
@@ -266,6 +267,8 @@ public class NetworkBondingManager : IDisposable
                         IsEnabled = true,
                         IsOnline = true
                     };
+
+                    if (adapter.IsMobilePhone) adapter.PhoneDeviceName = UsbPhoneDisplayName.Find(nic.Id);
 
                     switch (CurrentMode)
                     {

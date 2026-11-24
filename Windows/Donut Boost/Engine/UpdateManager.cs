@@ -138,17 +138,36 @@ public class UpdateManager
         try
         {
             bool downloaded = false;
+            Exception? lastTransportError = null;
             foreach (var url in downloadCandidates)
             {
-                try
+                const int maxAttempts = 3;
+                for (int attempt = 1; attempt <= maxAttempts; attempt++)
                 {
-                    await DownloadVerifiedInstallerAsync(_httpClient, url, installerPath, manifest.InstallerSha256,
-                        onProgress, onStatus, cancellationToken);
-                    downloaded = true;
-                    break;
+                    try
+                    {
+                        await DownloadVerifiedInstallerAsync(_httpClient, url, installerPath, manifest.InstallerSha256,
+                            onProgress, onStatus, cancellationToken);
+                        downloaded = true;
+                        break;
+                    }
+                    catch (Exception ex) when (!cancellationToken.IsCancellationRequested && IsRetryableDownloadError(ex))
+                    {
+                        lastTransportError = ex;
+                        if (attempt == maxAttempts) break;
+                        onStatus($"The update connection was interrupted. Retrying ({attempt + 1}/{maxAttempts})…");
+                        await Task.Delay(TimeSpan.FromSeconds(attempt), cancellationToken);
+                        onProgress(0, 0, 0);
+                    }
+                    catch (HttpRequestException) when (url != downloadCandidates.Last() && !cancellationToken.IsCancellationRequested)
+                    {
+                        break;
+                    }
                 }
-                catch (HttpRequestException) when (url != downloadCandidates.Last()) { }
+                if (downloaded) break;
             }
+            if (!downloaded && lastTransportError != null)
+                throw new InvalidOperationException("The update connection kept dropping. Try Again or download the installer from the Donut website.", lastTransportError);
             if (!downloaded) return false;
 
             onStatus("Opening installer. Approve the Windows prompt if it appears.");
@@ -187,6 +206,12 @@ public class UpdateManager
         }
     }
 
+    private static bool IsRetryableDownloadError(Exception error) =>
+        error is TimeoutException or EndOfStreamException ||
+        error is HttpRequestException request &&
+        (request.StatusCode is null || (int)request.StatusCode.Value is 408 or 429 or >= 500) ||
+        (error is IOException && error is not InvalidDataException);
+
     private static async Task DownloadVerifiedInstallerAsync(HttpClient client, string url, string installerPath,
         string expectedHash, Action<int, long, long> onProgress, Action<string> onStatus, CancellationToken token)
     {
@@ -223,8 +248,10 @@ public class UpdateManager
                     onProgress(percent, totalRead, totalBytes);
                 }
             }
+            if (totalRead == 0 || (totalBytes > 0 && totalRead < totalBytes))
+                throw new EndOfStreamException("The connection closed before the installer was fully downloaded.");
             onStatus("Verifying installer...");
-            if (totalRead == 0 || (totalBytes > 0 && totalRead != totalBytes) ||
+            if ((totalBytes > 0 && totalRead != totalBytes) ||
                 !string.Equals(Convert.ToHexString(hash.GetHashAndReset()), expectedHash, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("The installer could not be verified. Select Try Again to check for a fresh update.");
         }

@@ -17,6 +17,8 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+    internal string? PhoneDeviceName { get; set; }
+    public string PreviewDisplayName => PhoneDeviceName ?? (IsMobilePhone ? "USB tethering" : Name);
     public int InterfaceIndex { get; set; }
     public IPAddress? LocalIp { get; set; }
     public int IPv6InterfaceIndex { get; set; }
@@ -87,6 +89,56 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
         }
     }
 
+    private const int PreviewSampleCount = 20;
+    private readonly Queue<double> _previewHistory = new();
+    private readonly double[] _previewStart = new double[PreviewSampleCount];
+    private readonly double[] _previewTarget = new double[PreviewSampleCount];
+    private long _previewSampleTime;
+    public System.Windows.Media.PointCollection PreviewSparkline { get; } = new();
+    public string PreviewSparklineBrush => IsWifi ? "#FFAB30" : "#A593FF";
+
+    internal void AddPreviewSample(double bytesPerSecond)
+    {
+        if (_previewHistory.Count == PreviewSampleCount) _previewHistory.Dequeue();
+        _previewHistory.Enqueue(Math.Max(0, bytesPerSecond));
+        double scale = Math.Max(1, _previewHistory.Max());
+
+        if (PreviewSparkline.Count == 0)
+        {
+            for (int index = 0; index < PreviewSampleCount; index++)
+                PreviewSparkline.Add(new System.Windows.Point(index * 65.0 / (PreviewSampleCount - 1), 15));
+        }
+
+        for (int index = 0; index < PreviewSampleCount; index++)
+        {
+            _previewStart[index] = PreviewSparkline[index].Y;
+            _previewTarget[index] = 15;
+        }
+
+        int sampleIndex = PreviewSampleCount - _previewHistory.Count;
+        foreach (double sample in _previewHistory)
+            _previewTarget[sampleIndex++] = 15 - 13 * sample / scale;
+        _previewSampleTime = System.Diagnostics.Stopwatch.GetTimestamp();
+
+        if (!System.Windows.SystemParameters.ClientAreaAnimation)
+            RenderPreviewSample(immediate: true);
+    }
+
+    internal void RenderPreviewSample(bool immediate = false)
+    {
+        if (_previewSampleTime == 0) return;
+        double progress = immediate ? 1 : Math.Min(1,
+            System.Diagnostics.Stopwatch.GetElapsedTime(_previewSampleTime).TotalMilliseconds / 550);
+        double eased = progress * progress * (3 - 2 * progress);
+        for (int index = 0; index < PreviewSparkline.Count; index++)
+        {
+            var point = PreviewSparkline[index];
+            double y = _previewStart[index] + (_previewTarget[index] - _previewStart[index]) * eased;
+            if (Math.Abs(point.Y - y) > 0.002 || (progress >= 1 && point.Y != y))
+                PreviewSparkline[index] = new System.Windows.Point(point.X, y);
+        }
+        if (progress >= 1) _previewSampleTime = 0;
+    }
     private double _currentSpeedBps;
     public double CurrentSpeedBps
     {
@@ -187,6 +239,7 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
         OnPropertyChanged(nameof(IsMobilePhone));
         OnPropertyChanged(nameof(IsWifi));
         OnPropertyChanged(nameof(TypeLabel));
+        OnPropertyChanged(nameof(PreviewDisplayName));
         OnPropertyChanged(nameof(IconGlyph));
         OnPropertyChanged(nameof(AccentColor));
         OnPropertyChanged(nameof(RoleBadgeText));
