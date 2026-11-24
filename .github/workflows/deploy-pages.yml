@@ -76,6 +76,19 @@ jobs:
           $appVersion = (Get-Item "Windows/Donut Boost/publish/win-x64/DonutBoost.exe").VersionInfo.FileVersion
           if ($appVersion -ne $env:DONUT_BOOST_BUILD_VERSION) { throw "App version $appVersion does not match $env:DONUT_BOOST_BUILD_VERSION" }
 
+      - name: Install Go for the System Merge engine
+        if: steps.boost.outputs.reuse != 'true'
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: '1.27.4'
+          cache: false
+
+      - name: Build the bundled System Merge engine
+        if: steps.boost.outputs.reuse != 'true'
+        shell: pwsh
+        run: |
+          & "Windows/Donut Boost/SystemMerge/Build.ps1" -OutputDirectory "Windows/Donut Boost/publish/win-x64/system-merge"
+
       - name: Install Inno Setup compiler
         if: steps.boost.outputs.reuse != 'true'
         shell: pwsh

@@ -8,7 +8,7 @@
   <meta name="description" content="Donut Boost shows live Windows adapter receive rates and can split supported direct downloads across Wi-Fi and USB-tethered phone connections.">
   <title>Donut Boost — More connections. Faster downloads.</title>
   <link rel="stylesheet" href="hub.css?v=donut-boost-3">
-  <link rel="stylesheet" href="boost.css?v=12">
+  <link rel="stylesheet" href="boost.css?v=13">
   <link rel="stylesheet" href="account.css?v=close-button-1">
   <link rel="icon" type="image/svg+xml" href="donut-home-logo.svg?v=1">
   <link rel="shortcut icon" type="image/svg+xml" href="donut-home-logo.svg?v=1">
@@ -58,7 +58,7 @@
       <p class="boost-note"><strong>In the app:</strong> choose Combine Both, Home Wi-Fi Only, or Mobile Data Only; set custom download speed limits (or uncapped); toggle individual connections; pause, resume, or cancel a download; and choose its save folder.</p>
       <p class="boost-note"><strong>Torrents:</strong> paste a magnet link or choose a <code>.torrent</code> file. <strong>Combine connections for torrent peers</strong> lets outgoing peers use the selected Wi-Fi and tethered connections. Clear the option to use the Windows route with incoming peers and HTTP web seeds. Donut Boost stops the torrent when it completes.</p>
       <p class="boost-note"><strong>Download queue:</strong> add direct links, magnets, or torrent files to download them one at a time. Enter a time to start a queued download later while Donut Boost is open.</p>
-      <p class="boost-note">Adapter rates are measured from Windows network counters and include all traffic on each adapter, not only Donut Boost. By default, Windows keeps its existing route. If USB tethering makes Windows switch away from home Wi-Fi, use <strong>Prefer Wi-Fi</strong> in the app; Windows asks for administrator approval and Donut saves the previous metrics so you can restore them. The preference lasts until restored or Windows restarts. This keeps Wi-Fi as the normal system route while Donut's own direct downloads can still use selected adapters. Game launchers are not routed or bonded by Donut Boost.</p>
+      <p class="boost-note">Live adapter rates include all Windows traffic. Enable <strong>System merge</strong> to distribute new Windows connections across Wi-Fi and phone tethering, then run the <strong>Combined speed test</strong> to measure download throughput. The test can use up to 160 MB.</p>
       <p class="boost-note">Setup help: <a href="https://support.google.com/android/answer/9059108" target="_blank" rel="noopener">Android USB tethering</a> · <a href="https://support.apple.com/en-gb/111785" target="_blank" rel="noopener">iPhone Personal Hotspot on Windows</a>. Multi-connection speed depends on the server supporting byte-range downloads. Links without that support may not benefit from combined connections and can fail.</p>
       <section class="boost-extension-guide" id="chrome-extension" aria-labelledby="boost-extension-title">
         <h3 id="boost-extension-title">Donut Boost Chrome extension</h3>
@@ -79,11 +79,11 @@
             <h3>Launcher activity,<br><em>clearly shown.</em></h3>
             <span class="boost-live-status"><i></i> Monitor</span>
           </div>
-          <p class="boost-game-intro">Donut Boost can detect activity from supported launcher processes and show live receive rates measured on your adapters. Launcher downloads continue to use Windows networking.</p>
+          <p class="boost-game-intro">With System merge on, Donut Boost can spread new game download connections across your available links. Start or resume the download after turning it on. Each connection uses one link, so combined speeds depend on the launcher opening multiple connections.</p>
           <div class="boost-launcher-list" aria-label="Supported game launchers">
             <span>Steam</span><span>Epic Games</span><span>Riot Client</span><span>Microsoft Store</span><span>Unity</span><span>Xbox</span><span>EA App</span><span>Rockstar</span><span>Battle.net</span><span>Ubisoft Connect</span><span>GOG Galaxy</span>
           </div>
-          <p class="boost-game-footnote"><strong>Honest download status.</strong> The app reports exact game progress and ETA only when it can read reliable launcher counters (currently Steam). Other launchers may show activity and adapter receive rates without a verified game size, progress bar, or ETA. Game launchers are not routed or bonded by Donut Boost.</p>
+          <p class="boost-game-footnote"><strong>Honest download status.</strong> The app reports exact game progress and ETA only when it can read reliable launcher counters (currently Steam). Other launchers may show activity and adapter receive rates without a verified game size, progress bar, or ETA.</p>
         </div>
         <div class="boost-game-visual" aria-hidden="true">
           <svg viewBox="0 0 260 220" fill="none">
@@ -267,22 +267,22 @@
       <div class="boost-download-options">
         <article class="boost-download-card">
           <div class="boost-download-icon"><img src="donut-boost-icon.png" alt=""></div>
-          <div>
+          <div class="boost-download-copy">
             <p class="hub-eyebrow">Windows · x64</p>
             <h3>Donut Boost for Windows</h3>
-            <div class="boost-download-actions">
-              <a class="hub-button" href="Install%20Donut%20Boost.exe" download>Download Windows installer</a>
-            </div>
-            <p class="boost-download-note"><a class="boost-extension-help" href="#chrome-extension">Chrome extension setup guide</a></p>
+          </div>
+          <div class="boost-download-actions">
+            <a class="hub-button" href="Install%20Donut%20Boost.exe" download>Download Windows installer</a>
+            <a class="boost-extension-help" href="#chrome-extension">Chrome extension setup guide <span aria-hidden="true">↓</span></a>
           </div>
         </article>
         <article class="boost-download-card">
           <div class="boost-download-icon boost-macos-icon" aria-hidden="true">⌘</div>
-          <div>
+          <div class="boost-download-copy">
             <p class="hub-eyebrow">macOS</p>
             <h3>Donut Boost for Mac</h3>
-            <p class="boost-download-note"><span class="boost-coming-soon">Coming soon</span></p>
           </div>
+          <p class="boost-download-status"><span class="boost-coming-soon">Coming soon</span></p>
         </article>
       </div>
     </section>

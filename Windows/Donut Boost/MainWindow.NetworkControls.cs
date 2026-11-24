@@ -1,137 +1,97 @@
+using System.ComponentModel;
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Threading;
 using DonutBoost.Models;
 
 namespace DonutBoost;
 
 public partial class MainWindow
 {
-    private static readonly string NetMergeDirectory = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "net-merge");
-    private static readonly string NetMergeCli = Path.Combine(NetMergeDirectory, "net-merge.exe");
-    private readonly DispatcherTimer _systemMergeTimer = new() { Interval = TimeSpan.FromSeconds(4) };
-    private bool _readingMergeStatus;
-    private bool _changingMerge;
-
-    private void StartSystemMergeMonitor()
-    {
-        _systemMergeTimer.Tick += async (_, _) => await RefreshSystemMergeAsync();
-        _systemMergeTimer.Start();
-        _ = RefreshSystemMergeAsync();
-    }
-
-    private async Task<string> ReadSystemMergeAsync()
-    {
-        if (!File.Exists(NetMergeCli)) return "Install Net Merge";
-        string status = await RunNetMergeAsync("status");
-        if (status.StartsWith("net-merge is OFF.", StringComparison.OrdinalIgnoreCase)) return "System merge off";
-        if (status.StartsWith("net-merge is ON (", StringComparison.OrdinalIgnoreCase))
-        {
-            string mode = status["net-merge is ON (".Length..].Split(',')[0].Trim();
-            if (mode.Equals("tun", StringComparison.OrdinalIgnoreCase) ||
-                mode.Equals("system-wide", StringComparison.OrdinalIgnoreCase))
-                return "System merge on";
-            if (mode.Equals("socks", StringComparison.OrdinalIgnoreCase))
-                return "Net Merge proxy on";
-        }
-        return "Merge status unavailable";
-    }
-
-    private async Task RefreshSystemMergeAsync()
-    {
-        if (_readingMergeStatus || _changingMerge) return;
-        _readingMergeStatus = true;
-        try
-        {
-            string state = await ReadSystemMergeAsync();
-            if (!_windowClosed && !_changingMerge) SystemMergeButton.Content = state;
-        }
-        catch
-        {
-            if (!_windowClosed && !_changingMerge) SystemMergeButton.Content = "Merge status unavailable";
-        }
-        finally { _readingMergeStatus = false; }
-    }
+    private EventWaitHandle? _stopSystemMerge;
 
     private async void SystemMerge_Click(object sender, RoutedEventArgs e)
     {
-        if (_changingMerge) return;
-        _changingMerge = true;
+        if (_stopSystemMerge is { } current)
+        {
+            _systemMergeActive = false;
+            SystemMergeButton.Content = "Stopping merge…";
+            SystemMergeButton.IsEnabled = false;
+            _speedTestCancellation?.Cancel();
+            current.Set();
+            return;
+        }
+
+        SystemMergeButton.Content = "Starting merge…";
         SystemMergeButton.IsEnabled = false;
-        SystemMergeButton.Content = "Checking merge…";
+        string session = Guid.NewGuid().ToString("N");
+        using var ready = new EventWaitHandle(false, EventResetMode.ManualReset, $@"Local\DonutBoostMerge-{session}-Ready");
+        using var stop = new EventWaitHandle(false, EventResetMode.ManualReset, $@"Local\DonutBoostMerge-{session}-Stop");
+        _stopSystemMerge = stop;
         try
         {
-            string state = await ReadSystemMergeAsync();
-            if (state == "Install Net Merge")
+            string engineFolder = Path.Combine(AppContext.BaseDirectory, "system-merge");
+            string engine = Path.Combine(engineFolder, "DonutBoost.SystemMerge.exe");
+            if (!File.Exists(engine) || !File.Exists(Path.Combine(engineFolder, "wintun.dll")))
+                throw new InvalidOperationException("The System merge engine is missing. Install Donut Boost using the Windows installer.");
+
+            var launch = new ProcessStartInfo(engine)
             {
-                Process.Start(new ProcessStartInfo("https://github.com/net-merge/net-merge/releases/latest") { UseShellExecute = true });
-            }
-            else if (state == "System merge on")
+                UseShellExecute = true,
+                Verb = "runas",
+                WorkingDirectory = engineFolder,
+                WindowStyle = ProcessWindowStyle.Hidden
+            };
+            launch.ArgumentList.Add(Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
+            launch.ArgumentList.Add(session);
+            using var worker = Process.Start(launch) ?? throw new InvalidOperationException("The System merge engine could not start.");
+            Task exited = worker.WaitForExitAsync();
+            Task<bool> startup = Task.Run(() => WaitHandle.WaitAny(new[] { ready, stop }, TimeSpan.FromSeconds(20)) == 0);
+            await Task.WhenAny(exited, startup);
+            if (exited.IsCompleted) stop.Set();
+            bool started = await startup;
+            if (started && !worker.HasExited && !_windowClosed)
             {
-                await RunNetMergeAsync("off");
-            }
-            else if (state == "System merge off")
-            {
-                string result = await RunNetMergeAsync("on", allowFailure: true);
-                if ((await ReadSystemMergeAsync()) != "System merge on")
-                {
-                    if (!result.Contains("net-merge is not running;", StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidOperationException(result);
-                    using var mergeProcess = Process.Start(new ProcessStartInfo(NetMergeCli, "run")
-                    {
-                        UseShellExecute = true,
-                        Verb = "runas",
-                        WindowStyle = ProcessWindowStyle.Minimized,
-                        WorkingDirectory = NetMergeDirectory
-                    });
-                }
+                _systemMergeActive = true;
+                LauncherRoutingHint.Text = "System merge is on. Start or resume a launcher download to open new connections across available links.";
+                SystemMergeButton.Content = "System merge on";
+                SystemMergeButton.IsEnabled = true;
+                await exited;
             }
             else
             {
-                MessageBox.Show(this, "Check Net Merge in the Windows notification area. If its proxy is on, turn it off before starting system merge.",
-                    "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Information);
+                stop.Set();
+                await exited;
+                if (!_windowClosed)
+                    throw new InvalidOperationException("System merge could not start. Check that your network adapters are connected and try again.");
             }
+            if (worker.ExitCode != 0 && !_windowClosed)
+                throw new InvalidOperationException("System merge stopped unexpectedly.");
+        }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            // The user declined Windows elevation.
         }
         catch (Exception ex)
         {
             if (!_windowClosed)
-                MessageBox.Show(this, ex.Message, "Net Merge", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(this, ex.Message, "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
         {
-            _changingMerge = false;
-            SystemMergeButton.IsEnabled = true;
-            if (!_windowClosed) await RefreshSystemMergeAsync();
+            stop.Set();
+            _stopSystemMerge = null;
+            _systemMergeActive = false;
+            _speedTestCancellation?.Cancel();
+            if (!_windowClosed)
+            {
+                LauncherRoutingHint.Text = "Monitors supported launchers. Turn on System merge to route new launcher connections across available links.";
+                SystemMergeButton.Content = "System merge off";
+                SystemMergeButton.IsEnabled = true;
+            }
         }
-    }
-
-    private static async Task<string> RunNetMergeAsync(string command, bool allowFailure = false)
-    {
-        using var process = Process.Start(new ProcessStartInfo(NetMergeCli, command)
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            WorkingDirectory = NetMergeDirectory
-        }) ?? throw new InvalidOperationException("Net Merge could not start.");
-        Task<string> output = process.StandardOutput.ReadToEndAsync();
-        Task<string> error = process.StandardError.ReadToEndAsync();
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        try { await process.WaitForExitAsync(timeout.Token); }
-        catch (OperationCanceledException)
-        {
-            if (!process.HasExited) process.Kill();
-            throw new TimeoutException("Net Merge did not respond.");
-        }
-        string response = $"{await output}\n{await error}".Trim();
-        if (process.ExitCode != 0 && !allowFailure)
-            throw new InvalidOperationException(response.Length == 0 ? "Net Merge returned an error." : response);
-        return response;
     }
 
     private void EditAdapterLimits_Click(object sender, RoutedEventArgs e)

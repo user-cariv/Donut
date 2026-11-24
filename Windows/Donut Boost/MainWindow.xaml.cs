@@ -110,7 +110,6 @@ public partial class MainWindow : Window
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         Loaded -= MainWindow_Loaded;
-        StartSystemMergeMonitor();
         _checkingStartupLicense = true;
         StartBoostButton.IsEnabled = false;
         RedeemCodeButton.IsEnabled = false;
@@ -1523,7 +1522,8 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _windowClosed = true;
-        _systemMergeTimer.Stop();
+        _speedTestCancellation?.Cancel();
+        _stopSystemMerge?.Set();
         _downloadQueueTimer.Stop();
         _updateCancellation?.Cancel();
         _autoUpdateTimer?.Stop();

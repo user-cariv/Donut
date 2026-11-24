@@ -55,6 +55,7 @@
 .boost-download-card {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
+  align-content: start;
   align-items: start;
   gap: clamp(14px, 3vw, 24px);
   padding: clamp(18px, 3vw, 28px);
@@ -78,10 +79,14 @@
 body.dark-mode .boost-coming-soon { color: #ffd2ac; background: #483123; }
 .boost-download-icon { width: clamp(44px, 6vw, 64px); aspect-ratio: 1; }
 .boost-download-icon img { display: block; width: 100%; height: auto; border-radius: 24%; }
-.boost-download-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.boost-download-actions .hub-button { width: auto; min-height: 44px; padding: 10px 16px; text-align: center; }
+.boost-download-actions { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 12px; margin-top: 2px; }
+.boost-download-actions .hub-button { width: 100%; min-height: 48px; padding: 10px 14px; text-align: center; justify-content: center; line-height: 1.25; }
 .boost-download-actions .boost-extension-button, body.dark-mode .boost-download-actions .boost-extension-button { color: inherit; background: transparent; border: 1px solid #76635a; box-shadow: none; }
-.boost-download-actions a:focus-visible { outline: 2px solid var(--hub-orange); outline-offset: 3px; }
+.boost-download-actions a:focus-visible { outline: 2px solid var(--hub-orange); outline-offset: 2px; }
+.boost-download-actions .boost-extension-help { grid-column: 1 / -1; justify-self: start; display: inline-flex; align-items: center; gap: 7px; color: var(--hub-orange); font-size: .875rem; font-weight: 700; text-decoration: none; }
+.boost-download-actions .boost-extension-help:hover { text-decoration: underline; text-underline-offset: 3px; }
+.boost-download-actions .boost-extension-help span { font-size: 1rem; }
+.boost-download-status { grid-column: 2; margin: 10px 0 0; }
 .boost-extension-guide {
   margin-top: 30px;
   padding: clamp(20px, 4vw, 32px);
@@ -101,6 +106,7 @@ body.dark-mode .boost-extension-guide { border-color: #ffffff24; background: #21
 .boost-extension-guide code { overflow-wrap: anywhere; }
 body.dark-mode .boost-download-card { border-color: #3c2e29; background: #211a17; }
 @media (max-width: 760px) { .boost-download-options { grid-template-columns: minmax(0, 1fr); } }
+
 body.dark-mode .boost-steps article { border-color: #3c2e29; background: #211a17; }body.dark-mode .boost-note { border-color: #ffffff24; background: #ffffff08; }body.dark-mode .boost-game-card { border-color: #ffffff24; background: radial-gradient(ellipse at 84% 45%, #6745a633, transparent 36%), radial-gradient(ellipse at 5% 105%, #ed755024, transparent 40%), linear-gradient(135deg, #1d1a30, #111321 72%); }
 @media (max-width: 900px) { .boost-hero { gap: 28px; }.boost-hero h1 { font-size: clamp(46px, 6.4vw, 68px); } }
 @media (max-width: 760px) { .boost-page { width: min(100% - 32px, 560px); }.boost-hero { min-height: 0; grid-template-columns: 1fr; padding: 65px 0 45px; }.boost-hero-art { max-width: 560px; }.boost-how { padding: 45px 0 65px; }.boost-steps { grid-template-columns: 1fr; }.boost-game-card { grid-template-columns: 1fr; align-items: start; }.boost-game-visual { width: min(100%, 300px); height: 210px; margin: 8px auto 0; } }

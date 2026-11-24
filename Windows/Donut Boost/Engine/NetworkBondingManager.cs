@@ -315,7 +315,7 @@ public class NetworkBondingManager : IDisposable
         string[] virtualMarkers =
         {
             "vEthernet", "Hyper-V", "VMware", "VirtualBox", "Host-Only",
-            "WSL", "Docker", "Container", "TAP-Windows", "Wintun", "net-merge",
+            "WSL", "Docker", "Container", "TAP-Windows", "Wintun", "net-merge", "Donut Boost Merge",
             "WireGuard", "ZeroTier", "OpenVPN", "VPN", "Wi-Fi Direct Virtual"
         };
         return virtualMarkers.Any(marker => identity.Contains(marker, StringComparison.OrdinalIgnoreCase));

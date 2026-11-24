@@ -2,7 +2,7 @@
   "latestVersion": "1.0.11",
   "minRequiredVersion": "1.0.0",
   "releaseDate": "2026-11-24",
-  "releaseNotes": "Adds an opt-in System merge control for the separately installed Net Merge companion, a compact adapter limits editor, and a collapsible daily queue schedule. Restart Donut Boost to finish applying the update.",
+  "releaseNotes": "Includes built-in system-wide merging for Windows apps, an in-app combined speed test, and compact adapter and queue settings. Restart Donut Boost to finish applying the update.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }
