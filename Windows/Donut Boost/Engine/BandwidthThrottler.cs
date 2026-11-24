@@ -5,8 +5,7 @@ namespace DonutBoost.Engine;
 public class BandwidthThrottler
 {
     private long _maxBytesPerSecond = 0; // 0 = unlimited
-    private long _bytesConsumedInCurrentWindow = 0;
-    private long _windowStartTimeTicks = Stopwatch.GetTimestamp();
+    private double _nextAvailableTick;
     private readonly object _lock = new();
 
     public double CurrentLimitMbps
@@ -15,7 +14,7 @@ public class BandwidthThrottler
         {
             lock (_lock)
             {
-                return _maxBytesPerSecond <= 0 ? 0 : (_maxBytesPerSecond * 8.0) / (1024.0 * 1024.0);
+                return _maxBytesPerSecond * 8.0 / 1_000_000.0;
             }
         }
     }
@@ -30,46 +29,38 @@ public class BandwidthThrottler
             }
             else
             {
-                _maxBytesPerSecond = (long)((mbps * 1024.0 * 1024.0) / 8.0);
+                _maxBytesPerSecond = (long)(mbps * 1_000_000.0 / 8.0);
             }
-            _windowStartTimeTicks = Stopwatch.GetTimestamp();
-            _bytesConsumedInCurrentWindow = 0;
+            _nextAvailableTick = 0;
         }
     }
 
-    public async Task ThrottleAsync(int bytesRead, CancellationToken token)
+    internal void ResetSchedule()
     {
-        if (_maxBytesPerSecond <= 0 || bytesRead <= 0) return;
+        lock (_lock) _nextAvailableTick = 0;
+    }
 
-        double delayMs = 0;
+    // Each worker reserves time on the same clock, so parallel requests share the limit.
+    public double ReserveDelayMilliseconds(int bytesRead)
+    {
         lock (_lock)
         {
-            if (_maxBytesPerSecond <= 0) return;
-
+            if (_maxBytesPerSecond <= 0 || bytesRead <= 0) return 0;
             long now = Stopwatch.GetTimestamp();
-            double elapsedSec = (double)(now - _windowStartTimeTicks) / Stopwatch.Frequency;
-
-            if (elapsedSec >= 0.5)
-            {
-                // Reset sliding window every 500ms for smooth, responsive rate pacing
-                _windowStartTimeTicks = now;
-                _bytesConsumedInCurrentWindow = bytesRead;
-            }
-            else
-            {
-                _bytesConsumedInCurrentWindow += bytesRead;
-                double allowedBytes = _maxBytesPerSecond * elapsedSec;
-                if (_bytesConsumedInCurrentWindow > allowedBytes)
-                {
-                    double targetSeconds = (double)_bytesConsumedInCurrentWindow / _maxBytesPerSecond;
-                    delayMs = (targetSeconds - elapsedSec) * 1000.0;
-                }
-            }
+            _nextAvailableTick = Math.Max(now, _nextAvailableTick) +
+                bytesRead * (double)Stopwatch.Frequency / _maxBytesPerSecond;
+            return (_nextAvailableTick - now) * 1000.0 / Stopwatch.Frequency;
         }
+    }
 
-        if (delayMs > 2)
-        {
-            await Task.Delay((int)Math.Min(delayMs, 500), token);
-        }
+    internal static Task PaceAsync(Models.NetworkAdapterInfo adapter, int bytesRead,
+        BandwidthThrottler overall, BandwidthThrottler home, CancellationToken token)
+    {
+        double delay = Math.Max(overall.ReserveDelayMilliseconds(bytesRead),
+            adapter.DownloadThrottler.ReserveDelayMilliseconds(bytesRead));
+        if (!adapter.IsMobilePhone)
+            delay = Math.Max(delay, home.ReserveDelayMilliseconds(bytesRead));
+
+        return delay >= 1 ? Task.Delay(TimeSpan.FromMilliseconds(delay), token) : Task.CompletedTask;
     }
 }

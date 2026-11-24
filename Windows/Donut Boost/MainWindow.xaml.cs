@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -26,6 +27,11 @@ public partial class MainWindow : Window
     private readonly DownloadQueue _downloadQueue = new();
     private readonly DispatcherTimer _downloadQueueTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private bool _runningTransfer;
+    private readonly Dictionary<string, double> _savedAdapterLimits = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, long> _savedAdapterDataLimits = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly string SpeedLimitsPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DonutBoost", "speed-limits.json");
+    private sealed record SpeedLimits(double Overall, Dictionary<string, double> Adapters, Dictionary<string, long>? DataLimits);
 
     public MainWindow()
     {
@@ -46,6 +52,7 @@ public partial class MainWindow : Window
         _licenseManager = new LicenseManager();
         _bondingManager = new NetworkBondingManager();
         _downloader = new MultiChannelDownloader(_bondingManager, _licenseManager);
+        LoadSpeedLimits();
         _gameBoostProxy = new GameBoostProxyServer(_bondingManager, _licenseManager);
 
         _bondingManager.AdaptersChanged += OnAdaptersChanged;
@@ -491,6 +498,98 @@ public partial class MainWindow : Window
         }) + capText;
     }
 
+    private void ApplyOverallSpeedLimit_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryReadNetworkSpeedLimit(OverallSpeedLimitTextBox, out double mbps)) return;
+        _downloader.OverallThrottler.SetLimitMbps(mbps);
+        SaveSpeedLimits();
+        OnLogReceived(mbps == 0 ? "Overall download speed limit cleared." : $"Overall download speed limited to {mbps:0.##} Mbps.");
+    }
+
+    private void ApplyAdapterSpeedLimit_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { DataContext: NetworkAdapterInfo adapter, Tag: TextBox input } ||
+            !TryReadNetworkSpeedLimit(input, out double mbps)) return;
+        adapter.SetDownloadLimitMbps(mbps);
+        if (mbps == 0) _savedAdapterLimits.Remove(adapter.Id);
+        else _savedAdapterLimits[adapter.Id] = mbps;
+        SaveSpeedLimits();
+        OnLogReceived(mbps == 0 ? $"[{adapter.Name}] Download speed limit cleared." : $"[{adapter.Name}] Download speed limited to {mbps:0.##} Mbps.");
+    }
+
+    private bool TryReadNetworkSpeedLimit(TextBox input, out double mbps)
+    {
+        if (double.TryParse(input.Text, NumberStyles.AllowDecimalPoint, CultureInfo.CurrentCulture, out mbps) &&
+            IsValidNetworkSpeedLimit(mbps))
+            return true;
+
+        MessageBox.Show(this, "Enter a speed from 0.1 to 100,000 Mbps, or 0 for unlimited.",
+            "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Information);
+        input.Focus();
+        return false;
+    }
+
+    private void ApplyAdapterDataLimit_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { DataContext: NetworkAdapterInfo adapter, Tag: TextBox input }) return;
+        if (!long.TryParse(input.Text, NumberStyles.None, CultureInfo.CurrentCulture, out long limit) ||
+            limit is < 0 or > 10_000_000)
+        {
+            MessageBox.Show(this, "Enter a whole number from 1 to 10,000,000 MB, or 0 for unlimited.",
+                "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Information);
+            input.Focus();
+            return;
+        }
+        adapter.SetDownloadDataLimitMb(limit);
+        if (limit == 0) _savedAdapterDataLimits.Remove(adapter.Id);
+        else _savedAdapterDataLimits[adapter.Id] = limit;
+        SaveSpeedLimits();
+        OnLogReceived(limit == 0 ? $"[{adapter.Name}] Data limit cleared." : $"[{adapter.Name}] Data limited to {limit:N0} MB per transfer.");
+    }
+
+    private static bool IsValidNetworkSpeedLimit(double mbps) => mbps == 0 || mbps is >= 0.1 and <= 100000;
+
+    private void LoadSpeedLimits()
+    {
+        try
+        {
+            if (!File.Exists(SpeedLimitsPath)) return;
+            var settings = JsonSerializer.Deserialize<SpeedLimits>(File.ReadAllText(SpeedLimitsPath));
+            if (settings is null) return;
+            if (IsValidNetworkSpeedLimit(settings.Overall))
+            {
+                _downloader.OverallThrottler.SetLimitMbps(settings.Overall);
+                OverallSpeedLimitTextBox.Text = settings.Overall.ToString("0.##", CultureInfo.CurrentCulture);
+            }
+            if (settings.Adapters is not null)
+                foreach (var (adapter, limit) in settings.Adapters.Where(entry => IsValidNetworkSpeedLimit(entry.Value)))
+                    _savedAdapterLimits[adapter] = limit;
+            if (settings.DataLimits is not null)
+                foreach (var (adapter, limit) in settings.DataLimits.Where(entry => entry.Value is > 0 and <= 10_000_000))
+                    _savedAdapterDataLimits[adapter] = limit;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            OnLogReceived($"Could not load download speed limits: {ex.Message}");
+        }
+    }
+
+    private void SaveSpeedLimits()
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(SpeedLimitsPath)!);
+            string pending = SpeedLimitsPath + ".tmp";
+            File.WriteAllText(pending, JsonSerializer.Serialize(new SpeedLimits(
+                _downloader.OverallThrottler.CurrentLimitMbps, _savedAdapterLimits, _savedAdapterDataLimits)));
+            File.Move(pending, SpeedLimitsPath, overwrite: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            OnLogReceived($"Could not save download speed limits: {ex.Message}");
+        }
+    }
+
     private void AdapterToggle_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement element && element.DataContext is NetworkAdapterInfo adapter)
@@ -548,6 +647,13 @@ public partial class MainWindow : Window
     private void UpdateAdaptersUI()
     {
         var adapters = _bondingManager.Adapters;
+        foreach (var adapter in adapters)
+        {
+            if (_savedAdapterLimits.TryGetValue(adapter.Id, out double limit) && Math.Abs(adapter.DownloadLimitMbps - limit) > 0.00001)
+                adapter.SetDownloadLimitMbps(limit);
+            if (_savedAdapterDataLimits.TryGetValue(adapter.Id, out long dataLimit) && adapter.DownloadDataLimitMb != dataLimit)
+                adapter.SetDownloadDataLimitMb(dataLimit);
+        }
         AdaptersItemsControl.ItemsSource = adapters;
 
         int activeCount = adapters.Count(a => a.IsEnabled && a.IsOnline);

@@ -30,6 +30,7 @@ public class MultiChannelDownloader
     public bool IsPaused => _isPaused;
     public bool BondTorrentPeers { get; set; } = true;
     public BandwidthThrottler Throttler => _throttler;
+    public BandwidthThrottler OverallThrottler { get; } = new();
 
     public event Action<DownloadSession>? ProgressUpdated;
     public event Action<DownloadSession>? StatusChanged;
@@ -100,6 +101,13 @@ public class MultiChannelDownloader
         _cts = CancellationTokenSource.CreateLinkedTokenSource(externalToken);
         var token = _cts.Token;
         _isPaused = false;
+        _throttler.ResetSchedule();
+        OverallThrottler.ResetSchedule();
+        foreach (var adapter in _bondingManager.Adapters)
+        {
+            adapter.DownloadThrottler.ResetSchedule();
+            adapter.TransferDataLimit.Reset();
+        }
 
         var session = new DownloadSession
         {
@@ -108,6 +116,35 @@ public class MultiChannelDownloader
         };
         _currentSession = session;
         StatusChanged?.Invoke(session);
+        string? checkpointPath = null;
+        DirectDownloadCheckpoint? checkpoint = null;
+        string? partialPath = null;
+
+        void SaveCheckpoint()
+        {
+            lock (_fileLock)
+            {
+                if (checkpoint is null || checkpointPath is null || _fileStream is null) return;
+                long prefix = session.Chunks.Count > 0 ? session.Chunks[0].StartOffset : checkpoint.ContiguousBytes;
+                foreach (var chunk in session.Chunks)
+                {
+                    prefix += chunk.BytesDownloaded;
+                    if (chunk.BytesDownloaded < chunk.TotalBytes) break;
+                }
+                if (prefix == checkpoint.ContiguousBytes) return;
+                try
+                {
+                    _fileStream.Flush(flushToDisk: true);
+                    var updated = checkpoint with { ContiguousBytes = prefix };
+                    updated.Save(checkpointPath);
+                    checkpoint = updated;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    LogReceived?.Invoke($"Could not save download progress: {ex.Message}");
+                }
+            }
+        }
 
         try
         {
@@ -168,7 +205,7 @@ public class MultiChannelDownloader
                     {
                         if (!adapterTransfer.Token.IsCancellationRequested)
                             LogReceived?.Invoke($"[{adapter.Name}] Download probe timed out.");
-                        return (Adapter: adapter, Probe: (FileName: string.Empty, TotalSize: -1L, SupportsRanges: false, Reachable: false));
+                        return (Adapter: adapter, Probe: (FileName: string.Empty, TotalSize: -1L, SupportsRanges: false, Reachable: false, EntityTag: (string?)null));
                     }
                 }));
             var reachable = probes.Where(p => p.Probe.Reachable).ToList();
@@ -178,9 +215,10 @@ public class MultiChannelDownloader
             var selected = reachable.FirstOrDefault(p => p.Probe.SupportsRanges && p.Probe.TotalSize > 0);
             if (selected.Adapter == null)
                 selected = reachable[0];
-            var (fileName, totalSize, supportsRanges, _) = selected.Probe;
+            var (fileName, totalSize, supportsRanges, _, entityTag) = selected.Probe;
             var rangeAdapters = reachable
-                .Where(p => p.Probe.SupportsRanges && p.Probe.TotalSize == totalSize)
+                .Where(p => p.Probe.SupportsRanges && p.Probe.TotalSize == totalSize &&
+                    (entityTag is null || p.Probe.EntityTag == entityTag))
                 .Select(p => p.Adapter)
                 .ToList();
             foreach (var probe in reachable.Where(p => supportsRanges && !rangeAdapters.Contains(p.Adapter)))
@@ -193,20 +231,50 @@ public class MultiChannelDownloader
             Directory.CreateDirectory(outputFolder);
             lock (_fileLock)
             {
-                _fileStream = OpenUniqueDestinationFile(outputFolder, fileName, out string destinationPath);
-                session.DestinationPath = destinationPath;
-                session.FileName = Path.GetFileName(destinationPath);
+                if (supportsRanges && entityTag is not null)
+                {
+                    checkpointPath = DirectDownloadCheckpoint.GetPath(normalizedUrl, outputFolder);
+                    checkpoint = DirectDownloadCheckpoint.Load(checkpointPath, outputFolder, entityTag, totalSize);
+                }
+                bool resuming = checkpoint is not null;
+                if (resuming)
+                {
+                    partialPath = Path.Combine(outputFolder, checkpoint!.PartialName);
+                    _fileStream = new FileStream(partialPath, FileMode.Open, FileAccess.Write, FileShare.Read);
+                    session.DownloadedBytes = checkpoint.ContiguousBytes;
+                    session.DestinationPath = partialPath;
+                    LogReceived?.Invoke($"Resuming from {session.FormattedDownloadedSize} saved on this device.");
+                }
+                else
+                {
+                    _fileStream = OpenUniqueDestinationFile(outputFolder,
+                        checkpointPath is null ? fileName : fileName + ".donutpart", out string path);
+                    session.DestinationPath = path;
+                    if (checkpointPath is not null) partialPath = path;
+                    else session.FileName = Path.GetFileName(path);
+                }
                 try
                 {
-                    if (supportsRanges && totalSize > 0)
+                    if (!resuming && supportsRanges && totalSize > 0)
                         _fileStream.SetLength(totalSize);
-                    MarkInternetDownload(destinationPath);
+                    MarkInternetDownload(session.DestinationPath);
+                    if (!resuming && checkpointPath is not null)
+                    {
+                        checkpoint = new DirectDownloadCheckpoint(Path.GetFileName(partialPath!), entityTag!, totalSize, 0);
+                        try { checkpoint.Save(checkpointPath); }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                        {
+                            LogReceived?.Invoke($"Download can continue without restart recovery: {ex.Message}");
+                            checkpoint = null;
+                        }
+                    }
                 }
                 catch
                 {
                     _fileStream.Dispose();
                     _fileStream = null;
-                    try { File.Delete(destinationPath); } catch { }
+                    if (!resuming)
+                        try { File.Delete(session.DestinationPath); } catch { }
                     throw;
                 }
             }
@@ -219,7 +287,7 @@ public class MultiChannelDownloader
             // caused Wi-Fi to keep downloading in Mobile Data Only mode.
             if (supportsRanges && totalSize > 0)
             {
-                await DownloadMultiChannelAsync(session, rangeAdapters, enabledAdapters, token);
+                await DownloadMultiChannelAsync(session, rangeAdapters, enabledAdapters, entityTag, SaveCheckpoint, token);
             }
             else
             {
@@ -242,7 +310,18 @@ public class MultiChannelDownloader
             }
             else
             {
+                SaveCheckpoint();
                 CloseDownloadFile();
+                if (partialPath is not null)
+                {
+                    session.DestinationPath = FinalizePartialFile(partialPath, fileName);
+                    session.FileName = Path.GetFileName(session.DestinationPath);
+                    try { File.Delete(checkpointPath!); }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        LogReceived?.Invoke($"Could not remove the completed download checkpoint: {ex.Message}");
+                    }
+                }
                 session.Status = DownloadStatus.Completed;
                 StatusChanged?.Invoke(session);
                 LogReceived?.Invoke($"✓ Download completed successfully! File saved to {session.DestinationPath}");
@@ -265,7 +344,7 @@ public class MultiChannelDownloader
         }
         finally
         {
-            try { CloseDownloadFile(); }
+            try { SaveCheckpoint(); CloseDownloadFile(); }
             catch (IOException ex) { LogReceived?.Invoke($"Could not finish writing the partial file: {ex.Message}"); }
             finally { Interlocked.Exchange(ref _cts, null)?.Dispose(); }
         }
@@ -305,14 +384,14 @@ public class MultiChannelDownloader
         int nextAdapter = -1;
         IReadOnlyList<NetworkAdapterInfo> GetPeerAdapters()
         {
-            var adapters = _bondingManager.GetActiveEnabledAdapters();
-            if (adapters.Count < 2) return adapters;
-            int first = (int)((uint)Interlocked.Increment(ref nextAdapter) % (uint)adapters.Count);
+            var adapters = _bondingManager.GetActiveEnabledAdapters().Where(adapter => !adapter.TransferDataLimit.IsReached).ToArray();
+            if (adapters.Length < 2) return adapters;
+            int first = (int)((uint)Interlocked.Increment(ref nextAdapter) % (uint)adapters.Length);
             return adapters.Skip(first).Concat(adapters.Take(first)).ToArray();
         }
         var factories = Factories.Default
-            .WithPeerConnectionCreator("ipv4", uri => new TorrentPeerConnection(uri, GetPeerAdapters, _throttler, token))
-            .WithPeerConnectionCreator("ipv6", uri => new TorrentPeerConnection(uri, GetPeerAdapters, _throttler, token));
+            .WithPeerConnectionCreator("ipv4", uri => new TorrentPeerConnection(uri, GetPeerAdapters, _throttler, OverallThrottler, token))
+            .WithPeerConnectionCreator("ipv6", uri => new TorrentPeerConnection(uri, GetPeerAdapters, _throttler, OverallThrottler, token));
         bool bondPeers = BondTorrentPeers;
         var settings = new EngineSettingsBuilder
         {
@@ -385,8 +464,14 @@ public class MultiChannelDownloader
             string route = bondPeers ? "peer connections use enabled Donut adapters" : "peer connections use the Windows route";
             LogReceived?.Invoke($"Torrent ready: {session.FileName} | verified payload size: {session.FormattedTotalSize} | {route}.");
 
+            int exhaustedPolls = 0;
             while (!token.IsCancellationRequested && !_torrentManager.Complete)
             {
+                exhaustedPolls = bondPeers && AllAdapterDataLimitsReached(_bondingManager.GetActiveEnabledAdapters())
+                    ? exhaustedPolls + 1 : 0;
+                if (exhaustedPolls >= 4)
+                    throw new IOException("The selected adapters reached their data limits. Raise a limit or select another adapter and retry.");
+
                 if (_isPaused)
                 {
                     await Task.Delay(250, token);
@@ -504,6 +589,23 @@ public class MultiChannelDownloader
         }
     }
 
+    private static string FinalizePartialFile(string partialPath, string fileName)
+    {
+        string folder = Path.GetDirectoryName(partialPath)!;
+        string name = Path.GetFileNameWithoutExtension(fileName);
+        string extension = Path.GetExtension(fileName);
+        for (int suffix = 0; ; suffix++)
+        {
+            string destination = Path.Combine(folder, suffix == 0 ? fileName : $"{name} ({suffix}){extension}");
+            try
+            {
+                File.Move(partialPath, destination);
+                return destination;
+            }
+            catch (IOException) when (File.Exists(destination)) { }
+        }
+    }
+
     private static void MarkInternetDownload(string path)
     {
         // Preserve Windows' Internet-zone handling for files saved by Donut.
@@ -515,12 +617,12 @@ public class MultiChannelDownloader
     }
 
     private async Task DownloadMultiChannelAsync(DownloadSession session, List<NetworkAdapterInfo> adapters,
-        List<NetworkAdapterInfo> probedAdapters, CancellationToken token)
+        List<NetworkAdapterInfo> probedAdapters, string? entityTag, Action saveCheckpoint, CancellationToken token)
     {
         // Compute chunk size: between 2 MB and 16 MB depending on total size
         long chunkSize = Math.Clamp(session.TotalBytes / (adapters.Count * 12), 2 * 1024 * 1024, 16 * 1024 * 1024);
         int chunkIndex = 0;
-        long currentOffset = 0;
+        long currentOffset = session.DownloadedBytes;
 
         var chunks = new List<DownloadChunk>();
         while (currentOffset < session.TotalBytes)
@@ -544,8 +646,9 @@ public class MultiChannelDownloader
         LogReceived?.Invoke($"⚡ Bonding pipeline active: {chunks.Count} chunks of {DownloadSession.FormatBytes(chunkSize)} bonded across {adapters.Count} connection(s).");
 
         // Speed measurement trackers
-        long lastDownloadedBytes = 0;
+        long lastDownloadedBytes = session.DownloadedBytes;
         var stopwatch = Stopwatch.StartNew();
+        var checkpointTimer = Stopwatch.StartNew();
 
         // Background monitor for live speed calculation
         var monitorTask = Task.Run(async () =>
@@ -555,6 +658,11 @@ public class MultiChannelDownloader
             {
                 await Task.Delay(250);
                 if (token.IsCancellationRequested) break;
+                if (checkpointTimer.ElapsedMilliseconds >= 3000)
+                {
+                    saveCheckpoint();
+                    checkpointTimer.Restart();
+                }
                 
                 if (_isPaused)
                 {
@@ -581,12 +689,14 @@ public class MultiChannelDownloader
 
         // Worker tasks per network adapter (12 workers for Mobile 5G, 8 for Wi-Fi for maximum 300+ Mbps throughput)
         var workerTasks = new List<Task>();
+        var workerAdapters = new List<NetworkAdapterInfo>();
         var trackedAdapterIds = new HashSet<string>(probedAdapters.Select(a => a.Id));
         var workerLock = new object();
 
         void SpawnWorkersForAdapter(NetworkAdapterInfo adp)
         {
             var client = _bondingManager.GetOrCreateClient(adp);
+            lock (workerLock) workerAdapters.Add(adp);
             int workersCount = adp.IsMobilePhone ? 12 : 8;
             for (int w = 0; w < workersCount; w++)
             {
@@ -600,6 +710,11 @@ public class MultiChannelDownloader
                             while (_isPaused && !token.IsCancellationRequested)
                             {
                                 await Task.Delay(200, token);
+                            }
+                            if (adp.TransferDataLimit.IsReached)
+                            {
+                                await Task.Delay(200, token);
+                                continue;
                             }
 
                             // Support live mid-download mode switching (Wi-Fi Only, Mobile Data Only, or Combine Both)
@@ -635,7 +750,7 @@ public class MultiChannelDownloader
                             using var adapterTransfer = new AdapterTransferCancellation(adp, token);
                             try
                             {
-                                interrupted = await DownloadChunkWithClientAsync(client, session.Url, chunk, adp, session, adapterTransfer.Token);
+                                interrupted = await DownloadChunkWithClientAsync(client, session.Url, chunk, adp, session, entityTag, adapterTransfer.Token);
                                 success = chunk.IsCompleted;
                             }
                             catch (Exception) when (adapterTransfer.Token.IsCancellationRequested)
@@ -743,6 +858,16 @@ public class MultiChannelDownloader
                 Task[] currentTasks;
                 lock (workerLock)
                 {
+                    bool noChunksInFlight;
+                    lock (queueLock)
+                        noChunksInFlight = pendingQueue.Count > 0 && pendingQueue.Count == chunks.Count(chunk => !chunk.IsCompleted);
+                    if (noChunksInFlight && AllAdapterDataLimitsReached(workerAdapters.Where(adapter => adapter.IsEnabled && adapter.IsOnline).ToArray()))
+                    {
+                        session.ErrorMessage = "The selected adapters reached their data limits. Raise a limit or select another adapter and retry.";
+                        session.Status = DownloadStatus.Failed;
+                        _cts?.Cancel();
+                        break;
+                    }
                     currentTasks = workerTasks.ToArray();
                 }
                 await Task.WhenAny(Task.WhenAll(currentTasks), Task.Delay(500, token));
@@ -766,7 +891,7 @@ public class MultiChannelDownloader
         ProgressUpdated?.Invoke(session);
     }
 
-    private async Task<bool> DownloadChunkWithClientAsync(HttpClient client, string url, DownloadChunk chunk, NetworkAdapterInfo adapter, DownloadSession session, CancellationToken token)
+    private async Task<bool> DownloadChunkWithClientAsync(HttpClient client, string url, DownloadChunk chunk, NetworkAdapterInfo adapter, DownloadSession session, string? entityTag, CancellationToken token)
     {
         // Support resuming chunk from exact downloaded offset
         long startFrom = chunk.StartOffset + chunk.BytesDownloaded;
@@ -778,6 +903,8 @@ public class MultiChannelDownloader
 
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Range = new RangeHeaderValue(startFrom, chunk.EndOffset);
+        if (entityTag is not null)
+            request.Headers.IfRange = new RangeConditionHeaderValue(EntityTagHeaderValue.Parse(entityTag));
 
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
         response.EnsureSuccessStatusCode();
@@ -788,7 +915,8 @@ public class MultiChannelDownloader
         }
 
         var contentRange = response.Content.Headers.ContentRange;
-        if (contentRange?.Unit != "bytes" || contentRange.From != startFrom || contentRange.To is null || contentRange.To < startFrom || contentRange.To > chunk.EndOffset ||
+        if ((entityTag is not null && response.Headers.ETag is { } responseTag && responseTag.ToString() != entityTag) ||
+            contentRange?.Unit != "bytes" || contentRange.From != startFrom || contentRange.To is null || contentRange.To < startFrom || contentRange.To > chunk.EndOffset ||
             (session.TotalBytes > 0 && contentRange.Length != session.TotalBytes) ||
             (response.Content.Headers.ContentLength.HasValue &&
              response.Content.Headers.ContentLength.Value != contentRange.To.Value - contentRange.From.Value + 1))
@@ -809,8 +937,9 @@ public class MultiChannelDownloader
 
             int length = (int)Math.Min(buffer.Length, responseEnd - writeOffset + 1);
             readTimeout.CancelAfter(TimeSpan.FromSeconds(20));
-            int bytesRead = await contentStream.ReadAsync(buffer.AsMemory(0, length), readTimeout.Token);
+            int bytesRead = await adapter.TransferDataLimit.ReadAsync(buffer.AsMemory(0, length), contentStream.ReadAsync, readTimeout.Token);
             readTimeout.CancelAfter(Timeout.InfiniteTimeSpan);
+            if (bytesRead < 0) return true;
             if (bytesRead == 0) break;
 
             lock (_fileLock)
@@ -820,25 +949,19 @@ public class MultiChannelDownloader
                 {
                     _fileStream.Seek(writeOffset, SeekOrigin.Begin);
                     _fileStream.Write(buffer, 0, bytesRead);
+                    chunk.BytesDownloaded += bytesRead;
                 }
             }
 
             writeOffset += bytesRead;
-            chunk.BytesDownloaded += bytesRead;
 
             adapter.AddDownloadedBytes(bytesRead);
             session.AddDownloadedBytes(bytesRead);
+            await BandwidthThrottler.PaceAsync(adapter, bytesRead, OverallThrottler, _throttler, token);
             if (chunk.BytesDownloaded == chunk.TotalBytes)
             {
                 chunk.IsCompleted = true;
                 return false;
-            }
-
-            // Apply real-time bandwidth throttling if configured by user
-            // Speed limit applies ONLY to Home Wi-Fi / LAN — Mobile 5G runs 100% full unthrottled speed!
-            if (!adapter.IsMobilePhone)
-            {
-                await _throttler.ThrottleAsync(bytesRead, token);
             }
 
         }
@@ -862,7 +985,10 @@ public class MultiChannelDownloader
 
             if (token.IsCancellationRequested) break;
 
-            var active = _bondingManager.GetActiveEnabledAdapters();
+            var enabled = _bondingManager.GetActiveEnabledAdapters();
+            if (AllAdapterDataLimitsReached(enabled))
+                throw new IOException("The selected adapters reached their data limits. Raise a limit or select another adapter and retry.");
+            var active = enabled.Where(adapter => !adapter.TransferDataLimit.IsReached).ToArray();
             var adapter = active.Contains(preferredAdapter) ? preferredAdapter :
                 active.OrderByDescending(a => a.IsWifi).FirstOrDefault();
             if (adapter == null)
@@ -941,9 +1067,9 @@ public class MultiChannelDownloader
                     while (_isPaused)
                         await Task.Delay(200, transferToken);
                     readTimeout.CancelAfter(TimeSpan.FromSeconds(20));
-                    bytesRead = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), readTimeout.Token);
+                    bytesRead = await adapter.TransferDataLimit.ReadAsync(buffer.AsMemory(), contentStream.ReadAsync, readTimeout.Token);
                     readTimeout.CancelAfter(Timeout.InfiniteTimeSpan);
-                    if (bytesRead == 0) break;
+                    if (bytesRead <= 0) break;
                     if (responseEnd is long end && bytesRead > end - session.DownloadedBytes + 1)
                         throw new InvalidDataException("The server sent more bytes than it advertised.");
                     lock (_fileLock)
@@ -959,12 +1085,7 @@ public class MultiChannelDownloader
                     adapter.AddDownloadedBytes(bytesRead);
                     session.AddDownloadedBytes(bytesRead);
 
-                    // Apply real-time bandwidth throttling if configured by user
-                    // Speed limit applies ONLY to Home Wi-Fi / LAN — Mobile 5G runs 100% full unthrottled speed!
-                    if (!adapter.IsMobilePhone)
-                    {
-                        await _throttler.ThrottleAsync(bytesRead, transferToken);
-                    }
+                    await BandwidthThrottler.PaceAsync(adapter, bytesRead, OverallThrottler, _throttler, transferToken);
 
                     if (stopwatch.ElapsedMilliseconds >= 250)
                     {
@@ -980,6 +1101,7 @@ public class MultiChannelDownloader
 
                 // When the server does not provide a length, end at EOF instead
                 // of issuing another GET forever after the first full response.
+                if (bytesRead < 0) continue;
                 if (session.TotalBytes <= 0) break;
                 if (session.DownloadedBytes == bytesBeforeAttempt && session.DownloadedBytes < session.TotalBytes)
                 {
@@ -1020,6 +1142,9 @@ public class MultiChannelDownloader
         }
     }
 
+    private static bool AllAdapterDataLimitsReached(IReadOnlyCollection<NetworkAdapterInfo> adapters) =>
+        adapters.Count > 0 && adapters.All(adapter => adapter.TransferDataLimit.IsReached);
+
     private sealed class AdapterTransferCancellation : IDisposable
     {
         private readonly NetworkAdapterInfo _adapter;
@@ -1055,7 +1180,7 @@ public class MultiChannelDownloader
         }
     }
 
-    private async Task<(string FileName, long TotalSize, bool SupportsRanges, bool Reachable)> ProbeUrlAsync(HttpClient client, string url, CancellationToken token)
+    private async Task<(string FileName, long TotalSize, bool SupportsRanges, bool Reachable, string? EntityTag)> ProbeUrlAsync(HttpClient client, string url, CancellationToken token)
     {
         string rawFileName = string.Empty;
         try
@@ -1079,10 +1204,11 @@ public class MultiChannelDownloader
             using var rangeRes = await client.SendAsync(rangeReq, HttpCompletionOption.ResponseHeadersRead, rangeTimeout.Token);
             if (rangeRes.StatusCode == System.Net.HttpStatusCode.PartialContent &&
                 rangeRes.Content.Headers.ContentRange is { Unit: "bytes", From: 0, To: 0, Length: > 0 } range)
-                return (GetFileName(rangeRes, fileName), range.Length.Value, true, true);
+                return (GetFileName(rangeRes, fileName), range.Length.Value, true, true,
+                    rangeRes.Headers.ETag is { IsWeak: false, Tag: not "*" } tag ? tag.ToString() : null);
 
             if (rangeRes.StatusCode == System.Net.HttpStatusCode.OK)
-                return (GetFileName(rangeRes, fileName), rangeRes.Content.Headers.ContentLength ?? -1, false, true);
+                return (GetFileName(rangeRes, fileName), rangeRes.Content.Headers.ContentLength ?? -1, false, true, null);
         }
         catch (OperationCanceledException) when (!token.IsCancellationRequested)
         {
@@ -1098,7 +1224,7 @@ public class MultiChannelDownloader
         {
             using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, token);
             if (response.StatusCode == System.Net.HttpStatusCode.OK)
-                return (GetFileName(response, fileName), response.Content.Headers.ContentLength ?? -1, false, true);
+                return (GetFileName(response, fileName), response.Content.Headers.ContentLength ?? -1, false, true, null);
 
             LogReceived?.Invoke($"The download server returned HTTP {(int)response.StatusCode}.");
         }
@@ -1107,7 +1233,7 @@ public class MultiChannelDownloader
             LogReceived?.Invoke($"[Notice] Regular download probe: {ex.Message}");
         }
 
-        return (fileName, -1, false, false);
+        return (fileName, -1, false, false, null);
     }
 
     private static string GetFileName(HttpResponseMessage response, string fallback)

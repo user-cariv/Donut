@@ -11,6 +11,7 @@ internal sealed class TorrentPeerConnection : IPeerConnection
 {
     private readonly Func<IReadOnlyList<NetworkAdapterInfo>> _getAdapters;
     private readonly BandwidthThrottler _throttler;
+    private readonly BandwidthThrottler _overallThrottler;
     private readonly CancellationToken _sessionToken;
     private readonly object _connectionLock = new();
     private NetworkAdapterInfo? _adapter;
@@ -18,13 +19,14 @@ internal sealed class TorrentPeerConnection : IPeerConnection
     private bool _disposed;
 
     public TorrentPeerConnection(Uri uri, Func<IReadOnlyList<NetworkAdapterInfo>> getAdapters,
-        BandwidthThrottler throttler, CancellationToken sessionToken)
+        BandwidthThrottler throttler, BandwidthThrottler overallThrottler, CancellationToken sessionToken)
     {
         Uri = uri;
         EndPoint = new IPEndPoint(IPAddress.Parse(uri.DnsSafeHost), uri.Port);
         AddressBytes = EndPoint.Address.GetAddressBytes();
         _getAdapters = getAdapters;
         _throttler = throttler;
+        _overallThrottler = overallThrottler;
         _sessionToken = sessionToken;
     }
 
@@ -90,11 +92,13 @@ internal sealed class TorrentPeerConnection : IPeerConnection
             socket = _socket ?? throw new SocketException((int)SocketError.NotConnected);
             adapter = _adapter!;
         }
-        int count = await socket.ReceiveAsync(buffer, SocketFlags.None, _sessionToken);
+        int count = await adapter.TransferDataLimit.ReadAsync(buffer,
+            (destination, token) => socket.ReceiveAsync(destination, SocketFlags.None, token), _sessionToken);
+        if (count < 0) throw new SocketException((int)SocketError.ConnectionAborted);
         if (count > 0)
         {
             adapter.AddDownloadedBytes(count);
-            if (!adapter.IsMobilePhone) await _throttler.ThrottleAsync(count, _sessionToken);
+            await BandwidthThrottler.PaceAsync(adapter, count, _overallThrottler, _throttler, _sessionToken);
         }
         return count;
     }

@@ -50,7 +50,11 @@ Paste a BitTorrent magnet link into the download field, or use **Torrent** to ch
 
 ## Download queue
 
-Use **Add to queue** for a direct link, magnet link, or torrent file. Leave the time blank to start when the current download finishes, or enter a local time in `HH:mm` format. Scheduled downloads start while the app is open. The queue and its history are saved locally. After an interruption, **Retry selected** restarts a direct transfer or rechecks the partial torrent data.
+Use **Add to queue** for a direct link, magnet link, or torrent file. Leave the time blank to start when the current download finishes, or enter a local time in `HH:mm` format. Scheduled downloads start while the app is open. The queue and its history are saved locally.
+
+After a restart, use **Retry selected** on a queued transfer or submit the same direct link with the same destination folder. If the server supports byte ranges and provides an unchanged strong ETag, Donut Boost resumes from its saved checkpoint in the partial file. It may download some later chunks again. Retrying a torrent rechecks its partial data.
+
+Use **Overall Mbps limit** to share a speed cap across Donut Boost transfers. Set **Mbps limit** on any adapter to cap that connection separately. Set **MB per transfer** to stop using an adapter after Donut Boost reads that amount through it. If another eligible adapter remains, ranged transfers can continue on it. These saved limits apply to direct downloads and bonded torrent peers, and measure traffic read by Donut Boost. Enter **0** to clear a cap.
 
 ## Send links from Chrome or Edge
 

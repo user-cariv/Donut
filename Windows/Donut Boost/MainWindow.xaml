@@ -350,9 +350,16 @@
                                 </Button>
                             </StackPanel>
                         </Grid>
-                        <CheckBox x:Name="BondTorrentsCheckBox" Grid.Row="4" Content="Combine connections for torrent peers"
-                                  IsChecked="True" Foreground="{StaticResource TextSecondaryBrush}" Margin="4,10,0,0"
+                        <WrapPanel Grid.Row="4" Margin="4,10,0,0">
+                        <CheckBox x:Name="BondTorrentsCheckBox" Content="Combine connections for torrent peers"
+                                  IsChecked="True" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,16,0" VerticalAlignment="Center"
                                   ToolTip="Use enabled adapters for outgoing torrent peers. Tracker and DHT discovery may follow Windows routing. Clear this for incoming peers and HTTP web seeds."/>
+                            <TextBlock Text="Overall Mbps limit" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <TextBox x:Name="OverallSpeedLimitTextBox" Text="0" Width="56" Margin="0,0,6,0" Padding="4"
+                                     Background="#121214" Foreground="{StaticResource TextPrimaryBrush}" AutomationProperties.Name="Overall Mbps limit"
+                                     ToolTip="0 means unlimited. Applies to direct downloads and bonded torrent peers."/>
+                            <Button Content="Apply" Click="ApplyOverallSpeedLimit_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="9,3"/>
+                        </WrapPanel>
                     </Grid>
                 </Border>
 
@@ -636,6 +643,21 @@
                                                     </StackPanel>
                                                     <TextBlock Text="{Binding Description}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
                                                     <TextBlock Text="{Binding LocalIp}" FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                                                    <WrapPanel Margin="0,5,0,0">
+                                                        <TextBlock Text="Mbps limit" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" FontSize="10" Margin="0,0,5,0"/>
+                                                        <TextBox x:Name="AdapterLimitInput" Text="{Binding DownloadLimitMbps, Mode=OneWay, StringFormat={}{0:0.##}}"
+                                                                 Width="53" Padding="4,2" Margin="0,0,5,0"
+                                                                 Background="#121214" Foreground="{StaticResource TextPrimaryBrush}" AutomationProperties.Name="Adapter Mbps limit"
+                                                                 ToolTip="0 means unlimited on this adapter. Applies to direct downloads and bonded torrent peers."/>
+                                                        <Button Content="Apply" Tag="{Binding ElementName=AdapterLimitInput}" Click="ApplyAdapterSpeedLimit_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="7,2" FontSize="10"/>
+                                                    </WrapPanel>
+                                                    <WrapPanel Margin="0,4,0,0">
+                                                        <TextBlock Text="MB per transfer" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" FontSize="10" Margin="0,0,5,0"/>
+                                                        <TextBox x:Name="AdapterDataLimitInput" Text="{Binding DownloadDataLimitMb, Mode=OneWay}" Width="53" Padding="4,2" Margin="0,0,5,0"
+                                                                 Background="#121214" Foreground="{StaticResource TextPrimaryBrush}" AutomationProperties.Name="Adapter data limit in megabytes per transfer"
+                                                                 ToolTip="0 means unlimited. Counts bytes Donut reads through this adapter during a direct download or bonded torrent transfer."/>
+                                                        <Button Content="Apply" Tag="{Binding ElementName=AdapterDataLimitInput}" Click="ApplyAdapterDataLimit_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="7,2" FontSize="10"/>
+                                                    </WrapPanel>
                                                 </StackPanel>
 
                                                 <!-- Speed & Apple iOS Toggle Switch -->
