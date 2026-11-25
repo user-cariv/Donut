@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace DonutBoost;
 
@@ -10,6 +11,9 @@ public partial class MainWindow
     private CancellationTokenSource? _speedTestCancellation;
     private bool _showingSpeedTest;
     private double _liveGaugeMbps;
+    private double _shownTestMbps;
+    private double _targetTestMbps;
+    private bool _hasTestReading;
 
     private async void SpeedTestButton_Click(object sender, RoutedEventArgs e)
     {
@@ -35,27 +39,51 @@ public partial class MainWindow
         LiveSpeedGaugeDetail.Visibility = Visibility.Collapsed;
         SpeedTestGaugeDetail.Visibility = Visibility.Visible;
         SpeedTestGaugeDetail.Text = "Measuring to Cloudflare…";
-        WifiRateArc.Visibility = MobileRateArc.Visibility = Visibility.Hidden;
+        _targetWifi = _targetMobile = 0;
+        _shownTestMbps = _targetTestMbps = 0;
+        _hasTestReading = false;
         CombinedSpeedTextBlock.Text = "—";
         CombinedSpeedUnitTextBlock.Text = "MBPS";
+
+        long received = 0;
+        long lastBytes = 0;
+        var sampleClock = Stopwatch.StartNew();
+        var progressTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(125) };
+        progressTimer.Tick += (_, _) =>
+        {
+            if (_speedTestCancellation != cancellation) return;
+            long bytes = Interlocked.Read(ref received);
+            if (bytes == 0) return;
+            double seconds = sampleClock.Elapsed.TotalSeconds;
+            sampleClock.Restart();
+            UpdateSpeedTestTarget((bytes - lastBytes) * 8.0 / seconds / 1_000_000);
+            lastBytes = bytes;
+        };
+        progressTimer.Start();
 
         try
         {
             using var client = new HttpClient(new HttpClientHandler { UseProxy = false, AllowAutoRedirect = false });
-            double mbps = await MeasureDownloadMbpsAsync(client, deadline.Token);
+            double mbps = await MeasureDownloadMbpsAsync(client, deadline.Token, bytes => Interlocked.Add(ref received, bytes));
             if (cancellation.IsCancellationRequested) return;
-            SetSpeedGaugeValue(mbps);
+            UpdateSpeedTestTarget(mbps);
             SpeedTestGaugeDetail.Text = "Cloudflare · 96 MiB";
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         catch (Exception ex) when (ex is HttpRequestException or IOException or OperationCanceledException)
         {
             if (cancellation.IsCancellationRequested) return;
+            _hasTestReading = false;
+            _targetWifi = _targetMobile = 0;
+            if (!_previewRendering) RenderPreviewGauge(0, 0);
+            CombinedSpeedTextBlock.Text = "—";
+            CombinedSpeedUnitTextBlock.Text = "MBPS";
             SpeedTestGaugeDetail.Text = "Could not finish test";
             OnLogReceived($"Speed test failed: {ex.Message}");
         }
         finally
         {
+            progressTimer.Stop();
             if (_speedTestCancellation == cancellation)
             {
                 _speedTestCancellation = null;
@@ -74,17 +102,30 @@ public partial class MainWindow
         SpeedGaugeHeading.Text = "C O M B I N E D";
         SpeedTestGaugeDetail.Visibility = Visibility.Collapsed;
         LiveSpeedGaugeDetail.Visibility = Visibility.Visible;
-        WifiRateArc.Visibility = MobileRateArc.Visibility = Visibility.Visible;
         SetSpeedGaugeValue(_liveGaugeMbps);
+    }
+
+    private void UpdateSpeedTestTarget(double mbps)
+    {
+        _targetTestMbps = mbps;
+        _hasTestReading = true;
+        if (!_previewRendering)
+        {
+            _shownTestMbps = mbps;
+            SetSpeedGaugeValue(mbps);
+        }
     }
 
     private void SetSpeedGaugeValue(double mbps)
     {
-        CombinedSpeedTextBlock.Text = mbps >= 1000 ? $"{mbps / 1000:F2}" : $"{mbps:F1}";
-        CombinedSpeedUnitTextBlock.Text = mbps >= 1000 ? "GBPS" : "MBPS";
+        string value = mbps >= 1000 ? $"{mbps / 1000:F2}" : $"{mbps:F1}";
+        string unit = mbps >= 1000 ? "GBPS" : "MBPS";
+        if (CombinedSpeedTextBlock.Text != value) CombinedSpeedTextBlock.Text = value;
+        if (CombinedSpeedUnitTextBlock.Text != unit) CombinedSpeedUnitTextBlock.Text = unit;
     }
 
-    internal static async Task<double> MeasureDownloadMbpsAsync(HttpClient client, CancellationToken token)
+    internal static async Task<double> MeasureDownloadMbpsAsync(HttpClient client, CancellationToken token,
+        Action<int>? onBytesReceived = null)
     {
         const int streamCount = 12;
         const int bytesPerStream = 8 * 1024 * 1024;
@@ -108,6 +149,7 @@ public partial class MainWindow
                     .ConfigureAwait(false);
                 if (read == 0) throw new EndOfStreamException("The test server returned less data than requested.");
                 received += read;
+                onBytesReceived?.Invoke(read);
             }
             return received;
         }

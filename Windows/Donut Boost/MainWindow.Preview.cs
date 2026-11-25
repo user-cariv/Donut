@@ -107,12 +107,18 @@ public partial class MainWindow
     {
         var elapsed = frame - _lastGaugeFrame;
         _lastGaugeFrame = frame;
-        if (elapsed <= TimeSpan.Zero || (_shownWifi == _targetWifi && _shownMobile == _targetMobile))
-            return;
+        if (elapsed <= TimeSpan.Zero) return;
 
-        double weight = 1 - Math.Exp(-elapsed.TotalMilliseconds / 240);
-        RenderPreviewGauge(ApproachGaugeTarget(_shownWifi, _targetWifi, weight),
-            ApproachGaugeTarget(_shownMobile, _targetMobile, weight));
+        double weight = 1 - Math.Exp(-elapsed.TotalMilliseconds / 185);
+        if (_shownWifi != _targetWifi || _shownMobile != _targetMobile)
+            RenderPreviewGauge(ApproachGaugeTarget(_shownWifi, _targetWifi, weight),
+                ApproachGaugeTarget(_shownMobile, _targetMobile, weight));
+
+        if (_showingSpeedTest && _hasTestReading && _shownTestMbps != _targetTestMbps)
+        {
+            _shownTestMbps = ApproachGaugeTarget(_shownTestMbps, _targetTestMbps, weight);
+            SetSpeedGaugeValue(_shownTestMbps);
+        }
     }
 
     private static double ApproachGaugeTarget(double current, double target, double weight)
@@ -123,14 +129,17 @@ public partial class MainWindow
 
     private void RenderPreviewGauge(double wifi, double mobile)
     {
+        if (_shownWifi != wifi) SetArc(WifiRateArc, 110, wifi);
+        if (_shownMobile != mobile) SetArc(MobileRateArc, 90, mobile);
         _shownWifi = wifi;
         _shownMobile = mobile;
-        SetArc(WifiRateArc, 110, wifi);
-        SetArc(MobileRateArc, 90, mobile);
     }
 
     private void UpdatePreviewGauge(IReadOnlyList<(NetworkAdapterInfo Adapter, double BytesPerSecond)> sample)
     {
+        foreach (var item in sample) item.Adapter.AddPreviewSample(item.BytesPerSecond);
+        if (_showingSpeedTest && _speedTestCancellation is null) return;
+
         double wifi = sample.Where(item => item.Adapter.IsWifi).Sum(item => item.BytesPerSecond);
         double mobile = sample.Where(item => item.Adapter.IsMobilePhone && !item.Adapter.IsWifi).Sum(item => item.BytesPerSecond);
         double total = sample.Sum(item => item.BytesPerSecond);
@@ -139,7 +148,6 @@ public partial class MainWindow
         _targetMobile = mobile / gaugeScale;
         if (!_previewRendering || !SystemParameters.ClientAreaAnimation)
             RenderPreviewGauge(_targetWifi, _targetMobile);
-        foreach (var item in sample) item.Adapter.AddPreviewSample(item.BytesPerSecond);
     }
 
     private static void SetArc(GaugePath path, double radius, double fraction)
@@ -150,9 +158,14 @@ public partial class MainWindow
             return;
         }
         double angle = Math.Min(fraction, 0.998) * Math.Tau;
-        var figure = new PathFigure { StartPoint = new Point(140, 140 - radius), IsFilled = false };
-        figure.Segments.Add(new ArcSegment(new Point(140 + Math.Sin(angle) * radius, 140 - Math.Cos(angle) * radius),
-            new Size(radius, radius), 0, angle > Math.PI, SweepDirection.Clockwise, true));
-        path.Data = new PathGeometry(new[] { figure });
+        var geometry = new StreamGeometry();
+        using (var drawing = geometry.Open())
+        {
+            drawing.BeginFigure(new Point(140, 140 - radius), isFilled: false, isClosed: false);
+            drawing.ArcTo(new Point(140 + Math.Sin(angle) * radius, 140 - Math.Cos(angle) * radius),
+                new Size(radius, radius), 0, angle > Math.PI, SweepDirection.Clockwise, isStroked: true, isSmoothJoin: false);
+        }
+        geometry.Freeze();
+        path.Data = geometry;
     }
 }

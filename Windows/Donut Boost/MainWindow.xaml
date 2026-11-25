@@ -639,6 +639,18 @@
                                                         <!-- Live speed and adapter controls -->
                                                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
                                                             <StackPanel VerticalAlignment="Center">
+                                                                <StackPanel.Style>
+                                                                    <Style TargetType="StackPanel">
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsWifi}" Value="True">
+                                                                                <Setter Property="Margin" Value="0,0,12,0"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding IsMobilePhone}" Value="True">
+                                                                                <Setter Property="Margin" Value="0,0,12,0"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </StackPanel.Style>
                                                                 <TextBlock Text="{Binding DisplaySpeed}" FontWeight="Bold" FontSize="17" Foreground="#F4EFE6" HorizontalAlignment="Right"/>
                                                                 <Polyline Points="{Binding PreviewSparkline}" Stroke="{Binding PreviewSparklineBrush}" StrokeThickness="1.4" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="74" Height="17" HorizontalAlignment="Right" Margin="0,3,0,0"/>
                                                             </StackPanel>
