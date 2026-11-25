@@ -2,7 +2,7 @@
   "latestVersion": "1.0.12",
   "minRequiredVersion": "1.0.0",
   "releaseDate": "2026-11-25",
-  "releaseNotes": "Redesigned the Donut Boost browser extension popup with a new logo, a clearer download field, and expandable automatic download settings.",
+  "releaseNotes": "Wi-Fi and mobile speed graphs now scroll smoothly between readings. Both speed-limit dialogs have matching Cancel and Save buttons and no data budget controls.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }

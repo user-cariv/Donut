@@ -14,7 +14,6 @@ public partial class WifiLimitDialog : Window
         "GaugeFraction", typeof(double), typeof(WifiLimitDialog),
         new PropertyMetadata(0d, (owner, args) => ((WifiLimitDialog)owner).DrawGauge((double)args.NewValue)));
     public double LimitMbps { get; private set; }
-    public bool EditDataBudgets { get; private set; }
 
     public WifiLimitDialog(double currentLimitMbps = 30, bool isMobile = false)
     {
@@ -120,9 +119,4 @@ public partial class WifiLimitDialog : Window
         DialogResult = true;
     }
 
-    private void DataBudgets_Click(object sender, RoutedEventArgs e)
-    {
-        EditDataBudgets = true;
-        Close();
-    }
 }

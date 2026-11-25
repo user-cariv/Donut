@@ -554,9 +554,13 @@ public partial class MainWindow : Window
         {
             if (_savedAdapterLimits.TryGetValue(adapter.Id, out double limit) && Math.Abs(adapter.DownloadLimitMbps - limit) > 0.00001)
                 adapter.SetDownloadLimitMbps(limit);
-            if (_savedAdapterDataLimits.TryGetValue(adapter.Id, out long dataLimit) && adapter.DownloadDataLimitMb != dataLimit)
-                adapter.SetDownloadDataLimitMb(dataLimit);
-            adapter.SetDailyDownloadLimitMb(_dailyAdapterLimits.GetValueOrDefault(adapter.Id));
+            bool supportsDataBudgets = !adapter.IsWifi && !adapter.IsMobilePhone;
+            long transferLimit = supportsDataBudgets ? _savedAdapterDataLimits.GetValueOrDefault(adapter.Id) : 0;
+            long dailyLimit = supportsDataBudgets ? _dailyAdapterLimits.GetValueOrDefault(adapter.Id) : 0;
+            if (adapter.DownloadDataLimitMb != transferLimit)
+                adapter.SetDownloadDataLimitMb(transferLimit);
+            if (adapter.DailyDownloadLimitMb != dailyLimit)
+                adapter.SetDailyDownloadLimitMb(dailyLimit);
         }
         SyncPreviewAdapters(adapters.OrderBy(adapter => adapter.IsWifi ? 0 : adapter.IsMobilePhone ? 1 : 2).ToArray());
 

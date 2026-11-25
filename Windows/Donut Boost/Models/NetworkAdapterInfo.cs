@@ -92,6 +92,7 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
     }
 
     private const int PreviewSampleCount = 20;
+    private const double PreviewPointSpacing = 65.0 / (PreviewSampleCount - 1);
     private static readonly PointCollection EmptyPreviewSparkline = CreateEmptyPreviewSparkline();
     private readonly Queue<double> _previewHistory = new();
     private readonly double[] _previewStart = new double[PreviewSampleCount];
@@ -109,7 +110,7 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
 
     internal void AddPreviewSample(double bytesPerSecond)
     {
-        RenderPreviewSample();
+        RenderPreviewSample(immediate: true);
         if (_previewHistory.Count == PreviewSampleCount) _previewHistory.Dequeue();
         _previewHistory.Enqueue(Math.Max(0, bytesPerSecond));
         double scale = Math.Max(125_000, _previewHistory.Max());
@@ -118,7 +119,7 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
         {
             var baseline = new PointCollection(PreviewSampleCount);
             for (int index = 0; index < PreviewSampleCount; index++)
-                baseline.Add(new Point(index * 65.0 / (PreviewSampleCount - 1), 15));
+                baseline.Add(new Point(index * PreviewPointSpacing, 15));
             PublishPreviewSparkline(baseline);
         }
 
@@ -141,22 +142,24 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
     {
         if (_previewSampleTime == 0) return;
         double progress = immediate ? 1 : Math.Min(1,
-            System.Diagnostics.Stopwatch.GetElapsedTime(_previewSampleTime).TotalMilliseconds / 1000);
-        double eased = progress * progress * (3 - 2 * progress);
-        PointCollection? updated = null;
-        for (int index = 0; index < PreviewSparkline.Count; index++)
+            System.Diagnostics.Stopwatch.GetElapsedTime(_previewSampleTime).TotalMilliseconds / 950);
+        var points = new PointCollection(PreviewSampleCount + 1);
+        double firstVisibleY = Interpolate(_previewStart[1], _previewTarget[0], progress);
+        points.Add(new Point(0, Interpolate(_previewStart[0], firstVisibleY, progress)));
+        for (int index = 1; index < PreviewSampleCount; index++)
         {
-            var point = PreviewSparkline[index];
-            double y = _previewStart[index] + (_previewTarget[index] - _previewStart[index]) * eased;
-            if (Math.Abs(point.Y - y) > 0.002 || (progress >= 1 && point.Y != y))
-            {
-                updated ??= PreviewSparkline.Clone();
-                updated[index] = new Point(point.X, y);
-            }
+            if (index == 1 && progress >= 1) continue; // The left edge already contains this point.
+            points.Add(new Point((index - progress) * PreviewPointSpacing,
+                Interpolate(_previewStart[index], _previewTarget[index - 1], progress)));
         }
-        if (updated != null) PublishPreviewSparkline(updated);
+        points.Add(new Point((PreviewSampleCount - 1) * PreviewPointSpacing,
+            Interpolate(_previewStart[^1], _previewTarget[^1], progress)));
+        PublishPreviewSparkline(points);
         if (progress >= 1) _previewSampleTime = 0;
     }
+
+    private static double Interpolate(double start, double end, double progress) =>
+        start + (end - start) * progress;
 
     private void PublishPreviewSparkline(PointCollection points)
     {

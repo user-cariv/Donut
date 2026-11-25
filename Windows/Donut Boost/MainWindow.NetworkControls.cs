@@ -125,7 +125,7 @@ public partial class MainWindow
                 if (!isMobile) SetWifiLimit(speedDialog.LimitMbps);
                 SaveSpeedLimits();
             }
-            if (!speedDialog.EditDataBudgets) return;
+            return;
         }
 
         var panel = new StackPanel { Margin = new Thickness(20) };
@@ -149,16 +149,15 @@ public partial class MainWindow
             Text = "Applies to Donut downloads. Use 0 for unlimited. Daily budgets reset at local midnight.",
             TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8)
         });
-        var speed = adapter.IsWifi || adapter.IsMobilePhone ? null : AddField("Download speed (Mbps)", adapter.DownloadLimitMbps.ToString("0.##"));
+        var speed = AddField("Download speed (Mbps)", adapter.DownloadLimitMbps.ToString("0.##"));
         var transfer = AddField("Data per transfer (MB)", adapter.DownloadDataLimitMb.ToString());
         var daily = AddField("Data per day (MB)", adapter.DailyDownloadLimitMb.ToString());
         var save = new Button { Content = "Save limits", IsDefault = true, Style = (Style)FindResource("SecondaryButtonStyle") };
         panel.Children.Add(save);
         save.Click += (_, _) =>
         {
-            double mbps = adapter.DownloadLimitMbps;
-            if (speed != null && (!double.TryParse(speed.Text.Trim(), NumberStyles.AllowDecimalPoint, CultureInfo.CurrentCulture, out mbps) ||
-                !IsValidNetworkSpeedLimit(mbps)))
+            if (!double.TryParse(speed.Text.Trim(), NumberStyles.AllowDecimalPoint, CultureInfo.CurrentCulture, out double mbps) ||
+                !IsValidNetworkSpeedLimit(mbps))
             {
                 MessageBox.Show(dialog, "Enter 0 or a speed from 0.1 to 100,000 Mbps.", dialog.Title);
                 speed.Focus();
@@ -177,7 +176,7 @@ public partial class MainWindow
             SaveSpeedLimits();
             dialog.DialogResult = true;
         };
-        dialog.Loaded += (_, _) => (speed ?? transfer).Focus();
+        dialog.Loaded += (_, _) => speed.Focus();
         dialog.ShowDialog();
 
         bool ReadBudget(TextBox input, out long limit)
