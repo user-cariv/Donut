@@ -87,7 +87,7 @@ jobs:
         if: steps.boost.outputs.reuse != 'true'
         shell: pwsh
         run: |
-          & "Windows/Donut Boost/SystemMerge/Build.ps1" -OutputDirectory "Windows/Donut Boost/publish/win-x64/system-merge"
+          & "Windows/Donut Boost/SystemMerge/Build.ps1" -OutputDirectory "Windows/Donut Boost/publish/win-x64/system-merge/$env:DONUT_BOOST_BUILD_VERSION"
 
       - name: Install Inno Setup compiler
         if: steps.boost.outputs.reuse != 'true'

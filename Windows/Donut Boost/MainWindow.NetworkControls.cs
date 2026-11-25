@@ -62,6 +62,10 @@ public partial class MainWindow
         try
         {
             string engineFolder = Path.Combine(AppContext.BaseDirectory, "system-merge");
+            var appVersion = typeof(MainWindow).Assembly.GetName().Version;
+            if (appVersion is { Revision: > 0 })
+                engineFolder = Path.Combine(engineFolder, appVersion.ToString());
+
             string engine = Path.Combine(engineFolder, "DonutBoost.SystemMerge.exe");
             if (!File.Exists(engine) || !File.Exists(Path.Combine(engineFolder, "wintun.dll")))
                 throw new InvalidOperationException("The System merge engine is missing. Install Donut Boost using the Windows installer.");
