@@ -38,8 +38,7 @@ public partial class MainWindow
         SpeedGaugeHeading.Text = "D O W N L O A D  T E S T";
         LiveSpeedGaugeDetail.Visibility = Visibility.Collapsed;
         SpeedTestGaugeDetail.Visibility = Visibility.Visible;
-        SpeedTestGaugeDetail.Text = "Connecting to Cloudflare…";
-        LiveTrafficButton.Visibility = Visibility.Collapsed;
+        SpeedTestGaugeDetail.Text = "Connecting…";
         _targetWifi = _targetMobile = 0;
         _shownTestMbps = _targetTestMbps = 0;
         _hasTestReading = false;
@@ -57,7 +56,7 @@ public partial class MainWindow
             sampleClock.Restart();
             long bytes = Interlocked.Read(ref received);
             if (bytes == 0) return;
-            SpeedTestGaugeDetail.Text = "Measuring to Cloudflare…";
+            SpeedTestGaugeDetail.Text = "Measuring…";
             UpdateSpeedTestTarget((bytes - lastBytes) * 8.0 / seconds / 1_000_000);
             lastBytes = bytes;
         };
@@ -69,7 +68,8 @@ public partial class MainWindow
             double mbps = await MeasureDownloadMbpsAsync(client, deadline.Token, bytes => Interlocked.Add(ref received, bytes));
             if (cancellation.IsCancellationRequested) return;
             UpdateSpeedTestTarget(mbps);
-            SpeedTestGaugeDetail.Text = "Cloudflare · 192 MiB measured";
+            SpeedTestGaugeDetail.Visibility = Visibility.Collapsed;
+            OnLogReceived($"Speed test complete: {mbps:F1} Mbps (Cloudflare, 192 MiB measured).");
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         catch (Exception ex) when (ex is HttpRequestException or IOException or OperationCanceledException)
@@ -89,16 +89,10 @@ public partial class MainWindow
             if (_speedTestCancellation == cancellation)
             {
                 _speedTestCancellation = null;
-                if (!_windowClosed && _showingSpeedTest)
-                {
-                    SpeedTestButton.Content = "Test again";
-                    LiveTrafficButton.Visibility = Visibility.Visible;
-                }
+                if (!_windowClosed && _showingSpeedTest) SpeedTestButton.Content = "Test again";
             }
         }
     }
-
-    private void LiveTrafficButton_Click(object sender, RoutedEventArgs e) => RestoreLiveSpeedGauge();
 
     private void RestoreLiveSpeedGauge()
     {
@@ -107,7 +101,6 @@ public partial class MainWindow
         _speedTestCancellation = null;
         _showingSpeedTest = false;
         SpeedTestButton.Content = "Speed test";
-        LiveTrafficButton.Visibility = Visibility.Collapsed;
         SpeedGaugeHeading.Text = "C O M B I N E D";
         SpeedTestGaugeDetail.Visibility = Visibility.Collapsed;
         LiveSpeedGaugeDetail.Visibility = Visibility.Visible;

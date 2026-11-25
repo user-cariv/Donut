@@ -448,7 +448,7 @@
                                     <Button x:Name="SpeedTestButton" Content="Speed test" Click="SpeedTestButton_Click"
                                             Height="28" Padding="11,0,13,0" Foreground="#FFD08A" FontSize="12.5"
                                             FontWeight="SemiBold" Cursor="Hand" VerticalAlignment="Center"
-                                            ToolTip="Measure download speed to Cloudflare. Uses up to 198 MiB.">
+                                            ToolTip="Measure your download speed. Uses up to 198 MiB.">
                                         <Button.Template>
                                             <ControlTemplate TargetType="Button">
                                                 <Border x:Name="SpeedTestPill" CornerRadius="14" BorderThickness="1"
@@ -496,9 +496,6 @@
                                             </ControlTemplate>
                                         </Button.Template>
                                     </Button>
-                                    <Button x:Name="LiveTrafficButton" Content="Live traffic" Click="LiveTrafficButton_Click"
-                                            Visibility="Collapsed" Height="28" Padding="9,0" Margin="8,0,0,0"
-                                            Style="{StaticResource SecondaryButtonStyle}"/>
                                 </WrapPanel>
                                 <WrapPanel HorizontalAlignment="Center" Visibility="{Binding Visibility, ElementName=DonutTaskPanel}" Margin="0,4,0,0">
                                         <Button x:Name="PauseResumeButton" Click="PauseResumeButton_Click" Style="{StaticResource BoostButtonStyle}" Width="174" Height="54" FontSize="18" FontWeight="Bold" Padding="15,8" Margin="0,0,8,0" IsEnabled="False">
