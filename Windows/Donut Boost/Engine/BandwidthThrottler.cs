@@ -7,6 +7,7 @@ public class BandwidthThrottler
     private long _maxBytesPerSecond = 0; // 0 = unlimited
     private double _nextAvailableTick;
     private readonly object _lock = new();
+    private TaskCompletionSource _limitChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public double CurrentLimitMbps
     {
@@ -23,15 +24,13 @@ public class BandwidthThrottler
     {
         lock (_lock)
         {
-            if (mbps <= 0)
-            {
-                _maxBytesPerSecond = 0;
-            }
-            else
-            {
-                _maxBytesPerSecond = (long)(mbps * 1_000_000.0 / 8.0);
-            }
+            long bytesPerSecond = mbps > 0 ? (long)(mbps * 1_000_000.0 / 8.0) : 0;
+            if (_maxBytesPerSecond == bytesPerSecond) return;
+            _maxBytesPerSecond = bytesPerSecond;
             _nextAvailableTick = 0;
+            var previousLimit = _limitChanged;
+            _limitChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            previousLimit.SetResult();
         }
     }
 
@@ -43,20 +42,40 @@ public class BandwidthThrottler
     // Each worker reserves time on the same clock, so parallel requests share the limit.
     public double ReserveDelayMilliseconds(int bytesRead)
     {
-        lock (_lock)
-        {
-            if (_maxBytesPerSecond <= 0 || bytesRead <= 0) return 0;
-            long now = Stopwatch.GetTimestamp();
-            _nextAvailableTick = Math.Max(now, _nextAvailableTick) +
-                bytesRead * (double)Stopwatch.Frequency / _maxBytesPerSecond;
-            return (_nextAvailableTick - now) * 1000.0 / Stopwatch.Frequency;
-        }
+        lock (_lock) return ReserveDelayUnderLock(bytesRead);
     }
 
-    internal Task PaceWifiAsync(Models.NetworkAdapterInfo adapter, int bytesRead, CancellationToken token)
+    private double ReserveDelayUnderLock(int bytesRead)
     {
-        if (!adapter.IsWifi) return Task.CompletedTask;
-        double delay = ReserveDelayMilliseconds(bytesRead);
-        return delay >= 1 ? Task.Delay(TimeSpan.FromMilliseconds(delay), token) : Task.CompletedTask;
+        if (_maxBytesPerSecond <= 0 || bytesRead <= 0) return 0;
+        long now = Stopwatch.GetTimestamp();
+        _nextAvailableTick = Math.Max(now, _nextAvailableTick) +
+            bytesRead * (double)Stopwatch.Frequency / _maxBytesPerSecond;
+        return (_nextAvailableTick - now) * 1000.0 / Stopwatch.Frequency;
+    }
+
+    internal async Task PaceWifiAsync(Models.NetworkAdapterInfo adapter, int bytesRead, CancellationToken token)
+    {
+        if (!adapter.IsWifi) return;
+        while (true)
+        {
+            token.ThrowIfCancellationRequested();
+            double delay;
+            Task limitChanged;
+            lock (_lock)
+            {
+                delay = ReserveDelayUnderLock(bytesRead);
+                limitChanged = _limitChanged.Task;
+            }
+            if (delay < 1) return;
+            try
+            {
+                await limitChanged.WaitAsync(TimeSpan.FromMilliseconds(delay), token).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                return;
+            }
+        }
     }
 }
