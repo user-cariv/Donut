@@ -16,6 +16,12 @@ $command = Join-Path $source 'cmd/donut-system-merge'
 New-Item -ItemType Directory $command | Out-Null
 Copy-Item (Join-Path $PSScriptRoot '*.go') $command
 
+# Reuse the pinned engine's automatic pause/resume policy without starting its tray app.
+foreach ($name in 'autopause.go', 'autopause_test.go') {
+    $policy = [IO.File]::ReadAllText((Join-Path $source "internal/tray/$name"))
+    [IO.File]::WriteAllText((Join-Path $command $name), $policy.Replace('package tray', 'package main'))
+}
+
 # Give Donut its own tunnel identity. Keep changes to physical adapter settings in memory.
 $tun = Join-Path $source 'internal/tun/tun.go'
 $windowsTun = Join-Path $source 'internal/tun/tun_windows.go'

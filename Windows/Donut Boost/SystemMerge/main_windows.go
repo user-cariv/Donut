@@ -22,13 +22,13 @@ func main() {
 		fmt.Println("Donut Boost System Merge")
 		return
 	}
-	if err := run(); err != nil {
+	if err := runSystemMerge(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func run() (runErr error) {
+func runSystemMerge() (runErr error) {
 	if len(os.Args) != 3 || !windows.GetCurrentProcessToken().IsElevated() {
 		return fmt.Errorf("start System merge from Donut Boost")
 	}
@@ -111,19 +111,15 @@ func run() (runErr error) {
 	updates := make(chan adapterScan, 1)
 	go scanAdapters(done, updates)
 	tunnel := tun.New(balancer)
-	if err := tunnel.On(); err != nil {
-		return err
-	}
 	defer tunnel.Close()
 
-	report(summarizeLinks(scheduler.Snapshot(), skipped))
+	report("Using normal Windows routing while merge waits for two working links. " + summarizeLinks(scheduler.Snapshot(), skipped))
 	if err := windows.SetEvent(ready); err != nil {
 		return err
 	}
 	last := time.Now()
-	capturing := true
-	failedSamples := 0
-	var retryMergeAfter time.Time
+	pausePolicy := autoPauser{enabled: true}
+	pausePolicy.start(true)
 	var restoreError error
 	for {
 		result, err := windows.WaitForMultipleObjects(handles, false, 1000)
@@ -142,29 +138,21 @@ func run() (runErr error) {
 		}
 		scheduler.Tick(now.Sub(last))
 		slots := scheduler.Snapshot()
-		healthy, checking := linkHealth(slots)
-		if healthy || checking {
-			failedSamples = 0
-		} else {
-			failedSamples++
-		}
-		if capturing && failedSamples >= 3 {
+		switch pausePolicy.tick(now, tunnel.IsOn(), healthyLinkCount(slots), movingFlows(slots)) {
+		case autoPause:
 			tunnel.Off()
-			capturing = false
-			retryMergeAfter = now.Add(15 * time.Second)
-		} else if !capturing && healthy && !now.Before(retryMergeAfter) {
+		case autoResume:
 			if err := tunnel.On(); err != nil {
 				tunnel.Off()
+				pausePolicy.resumeFailed()
 				restoreError = err
-				retryMergeAfter = now.Add(15 * time.Second)
 			} else {
-				capturing = true
 				restoreError = nil
 			}
 		}
 		message := summarizeLinks(slots, skipped)
-		if !capturing {
-			message = "Using normal Windows routing while merge waits for a stable link. " + message
+		if !tunnel.IsOn() {
+			message = "Using normal Windows routing while merge waits for two working links. " + message
 			if restoreError != nil {
 				message += fmt.Sprintf(" Last merge attempt: %v", restoreError)
 			}
@@ -200,14 +188,29 @@ func scanAdapters(done <-chan struct{}, updates chan<- adapterScan) {
 	}
 }
 
-func linkHealth(slots []engine.SlotStats) (healthy, checking bool) {
+func healthyLinkCount(slots []engine.SlotStats) int {
+	count := 0
 	for _, slot := range slots {
-		if slot.Present {
-			healthy = healthy || slot.State == "up" || slot.State6 == "up"
-			checking = checking || slot.State == "checking" || slot.State6 == "checking"
+		if slot.Present && (slot.State == "up" || slot.State6 == "up") {
+			count++
 		}
 	}
-	return
+	return count
+}
+
+func movingFlows(slots []engine.SlotStats) int64 {
+	var count int64
+	var rate float64
+	for _, slot := range slots {
+		if slot.Present {
+			count += slot.Active
+			rate += slot.RateIn + slot.RateOut
+		}
+	}
+	if rate < quietRate {
+		return 0
+	}
+	return count
 }
 
 func upstreamTunnelActive() bool {
