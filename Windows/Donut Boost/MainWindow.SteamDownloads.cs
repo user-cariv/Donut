@@ -34,9 +34,8 @@ public partial class MainWindow
         SteamGameName.Text = download.Name;
         SteamGameSize.Text = $"{DownloadSession.FormatBytes(download.BytesDownloaded)} / {DownloadSession.FormatBytes(download.TotalBytes)}";
         SteamGameProgress.Value = 100.0 * download.BytesDownloaded / download.TotalBytes;
-        SteamGameRate.Text = download.RateMbps is { } rate ? $"Steam reported {rate:F1} Mbps" : "Waiting for a Steam speed sample";
         SteamGameEta.Text = download.RateMbps is > 0
-            ? $"Est. download ETA {DownloadSession.FormatETAFromSeconds((download.TotalBytes - download.BytesDownloaded) * 8.0 / (download.RateMbps.Value * 1_000_000))}"
-            : "Download ETA unavailable";
+            ? $"ETA {DownloadSession.FormatETAFromSeconds((download.TotalBytes - download.BytesDownloaded) * 8.0 / (download.RateMbps.Value * 1_000_000))}"
+            : "ETA —";
     }
 }

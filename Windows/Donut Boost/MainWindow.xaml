@@ -397,7 +397,6 @@
                                     <TextBlock x:Name="SteamGameSize" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
                                     <ProgressBar x:Name="SteamGameProgress" Height="5" Maximum="100" Margin="0,5,0,3"
                                                  Background="#322A26" Foreground="#FF9A16" BorderThickness="0"/>
-                                    <TextBlock x:Name="SteamGameRate" FontSize="11" TextWrapping="Wrap" Foreground="#78E2DB"/>
                                     <TextBlock x:Name="SteamGameEta" FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"/>
                                 </StackPanel>
                             </Grid>
@@ -420,17 +419,70 @@
                                         </Path>
                                         <Path x:Name="MobileRateArc" Stroke="#9783FF" StrokeThickness="11" StrokeStartLineCap="Round" StrokeEndLineCap="Round"><Path.Effect><DropShadowEffect Color="#8B7BFF" BlurRadius="14" ShadowDepth="0" Opacity="0.5"/></Path.Effect></Path>
                                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                            <TextBlock Text="C O M B I N E D" FontSize="10" Foreground="#B1A0E0" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="SpeedGaugeHeading" Text="C O M B I N E D" FontSize="10" Foreground="#B1A0E0" HorizontalAlignment="Center"/>
                                             <TextBlock x:Name="CombinedSpeedTextBlock" Text="0.0" FontSize="56" FontWeight="Bold" HorizontalAlignment="Center" Foreground="#F4EFE6"/>
                                             <TextBlock x:Name="CombinedSpeedUnitTextBlock" Text="Mbps" FontSize="13" HorizontalAlignment="Center" Foreground="#B1A0E0"/>
-                                            <TextBlock Text="{Binding Text, ElementName=FileSizeTextBlock}" FontSize="10" ToolTip="Gauge measures all Windows receive traffic" Foreground="#A29ABA" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                                            <TextBlock x:Name="LiveSpeedGaugeDetail" Text="{Binding Text, ElementName=FileSizeTextBlock}" FontSize="10" ToolTip="Gauge measures all Windows receive traffic" Foreground="#A29ABA" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                                            <TextBlock x:Name="SpeedTestGaugeDetail" Visibility="Collapsed" FontSize="10" Foreground="#A29ABA" HorizontalAlignment="Center" Margin="0,5,0,0"/>
                                         </StackPanel>
                                     </Grid>
                                 </Viewbox>
                                 <TextBlock x:Name="StatusBadgeTextBlock" Text="Ready" Visibility="Collapsed" Foreground="#B9A7DE" HorizontalAlignment="Center" FontWeight="SemiBold"/>
-                                <WrapPanel HorizontalAlignment="Center" Margin="0,9,0,15">
-                                    <TextBlock x:Name="WifiSummaryText" Text="Wi-Fi: Off" FontSize="13" Foreground="#FFB63E" Margin="0,0,12,0"/>
-                                    <TextBlock x:Name="TetherSummaryText" Text="Ethernet: Off" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <WrapPanel HorizontalAlignment="Center" Margin="0,9,0,8">
+                                    <TextBlock x:Name="WifiSummaryText" Text="Wi-Fi: Off" FontSize="13" Foreground="#FFB63E" VerticalAlignment="Center" Margin="0,0,14,0"/>
+                                    <TextBlock x:Name="TetherSummaryText" Text="Ethernet: Off" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                    <Border Width="1" Height="16" Background="#24FFFFFF" Margin="14,0" VerticalAlignment="Center"/>
+                                    <Button x:Name="SpeedTestButton" Content="Speed test" Click="SpeedTestButton_Click"
+                                            Height="28" Padding="11,0,13,0" Foreground="#FFD08A" FontSize="12.5"
+                                            FontWeight="SemiBold" Cursor="Hand" VerticalAlignment="Center"
+                                            ToolTip="Measure download speed to Cloudflare. Uses up to 96 MiB.">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border x:Name="SpeedTestPill" CornerRadius="14" BorderThickness="1"
+                                                        BorderBrush="#73FFB347" Padding="{TemplateBinding Padding}">
+                                                    <Border.Background>
+                                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                            <GradientStop Color="#33FFB347" Offset="0"/>
+                                                            <GradientStop Color="#14FF8A00" Offset="1"/>
+                                                        </LinearGradientBrush>
+                                                    </Border.Background>
+                                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <Viewbox Width="15" Height="15" Margin="0,0,7,0">
+                                                            <Canvas Width="24" Height="24">
+                                                                <Path Data="M4.5,18 A9,9 0 1 1 19.5,18 M12,13 L16,8"
+                                                                      Stroke="{TemplateBinding Foreground}" StrokeThickness="2"
+                                                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                                                <Ellipse Canvas.Left="10.8" Canvas.Top="12.8" Width="2.4" Height="2.4"
+                                                                         Stroke="{TemplateBinding Foreground}" StrokeThickness="2"/>
+                                                            </Canvas>
+                                                        </Viewbox>
+                                                        <ContentPresenter VerticalAlignment="Center" RecognizesAccessKey="True"/>
+                                                    </StackPanel>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="SpeedTestPill" Property="Background">
+                                                            <Setter.Value>
+                                                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                                    <GradientStop Color="#52FFB347" Offset="0"/>
+                                                                    <GradientStop Color="#29FF8A00" Offset="1"/>
+                                                                </LinearGradientBrush>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                        <Setter TargetName="SpeedTestPill" Property="Effect">
+                                                            <Setter.Value>
+                                                                <DropShadowEffect Color="#FF9628" BlurRadius="16" ShadowDepth="0" Opacity="0.28"/>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                    </Trigger>
+                                                    <Trigger Property="IsKeyboardFocused" Value="True">
+                                                        <Setter TargetName="SpeedTestPill" Property="BorderBrush" Value="#FFB347"/>
+                                                        <Setter TargetName="SpeedTestPill" Property="BorderThickness" Value="2"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
                                 </WrapPanel>
                                 <WrapPanel HorizontalAlignment="Center" Visibility="{Binding Visibility, ElementName=DonutTaskPanel}" Margin="0,4,0,0">
                                         <Button x:Name="PauseResumeButton" Click="PauseResumeButton_Click" Style="{StaticResource BoostButtonStyle}" Width="174" Height="54" FontSize="18" FontWeight="Bold" Padding="15,8" Margin="0,0,8,0" IsEnabled="False">
@@ -484,10 +536,10 @@
                         <Border Background="{StaticResource PreviewCardBrush}" BorderBrush="{StaticResource PreviewGlassEdge}" BorderThickness="1" Padding="17,13" CornerRadius="20" Margin="0,0,0,11">
                             <StackPanel>
                                 <DockPanel>
-                                    <TextBlock x:Name="PreviewWifiLimitText" DockPanel.Dock="Right" Text="Unlimited" Foreground="#FFB63E" FontWeight="SemiBold"/>
-                                    <TextBlock Text="Wi-Fi speed limit" FontSize="15" Foreground="#F4EFE6" FontWeight="Bold"/>
+                                    <TextBlock x:Name="PreviewDownloadLimitText" DockPanel.Dock="Right" Text="Unlimited" Foreground="#FFB63E" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Download speed limit" FontSize="15" Foreground="#F4EFE6" FontWeight="Bold"/>
                                 </DockPanel>
-                                <Slider x:Name="PreviewWifiLimit" Minimum="-1" Maximum="3" Value="3" SmallChange="0.1" LargeChange="0.25" IsMoveToPointEnabled="True" ValueChanged="PreviewWifiLimit_Changed" PreviewMouseDown="StopWifiSliderAnimation" PreviewKeyDown="StopWifiSliderAnimation" Margin="2,9,2,5" Height="22" AutomationProperties.Name="Wi-Fi speed limit for Donut downloads">
+                                <Slider x:Name="PreviewDownloadLimit" Minimum="-1" Maximum="3" Value="3" SmallChange="0.1" LargeChange="0.25" IsMoveToPointEnabled="True" ValueChanged="PreviewDownloadLimit_Changed" PreviewMouseDown="StopDownloadSliderAnimation" PreviewKeyDown="StopDownloadSliderAnimation" Margin="2,9,2,5" Height="22" AutomationProperties.Name="Combined speed limit for Donut downloads">
                                     <Slider.Template>
                                         <ControlTemplate TargetType="Slider">
                                             <Grid>
@@ -590,12 +642,25 @@
                                                                 <TextBlock Text="{Binding DisplaySpeed}" FontWeight="Bold" FontSize="17" Foreground="#F4EFE6" HorizontalAlignment="Right"/>
                                                                 <Polyline Points="{Binding PreviewSparkline}" Stroke="{Binding PreviewSparklineBrush}" StrokeThickness="1.4" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="74" Height="17" HorizontalAlignment="Right" Margin="0,3,0,0"/>
                                                             </StackPanel>
-                                                            <Button Content="Limits" Click="EditAdapterLimits_Click" Style="{StaticResource SecondaryButtonStyle}" HorizontalAlignment="Left" Padding="8,3" Margin="10,0,10,0" VerticalAlignment="Center" FontSize="10"/>
+                                                            <Button Content="Data limits" Click="EditAdapterDataLimits_Click" HorizontalAlignment="Left" Padding="8,3" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="10">
+                                                                <Button.Style>
+                                                                    <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsWifi}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding IsMobilePhone}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Button.Style>
+                                                            </Button>
                                                             <ToggleButton IsChecked="{Binding IsEnabled, Mode=TwoWay}"
                                                                           Style="{StaticResource ModernToggleSwitchStyle}"
                                                                           Click="AdapterToggle_Click"
                                                                           ToolTip="{Binding ToggleTooltip}"
-                                                                          HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                                                          HorizontalAlignment="Right" VerticalAlignment="Center" Margin="10,0,0,0"/>
                                                         </StackPanel>
                                                     </Grid>
                                                 </Border>

@@ -53,14 +53,9 @@ public class BandwidthThrottler
         }
     }
 
-    internal static Task PaceAsync(Models.NetworkAdapterInfo adapter, int bytesRead,
-        BandwidthThrottler overall, BandwidthThrottler home, CancellationToken token)
+    internal Task PaceAsync(int bytesRead, CancellationToken token)
     {
-        double delay = Math.Max(overall.ReserveDelayMilliseconds(bytesRead),
-            adapter.DownloadThrottler.ReserveDelayMilliseconds(bytesRead));
-        if (!adapter.IsMobilePhone)
-            delay = Math.Max(delay, home.ReserveDelayMilliseconds(bytesRead));
-
+        double delay = ReserveDelayMilliseconds(bytesRead);
         return delay >= 1 ? Task.Delay(TimeSpan.FromMilliseconds(delay), token) : Task.CompletedTask;
     }
 }

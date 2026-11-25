@@ -30,7 +30,6 @@ public class MultiChannelDownloader
     public bool IsPaused => _isPaused;
     public bool BondTorrentPeers { get; set; } = true;
     public BandwidthThrottler Throttler => _throttler;
-    public BandwidthThrottler OverallThrottler { get; } = new();
 
     public event Action<DownloadSession>? ProgressUpdated;
     public event Action<DownloadSession>? StatusChanged;
@@ -104,12 +103,8 @@ public class MultiChannelDownloader
         var token = _cts.Token;
         _isPaused = false;
         _throttler.ResetSchedule();
-        OverallThrottler.ResetSchedule();
         foreach (var adapter in _bondingManager.Adapters)
-        {
-            adapter.DownloadThrottler.ResetSchedule();
             adapter.TransferDataLimit.Reset();
-        }
 
         var session = new DownloadSession
         {
@@ -423,13 +418,15 @@ public class MultiChannelDownloader
             return adapters.Skip(first).Concat(adapters.Take(first)).ToArray();
         }
         var factories = Factories.Default
-            .WithPeerConnectionCreator("ipv4", uri => new TorrentPeerConnection(uri, GetPeerAdapters, _throttler, OverallThrottler, token))
-            .WithPeerConnectionCreator("ipv6", uri => new TorrentPeerConnection(uri, GetPeerAdapters, _throttler, OverallThrottler, token));
+            .WithPeerConnectionCreator("ipv4", uri => new TorrentPeerConnection(uri, GetPeerAdapters, token))
+            .WithPeerConnectionCreator("ipv6", uri => new TorrentPeerConnection(uri, GetPeerAdapters, token));
+        int TorrentDownloadRate() => (int)Math.Min(int.MaxValue, _throttler.CurrentLimitMbps * 125_000);
         bool bondPeers = BondTorrentPeers;
         var settings = new EngineSettingsBuilder
         {
             CacheDirectory = cacheDirectory,
-            AllowPortForwarding = false
+            AllowPortForwarding = false,
+            MaximumDownloadRate = TorrentDownloadRate()
         };
         if (bondPeers)
         {
@@ -500,6 +497,13 @@ public class MultiChannelDownloader
             int exhaustedPolls = 0;
             while (!token.IsCancellationRequested && !_torrentManager.Complete)
             {
+                int downloadRate = TorrentDownloadRate();
+                if (settings.MaximumDownloadRate != downloadRate)
+                {
+                    settings.MaximumDownloadRate = downloadRate;
+                    await _torrentEngine.UpdateSettingsAsync(settings.ToSettings());
+                }
+
                 exhaustedPolls = bondPeers && AllAdapterDataLimitsReached(_bondingManager.GetActiveEnabledAdapters())
                     ? exhaustedPolls + 1 : 0;
                 if (exhaustedPolls >= 4)
@@ -1000,7 +1004,7 @@ public class MultiChannelDownloader
 
             adapter.AddDownloadedBytes(bytesRead);
             session.AddDownloadedBytes(bytesRead);
-            await BandwidthThrottler.PaceAsync(adapter, bytesRead, OverallThrottler, _throttler, token);
+            await _throttler.PaceAsync(bytesRead, token);
             if (chunk.BytesDownloaded == chunk.TotalBytes)
             {
                 chunk.IsCompleted = true;
@@ -1134,7 +1138,7 @@ public class MultiChannelDownloader
                     adapter.AddDownloadedBytes(bytesRead);
                     session.AddDownloadedBytes(bytesRead);
 
-                    await BandwidthThrottler.PaceAsync(adapter, bytesRead, OverallThrottler, _throttler, transferToken);
+                    await _throttler.PaceAsync(bytesRead, transferToken);
 
                     if (stopwatch.ElapsedMilliseconds >= 250)
                     {

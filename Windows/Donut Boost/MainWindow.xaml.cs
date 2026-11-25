@@ -4,6 +4,7 @@ using System.IO;
 using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -30,13 +31,12 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _downloadQueueTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private bool _runningTransfer;
     private readonly Dictionary<Guid, (string CookieHeader, DateTimeOffset Expiry)> _browserSessions = new();
-    private readonly Dictionary<string, double> _savedAdapterLimits = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, long> _savedAdapterDataLimits = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, long> _dailyAdapterLimits = new(StringComparer.OrdinalIgnoreCase);
     private static readonly string SpeedLimitsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DonutBoost", "speed-limits.json");
-    private sealed record SpeedLimits(Dictionary<string, double> Adapters, Dictionary<string, long>? DataLimits,
-        Dictionary<string, long>? DailyLimits, double WifiMbps = 0);
+    private sealed record SpeedLimits(Dictionary<string, long>? DataLimits, Dictionary<string, long>? DailyLimits,
+        [property: JsonPropertyName("WifiMbps")] double DownloadMbps = 0);
 
     public MainWindow()
     {
@@ -443,7 +443,7 @@ public partial class MainWindow : Window
         PreviewMobile.IsChecked = _bondingManager.CurrentMode == BondingMode.MobileDataOnly;
         MovePreviewModePill();
         double cap = _downloader.Throttler.CurrentLimitMbps;
-        string capText = cap > 0 ? $" • Donut download cap: {cap:F0} Mbps (mobile adapters uncapped)" : "";
+        string capText = cap > 0 ? $" • Donut download cap: {cap:0.##} Mbps" : "";
         FooterStatusModeText.Text = (_bondingManager.CurrentMode switch
         {
             BondingMode.CombineAll => "⚡ Donut downloads: all selected adapters",
@@ -462,11 +462,8 @@ public partial class MainWindow : Window
             if (!File.Exists(SpeedLimitsPath)) return;
             var settings = JsonSerializer.Deserialize<SpeedLimits>(File.ReadAllText(SpeedLimitsPath));
             if (settings is null) return;
-            if (IsValidNetworkSpeedLimit(settings.WifiMbps))
-                SetWifiLimit(settings.WifiMbps);
-            if (settings.Adapters is not null)
-                foreach (var (adapter, limit) in settings.Adapters.Where(entry => IsValidNetworkSpeedLimit(entry.Value)))
-                    _savedAdapterLimits[adapter] = limit;
+            if (IsValidNetworkSpeedLimit(settings.DownloadMbps))
+                SetDownloadLimit(settings.DownloadMbps);
             if (settings.DataLimits is not null)
                 foreach (var (adapter, limit) in settings.DataLimits.Where(entry => entry.Value is > 0 and <= 10_000_000))
                     _savedAdapterDataLimits[adapter] = limit;
@@ -487,7 +484,7 @@ public partial class MainWindow : Window
             Directory.CreateDirectory(Path.GetDirectoryName(SpeedLimitsPath)!);
             string pending = SpeedLimitsPath + ".tmp";
             File.WriteAllText(pending, JsonSerializer.Serialize(new SpeedLimits(
-                _savedAdapterLimits, _savedAdapterDataLimits, _dailyAdapterLimits, _downloader.Throttler.CurrentLimitMbps)));
+                _savedAdapterDataLimits, _dailyAdapterLimits, _downloader.Throttler.CurrentLimitMbps)));
             File.Move(pending, SpeedLimitsPath, overwrite: true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -552,8 +549,6 @@ public partial class MainWindow : Window
         var adapters = _bondingManager.Adapters;
         foreach (var adapter in adapters)
         {
-            if (_savedAdapterLimits.TryGetValue(adapter.Id, out double limit) && Math.Abs(adapter.DownloadLimitMbps - limit) > 0.00001)
-                adapter.SetDownloadLimitMbps(limit);
             bool supportsDataBudgets = !adapter.IsWifi && !adapter.IsMobilePhone;
             long transferLimit = supportsDataBudgets ? _savedAdapterDataLimits.GetValueOrDefault(adapter.Id) : 0;
             long dailyLimit = supportsDataBudgets ? _dailyAdapterLimits.GetValueOrDefault(adapter.Id) : 0;
@@ -732,6 +727,7 @@ public partial class MainWindow : Window
     private async Task RunDownloadAsync(string input, string folder, long? expectedBytes = null, string? browserCookieHeader = null)
     {
         _runningTransfer = true;
+        RestoreLiveSpeedGauge();
         UpdateSteamTask(null);
         StartBoostButton.IsEnabled = false;
         OnLogReceived("Preparing download?");
@@ -998,8 +994,8 @@ public partial class MainWindow : Window
             double combinedReceiveBps = sample.Sum(item => item.BytesPerSecond);
             double mbps = combinedReceiveBps * 8 / 1_000_000.0;
             string speedText = mbps >= 1000 ? $"{(mbps / 1000):F2} Gbps" : $"{mbps:F1} Mbps";
-            CombinedSpeedTextBlock.Text = mbps >= 1000 ? $"{mbps / 1000:F2}" : $"{mbps:F1}";
-            CombinedSpeedUnitTextBlock.Text = mbps >= 1000 ? "GBPS" : "MBPS";
+            _liveGaugeMbps = mbps;
+            if (!_showingSpeedTest) SetSpeedGaugeValue(mbps);
 
             bool isDirectDownloadActive = _downloader.CurrentSession != null &&
                 (_downloader.CurrentSession.Status == DownloadStatus.Downloading ||
@@ -1085,6 +1081,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        RestoreLiveSpeedGauge();
         using var cancellation = new CancellationTokenSource();
         _updateCancellation = cancellation;
         StartBoostButton.IsEnabled = false;
@@ -1164,6 +1161,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _windowClosed = true;
+        _speedTestCancellation?.Cancel();
         DisposeNotificationArea();
         _stopSystemMerge?.Set();
         _downloadQueueTimer.Stop();

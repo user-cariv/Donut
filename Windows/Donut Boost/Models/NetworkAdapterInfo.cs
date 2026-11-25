@@ -29,9 +29,7 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
     public IPAddress? GatewayIp { get; set; }
     public NetworkInterfaceType InterfaceType { get; set; }
     public long SpeedBitsPerSecond { get; set; }
-    internal Engine.BandwidthThrottler DownloadThrottler { get; } = new();
     internal Engine.AdapterDataLimit TransferDataLimit { get; } = new();
-    public double DownloadLimitMbps => DownloadThrottler.CurrentLimitMbps;
     public long DownloadDataLimitMb => TransferDataLimit.MaximumBytes / 1_000_000;
     public long DailyDownloadLimitMb => TransferDataLimit.DailyMaximumBytes / 1_000_000;
 
@@ -42,12 +40,6 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
             "DonutBoost", "adapter-usage", key + ".json");
         TransferDataLimit.SetDailyLimit(megabytes * 1_000_000, path);
         OnPropertyChanged(nameof(DailyDownloadLimitMb));
-    }
-
-    internal void SetDownloadLimitMbps(double mbps)
-    {
-        DownloadThrottler.SetLimitMbps(mbps);
-        OnPropertyChanged(nameof(DownloadLimitMbps));
     }
 
     internal void SetDownloadDataLimitMb(long megabytes)
