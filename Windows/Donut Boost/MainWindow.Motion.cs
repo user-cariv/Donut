@@ -58,7 +58,9 @@ public partial class MainWindow
 
     private void RenderPreviewFrame(object? sender, EventArgs e)
     {
-        double phase = _wallpaperElapsed.Elapsed.TotalSeconds * Math.Tau / 24;
+        var frame = _wallpaperElapsed.Elapsed;
+        AdvancePreviewGauge(frame);
+        double phase = frame.TotalSeconds * Math.Tau / 24;
         WallpaperTravel.X = Math.Sin(phase) * WallpaperViewport.ActualWidth * 0.37;
         WallpaperTravel.Y = Math.Cos(phase) * WallpaperViewport.ActualHeight * 0.30;
         foreach (var adapter in _previewAdapters)

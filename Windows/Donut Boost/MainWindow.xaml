@@ -567,7 +567,7 @@
                                                                             </DataTrigger>
                                                                             <DataTrigger Binding="{Binding IsMobilePhone}" Value="True">
                                                                                 <Setter Property="Stroke" Value="#AC9BFF"/>
-                                                                                <Setter Property="Data" Value="M4,19 V15 M9,19 V12 M14,19 V8 M19,19 V4"/>
+                                                                                <Setter Property="Data" Value="M9,2.5 H15 Q17,2.5 17,4.5 V19.5 Q17,21.5 15,21.5 H9 Q7,21.5 7,19.5 V4.5 Q7,2.5 9,2.5 Z M10.5,5 H13.5 M11,18.5 H13"/>
                                                                             </DataTrigger>
                                                                         </Style.Triggers>
                                                                     </Style>

@@ -2,7 +2,7 @@
   "latestVersion": "1.0.12",
   "minRequiredVersion": "1.0.0",
   "releaseDate": "2026-11-25",
-  "releaseNotes": "Fixed a crash when connecting a phone for USB tethering. Restart Donut Boost to finish applying the update.",
+  "releaseNotes": "Smoother Wi-Fi and mobile speed rings and graphs, a phone icon for tethering, and faster recovery when a bonded download connection stalls. Restart Donut Boost to finish applying the update.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }

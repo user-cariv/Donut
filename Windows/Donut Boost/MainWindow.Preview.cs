@@ -57,36 +57,28 @@ public partial class MainWindow
         if (sender is CheckBox check) _downloader.BondTorrentPeers = check.IsChecked == true;
     }
 
-    private System.Windows.Threading.DispatcherTimer? _gaugeTransition;
     private double _shownWifi;
     private double _shownMobile;
+    private double _targetWifi;
+    private double _targetMobile;
+    private TimeSpan _lastGaugeFrame;
 
-    private void AnimatePreviewGauge(double wifi, double mobile)
+    private void AdvancePreviewGauge(TimeSpan frame)
     {
-        _gaugeTransition?.Stop();
-        if (!SystemParameters.ClientAreaAnimation || (wifi == _shownWifi && mobile == _shownMobile))
-        {
-            RenderPreviewGauge(wifi, mobile);
+        var elapsed = frame - _lastGaugeFrame;
+        _lastGaugeFrame = frame;
+        if (elapsed <= TimeSpan.Zero || (_shownWifi == _targetWifi && _shownMobile == _targetMobile))
             return;
-        }
 
-        double startWifi = _shownWifi;
-        double startMobile = _shownMobile;
-        long start = System.Diagnostics.Stopwatch.GetTimestamp();
-        var timer = new System.Windows.Threading.DispatcherTimer(
-            System.Windows.Threading.DispatcherPriority.Render, Dispatcher)
-        {
-            Interval = TimeSpan.FromMilliseconds(16)
-        };
-        timer.Tick += (_, _) =>
-        {
-            double progress = Math.Min(1, System.Diagnostics.Stopwatch.GetElapsedTime(start).TotalMilliseconds / 200);
-            double eased = progress * progress * (3 - 2 * progress);
-            RenderPreviewGauge(startWifi + (wifi - startWifi) * eased, startMobile + (mobile - startMobile) * eased);
-            if (progress >= 1) timer.Stop();
-        };
-        _gaugeTransition = timer;
-        timer.Start();
+        double weight = 1 - Math.Exp(-elapsed.TotalMilliseconds / 240);
+        RenderPreviewGauge(ApproachGaugeTarget(_shownWifi, _targetWifi, weight),
+            ApproachGaugeTarget(_shownMobile, _targetMobile, weight));
+    }
+
+    private static double ApproachGaugeTarget(double current, double target, double weight)
+    {
+        double next = current + (target - current) * weight;
+        return Math.Abs(next - target) < 0.0005 ? target : next;
     }
 
     private void RenderPreviewGauge(double wifi, double mobile)
@@ -103,7 +95,10 @@ public partial class MainWindow
         double mobile = sample.Where(item => item.Adapter.IsMobilePhone && !item.Adapter.IsWifi).Sum(item => item.BytesPerSecond);
         double total = sample.Sum(item => item.BytesPerSecond);
         double gaugeScale = Math.Max(12_500_000, total);
-        AnimatePreviewGauge(wifi / gaugeScale, mobile / gaugeScale);
+        _targetWifi = wifi / gaugeScale;
+        _targetMobile = mobile / gaugeScale;
+        if (!_previewRendering || !SystemParameters.ClientAreaAnimation)
+            RenderPreviewGauge(_targetWifi, _targetMobile);
         foreach (var item in sample) item.Adapter.AddPreviewSample(item.BytesPerSecond);
     }
 

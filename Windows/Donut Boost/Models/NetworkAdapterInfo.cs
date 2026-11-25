@@ -109,9 +109,10 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
 
     internal void AddPreviewSample(double bytesPerSecond)
     {
+        RenderPreviewSample();
         if (_previewHistory.Count == PreviewSampleCount) _previewHistory.Dequeue();
         _previewHistory.Enqueue(Math.Max(0, bytesPerSecond));
-        double scale = Math.Max(1, _previewHistory.Max());
+        double scale = Math.Max(125_000, _previewHistory.Max());
 
         if (PreviewSparkline.Count == 0)
         {
@@ -140,7 +141,7 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
     {
         if (_previewSampleTime == 0) return;
         double progress = immediate ? 1 : Math.Min(1,
-            System.Diagnostics.Stopwatch.GetElapsedTime(_previewSampleTime).TotalMilliseconds / 550);
+            System.Diagnostics.Stopwatch.GetElapsedTime(_previewSampleTime).TotalMilliseconds / 1000);
         double eased = progress * progress * (3 - 2 * progress);
         PointCollection? updated = null;
         for (int index = 0; index < PreviewSparkline.Count; index++)

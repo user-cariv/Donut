@@ -780,6 +780,7 @@ public class MultiChannelDownloader
                             bool success = false;
                             bool interrupted = false;
                             bool attemptThrew = false;
+                            int retryDelayMs = 0;
                             long bytesBeforeAttempt = chunk.BytesDownloaded;
                             using var adapterTransfer = new AdapterTransferCancellation(adp, token);
                             try
@@ -814,8 +815,7 @@ public class MultiChannelDownloader
                                     }
                                     else
                                     {
-                                        int delayMs = Math.Min(4000, 250 * (1 << Math.Min(chunk.ConsecutiveFailures, 4)));
-                                        await Task.Delay(delayMs, token);
+                                        retryDelayMs = Math.Min(4000, 250 * (1 << Math.Min(chunk.ConsecutiveFailures, 4)));
                                     }
                                 }
                             }
@@ -835,7 +835,7 @@ public class MultiChannelDownloader
                                 }
                                 else
                                 {
-                                    await Task.Delay(Math.Min(4000, 250 * (1 << Math.Min(chunk.ConsecutiveFailures, 4))), token);
+                                    retryDelayMs = Math.Min(4000, 250 * (1 << Math.Min(chunk.ConsecutiveFailures, 4)));
                                 }
                             }
 
@@ -848,6 +848,10 @@ public class MultiChannelDownloader
                                     pendingQueue.Enqueue(chunk);
                                 }
                             }
+
+                            // Let a healthy worker resume the saved range while this worker backs off.
+                            if (retryDelayMs > 0)
+                                await Task.Delay(retryDelayMs, token);
 
                             if (!success && token.IsCancellationRequested) break;
                         }
