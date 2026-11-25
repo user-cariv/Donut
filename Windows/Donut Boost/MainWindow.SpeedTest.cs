@@ -17,7 +17,7 @@ public partial class MainWindow
 
     private async void SpeedTestButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_showingSpeedTest)
+        if (_speedTestCancellation is not null)
         {
             RestoreLiveSpeedGauge();
             return;
@@ -30,7 +30,7 @@ public partial class MainWindow
 
         using var cancellation = new CancellationTokenSource();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
-        deadline.CancelAfter(TimeSpan.FromSeconds(25));
+        deadline.CancelAfter(TimeSpan.FromSeconds(50));
         ShowPreviewDownloads_Click(sender, e);
         _speedTestCancellation = cancellation;
         _showingSpeedTest = true;
@@ -38,7 +38,8 @@ public partial class MainWindow
         SpeedGaugeHeading.Text = "D O W N L O A D  T E S T";
         LiveSpeedGaugeDetail.Visibility = Visibility.Collapsed;
         SpeedTestGaugeDetail.Visibility = Visibility.Visible;
-        SpeedTestGaugeDetail.Text = "Measuring to Cloudflare…";
+        SpeedTestGaugeDetail.Text = "Connecting to Cloudflare…";
+        LiveTrafficButton.Visibility = Visibility.Collapsed;
         _targetWifi = _targetMobile = 0;
         _shownTestMbps = _targetTestMbps = 0;
         _hasTestReading = false;
@@ -48,14 +49,15 @@ public partial class MainWindow
         long received = 0;
         long lastBytes = 0;
         var sampleClock = Stopwatch.StartNew();
-        var progressTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(125) };
+        var progressTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         progressTimer.Tick += (_, _) =>
         {
             if (_speedTestCancellation != cancellation) return;
-            long bytes = Interlocked.Read(ref received);
-            if (bytes == 0) return;
             double seconds = sampleClock.Elapsed.TotalSeconds;
             sampleClock.Restart();
+            long bytes = Interlocked.Read(ref received);
+            if (bytes == 0) return;
+            SpeedTestGaugeDetail.Text = "Measuring to Cloudflare…";
             UpdateSpeedTestTarget((bytes - lastBytes) * 8.0 / seconds / 1_000_000);
             lastBytes = bytes;
         };
@@ -67,7 +69,7 @@ public partial class MainWindow
             double mbps = await MeasureDownloadMbpsAsync(client, deadline.Token, bytes => Interlocked.Add(ref received, bytes));
             if (cancellation.IsCancellationRequested) return;
             UpdateSpeedTestTarget(mbps);
-            SpeedTestGaugeDetail.Text = "Cloudflare · 96 MiB";
+            SpeedTestGaugeDetail.Text = "Cloudflare · 192 MiB measured";
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         catch (Exception ex) when (ex is HttpRequestException or IOException or OperationCanceledException)
@@ -87,10 +89,16 @@ public partial class MainWindow
             if (_speedTestCancellation == cancellation)
             {
                 _speedTestCancellation = null;
-                if (!_windowClosed && _showingSpeedTest) SpeedTestButton.Content = "Live traffic";
+                if (!_windowClosed && _showingSpeedTest)
+                {
+                    SpeedTestButton.Content = "Test again";
+                    LiveTrafficButton.Visibility = Visibility.Visible;
+                }
             }
         }
     }
+
+    private void LiveTrafficButton_Click(object sender, RoutedEventArgs e) => RestoreLiveSpeedGauge();
 
     private void RestoreLiveSpeedGauge()
     {
@@ -99,6 +107,7 @@ public partial class MainWindow
         _speedTestCancellation = null;
         _showingSpeedTest = false;
         SpeedTestButton.Content = "Speed test";
+        LiveTrafficButton.Visibility = Visibility.Collapsed;
         SpeedGaugeHeading.Text = "C O M B I N E D";
         SpeedTestGaugeDetail.Visibility = Visibility.Collapsed;
         LiveSpeedGaugeDetail.Visibility = Visibility.Visible;
@@ -128,28 +137,32 @@ public partial class MainWindow
         Action<int>? onBytesReceived = null)
     {
         const int streamCount = 12;
-        const int bytesPerStream = 8 * 1024 * 1024;
+        const int warmupBytes = 512 * 1024;
+        const int bytesPerStream = 16 * 1024 * 1024;
         string run = Guid.NewGuid().ToString("N");
+        await Task.WhenAll(Enumerable.Range(0, streamCount).Select(index => DownloadAsync(index, warmupBytes, null)))
+            .ConfigureAwait(false);
         var clock = Stopwatch.StartNew();
-        var counts = await Task.WhenAll(Enumerable.Range(0, streamCount).Select(DownloadAsync));
+        var counts = await Task.WhenAll(Enumerable.Range(0, streamCount).Select(index => DownloadAsync(index, bytesPerStream, onBytesReceived)))
+            .ConfigureAwait(false);
         return counts.Sum() * 8.0 / clock.Elapsed.TotalSeconds / 1_000_000;
 
-        async Task<int> DownloadAsync(int index)
+        async Task<int> DownloadAsync(int index, int requestedBytes, Action<int>? onRead)
         {
             using var response = await client.GetAsync(
-                $"https://speed.cloudflare.com/__down?bytes={bytesPerStream}&run={run}&stream={index}",
+                $"https://speed.cloudflare.com/__down?bytes={requestedBytes}&run={run}&stream={index}",
                 HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             await using var stream = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
             var buffer = new byte[64 * 1024];
             int received = 0;
-            while (received < bytesPerStream)
+            while (received < requestedBytes)
             {
-                int read = await stream.ReadAsync(buffer.AsMemory(0, Math.Min(buffer.Length, bytesPerStream - received)), token)
+                int read = await stream.ReadAsync(buffer.AsMemory(0, Math.Min(buffer.Length, requestedBytes - received)), token)
                     .ConfigureAwait(false);
                 if (read == 0) throw new EndOfStreamException("The test server returned less data than requested.");
                 received += read;
-                onBytesReceived?.Invoke(read);
+                onRead?.Invoke(read);
             }
             return received;
         }

@@ -109,7 +109,8 @@ public partial class MainWindow
         _lastGaugeFrame = frame;
         if (elapsed <= TimeSpan.Zero) return;
 
-        double weight = 1 - Math.Exp(-elapsed.TotalMilliseconds / 185);
+        double settleTime = _showingSpeedTest ? 620 : 240;
+        double weight = 1 - Math.Exp(-elapsed.TotalMilliseconds / settleTime);
         if (_shownWifi != _targetWifi || _shownMobile != _targetMobile)
             RenderPreviewGauge(ApproachGaugeTarget(_shownWifi, _targetWifi, weight),
                 ApproachGaugeTarget(_shownMobile, _targetMobile, weight));
@@ -143,7 +144,9 @@ public partial class MainWindow
         double wifi = sample.Where(item => item.Adapter.IsWifi).Sum(item => item.BytesPerSecond);
         double mobile = sample.Where(item => item.Adapter.IsMobilePhone && !item.Adapter.IsWifi).Sum(item => item.BytesPerSecond);
         double total = sample.Sum(item => item.BytesPerSecond);
-        double gaugeScale = Math.Max(12_500_000, total);
+        double gaugeScale = _showingSpeedTest
+            ? Math.Max(62_500_000, total * 1.15)
+            : Math.Max(12_500_000, total);
         _targetWifi = wifi / gaugeScale;
         _targetMobile = mobile / gaugeScale;
         if (!_previewRendering || !SystemParameters.ClientAreaAnimation)
