@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Send to Donut Boost",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Send a direct download link or magnet link from Chrome to Donut Boost.",
   "icons": {
     "16": "icons/boost-16.png",
