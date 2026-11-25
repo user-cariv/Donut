@@ -138,14 +138,20 @@ public partial class MainWindow
     {
         const int streamCount = 12;
         const int warmupBytes = 512 * 1024;
-        const int bytesPerStream = 16 * 1024 * 1024;
+        const int bytesPerRequest = 8 * 1024 * 1024;
         string run = Guid.NewGuid().ToString("N");
         await Task.WhenAll(Enumerable.Range(0, streamCount).Select(index => DownloadAsync(index, warmupBytes, null)))
             .ConfigureAwait(false);
         var clock = Stopwatch.StartNew();
-        var counts = await Task.WhenAll(Enumerable.Range(0, streamCount).Select(index => DownloadAsync(index, bytesPerStream, onBytesReceived)))
-            .ConfigureAwait(false);
+        var counts = await Task.WhenAll(Enumerable.Range(0, streamCount).Select(MeasureStreamAsync)).ConfigureAwait(false);
         return counts.Sum() * 8.0 / clock.Elapsed.TotalSeconds / 1_000_000;
+
+        async Task<int> MeasureStreamAsync(int index)
+        {
+            int first = await DownloadAsync(index, bytesPerRequest, onBytesReceived).ConfigureAwait(false);
+            int second = await DownloadAsync(index + streamCount, bytesPerRequest, onBytesReceived).ConfigureAwait(false);
+            return first + second;
+        }
 
         async Task<int> DownloadAsync(int index, int requestedBytes, Action<int>? onRead)
         {
