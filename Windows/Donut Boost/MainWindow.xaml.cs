@@ -1161,6 +1161,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _windowClosed = true;
+        _speedTestResultTimer.Stop();
         _speedTestCancellation?.Cancel();
         DisposeNotificationArea();
         _stopSystemMerge?.Set();

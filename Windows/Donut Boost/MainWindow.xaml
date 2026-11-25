@@ -501,7 +501,7 @@
                                         <Button x:Name="PauseResumeButton" Click="PauseResumeButton_Click" Style="{StaticResource BoostButtonStyle}" Width="174" Height="54" FontSize="18" FontWeight="Bold" Padding="15,8" Margin="0,0,8,0" IsEnabled="False">
                                             <TextBlock x:Name="PauseResumeButtonText" Text="⏸ Pause"/>
                                         </Button>
-                                        <Button Background="#382025" BorderBrush="#AE5151" Foreground="#FF8077" x:Name="CancelDownloadButton" Click="CancelDownloadButton_Click" Style="{StaticResource SecondaryButtonStyle}" Width="174" Height="54" FontSize="18" FontWeight="Bold" Padding="15,8" Margin="0,0,8,0" IsEnabled="False">
+                                        <Button Background="#382025" BorderBrush="#AE5151" Foreground="#FF8077" x:Name="CancelDownloadButton" Click="CancelDownloadButton_Click" Style="{StaticResource SecondaryButtonStyle}" Width="174" Height="54" FontSize="18" FontWeight="Bold" Padding="15,8" IsEnabled="False">
                                             <TextBlock Text="✕ Cancel"/>
                                         </Button>
 

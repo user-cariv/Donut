@@ -9,6 +9,7 @@ namespace DonutBoost;
 public partial class MainWindow
 {
     private CancellationTokenSource? _speedTestCancellation;
+    private readonly DispatcherTimer _speedTestResultTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     private bool _showingSpeedTest;
     private double _liveGaugeMbps;
     private double _shownTestMbps;
@@ -28,6 +29,7 @@ public partial class MainWindow
             return;
         }
 
+        _speedTestResultTimer.Stop();
         using var cancellation = new CancellationTokenSource();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
         deadline.CancelAfter(TimeSpan.FromSeconds(50));
@@ -89,13 +91,18 @@ public partial class MainWindow
             if (_speedTestCancellation == cancellation)
             {
                 _speedTestCancellation = null;
-                if (!_windowClosed && _showingSpeedTest) SpeedTestButton.Content = "Test again";
+                if (!_windowClosed && _showingSpeedTest)
+                {
+                    SpeedTestButton.Content = "Test again";
+                    _speedTestResultTimer.Start();
+                }
             }
         }
     }
 
     private void RestoreLiveSpeedGauge()
     {
+        _speedTestResultTimer.Stop();
         if (!_showingSpeedTest) return;
         _speedTestCancellation?.Cancel();
         _speedTestCancellation = null;

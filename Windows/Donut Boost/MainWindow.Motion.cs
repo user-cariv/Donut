@@ -16,6 +16,7 @@ public partial class MainWindow
 
     private void InitializePreviewMotion()
     {
+        _speedTestResultTimer.Tick += (_, _) => RestoreLiveSpeedGauge();
         AdaptersItemsControl.ItemsSource = _previewAdapters;
         AddHandler(Mouse.PreviewMouseMoveEvent, new MouseEventHandler(PreviewPointerMoved), true);
         AddHandler(Mouse.PreviewMouseDownEvent, new MouseButtonEventHandler(PreviewPointerPressed), true);
