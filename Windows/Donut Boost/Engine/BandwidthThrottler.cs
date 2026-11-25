@@ -53,8 +53,9 @@ public class BandwidthThrottler
         }
     }
 
-    internal Task PaceAsync(int bytesRead, CancellationToken token)
+    internal Task PaceWifiAsync(Models.NetworkAdapterInfo adapter, int bytesRead, CancellationToken token)
     {
+        if (!adapter.IsWifi) return Task.CompletedTask;
         double delay = ReserveDelayMilliseconds(bytesRead);
         return delay >= 1 ? Task.Delay(TimeSpan.FromMilliseconds(delay), token) : Task.CompletedTask;
     }

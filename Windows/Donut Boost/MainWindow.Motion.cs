@@ -60,11 +60,30 @@ public partial class MainWindow
     {
         var frame = _wallpaperElapsed.Elapsed;
         AdvancePreviewGauge(frame);
-        double phase = frame.TotalSeconds * Math.Tau / 24;
-        WallpaperTravel.X = Math.Sin(phase) * WallpaperViewport.ActualWidth * 0.37;
-        WallpaperTravel.Y = Math.Cos(phase) * WallpaperViewport.ActualHeight * 0.30;
+        AdvanceWallpaper(frame);
         foreach (var adapter in _previewAdapters)
             adapter.RenderPreviewSample();
+    }
+
+    private void AdvanceWallpaper(TimeSpan frame)
+    {
+        double phase = frame.TotalSeconds * Math.Tau / 24;
+        double direction = Math.Sin(phase);
+        double width = WallpaperViewport.ActualWidth;
+        double height = WallpaperViewport.ActualHeight;
+        WallpaperTravel.X = direction * width * 0.39;
+        WallpaperTravel.Y = Math.Sin(phase + Math.PI / 5) * height * 0.36;
+
+        // Separate near the turns and merge as the travel path crosses the center.
+        double split = Math.Pow(direction, 4);
+        double inward = -direction * split;
+        WallpaperUpperTravel.X = inward * Math.Min(width * 0.24, 310);
+        WallpaperUpperTravel.Y = direction * split * Math.Min(height * 0.15, 120);
+        WallpaperLowerTravel.X = inward * Math.Min(width * 0.08, 105);
+        WallpaperLowerTravel.Y = inward * Math.Min(height * 0.40, 290);
+        WallpaperGlow.Opacity = 1 - split * 0.34;
+        WallpaperUpperGlow.Opacity = split * 0.60;
+        WallpaperLowerGlow.Opacity = split * 0.54;
     }
     private void SyncPreviewAdapters(IReadOnlyList<NetworkAdapterInfo> adapters)
     {

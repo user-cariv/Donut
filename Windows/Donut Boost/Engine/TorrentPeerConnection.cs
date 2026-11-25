@@ -10,6 +10,7 @@ namespace DonutBoost.Engine;
 internal sealed class TorrentPeerConnection : IPeerConnection
 {
     private readonly Func<IReadOnlyList<NetworkAdapterInfo>> _getAdapters;
+    private readonly BandwidthThrottler _wifiThrottler;
     private readonly CancellationToken _sessionToken;
     private readonly object _connectionLock = new();
     private NetworkAdapterInfo? _adapter;
@@ -17,12 +18,13 @@ internal sealed class TorrentPeerConnection : IPeerConnection
     private bool _disposed;
 
     public TorrentPeerConnection(Uri uri, Func<IReadOnlyList<NetworkAdapterInfo>> getAdapters,
-        CancellationToken sessionToken)
+        BandwidthThrottler wifiThrottler, CancellationToken sessionToken)
     {
         Uri = uri;
         EndPoint = new IPEndPoint(IPAddress.Parse(uri.DnsSafeHost), uri.Port);
         AddressBytes = EndPoint.Address.GetAddressBytes();
         _getAdapters = getAdapters;
+        _wifiThrottler = wifiThrottler;
         _sessionToken = sessionToken;
     }
 
@@ -92,7 +94,10 @@ internal sealed class TorrentPeerConnection : IPeerConnection
             (destination, token) => socket.ReceiveAsync(destination, SocketFlags.None, token), _sessionToken);
         if (count < 0) throw new SocketException((int)SocketError.ConnectionAborted);
         if (count > 0)
+        {
             adapter.AddDownloadedBytes(count);
+            await _wifiThrottler.PaceWifiAsync(adapter, count, _sessionToken);
+        }
         return count;
     }
 

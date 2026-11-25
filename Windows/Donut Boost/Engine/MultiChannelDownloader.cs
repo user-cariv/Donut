@@ -418,15 +418,13 @@ public class MultiChannelDownloader
             return adapters.Skip(first).Concat(adapters.Take(first)).ToArray();
         }
         var factories = Factories.Default
-            .WithPeerConnectionCreator("ipv4", uri => new TorrentPeerConnection(uri, GetPeerAdapters, token))
-            .WithPeerConnectionCreator("ipv6", uri => new TorrentPeerConnection(uri, GetPeerAdapters, token));
-        int TorrentDownloadRate() => (int)Math.Min(int.MaxValue, _throttler.CurrentLimitMbps * 125_000);
+            .WithPeerConnectionCreator("ipv4", uri => new TorrentPeerConnection(uri, GetPeerAdapters, _throttler, token))
+            .WithPeerConnectionCreator("ipv6", uri => new TorrentPeerConnection(uri, GetPeerAdapters, _throttler, token));
         bool bondPeers = BondTorrentPeers;
         var settings = new EngineSettingsBuilder
         {
             CacheDirectory = cacheDirectory,
-            AllowPortForwarding = false,
-            MaximumDownloadRate = TorrentDownloadRate()
+            AllowPortForwarding = false
         };
         if (bondPeers)
         {
@@ -497,13 +495,6 @@ public class MultiChannelDownloader
             int exhaustedPolls = 0;
             while (!token.IsCancellationRequested && !_torrentManager.Complete)
             {
-                int downloadRate = TorrentDownloadRate();
-                if (settings.MaximumDownloadRate != downloadRate)
-                {
-                    settings.MaximumDownloadRate = downloadRate;
-                    await _torrentEngine.UpdateSettingsAsync(settings.ToSettings());
-                }
-
                 exhaustedPolls = bondPeers && AllAdapterDataLimitsReached(_bondingManager.GetActiveEnabledAdapters())
                     ? exhaustedPolls + 1 : 0;
                 if (exhaustedPolls >= 4)
@@ -1004,7 +995,7 @@ public class MultiChannelDownloader
 
             adapter.AddDownloadedBytes(bytesRead);
             session.AddDownloadedBytes(bytesRead);
-            await _throttler.PaceAsync(bytesRead, token);
+            await _throttler.PaceWifiAsync(adapter, bytesRead, token);
             if (chunk.BytesDownloaded == chunk.TotalBytes)
             {
                 chunk.IsCompleted = true;
@@ -1138,7 +1129,7 @@ public class MultiChannelDownloader
                     adapter.AddDownloadedBytes(bytesRead);
                     session.AddDownloadedBytes(bytesRead);
 
-                    await _throttler.PaceAsync(bytesRead, transferToken);
+                    await _throttler.PaceWifiAsync(adapter, bytesRead, transferToken);
 
                     if (stopwatch.ElapsedMilliseconds >= 250)
                     {

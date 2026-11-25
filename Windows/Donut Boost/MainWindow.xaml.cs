@@ -443,7 +443,7 @@ public partial class MainWindow : Window
         PreviewMobile.IsChecked = _bondingManager.CurrentMode == BondingMode.MobileDataOnly;
         MovePreviewModePill();
         double cap = _downloader.Throttler.CurrentLimitMbps;
-        string capText = cap > 0 ? $" • Donut download cap: {cap:0.##} Mbps" : "";
+        string capText = cap > 0 ? $" • Donut Wi-Fi cap: {cap:0.##} Mbps" : "";
         FooterStatusModeText.Text = (_bondingManager.CurrentMode switch
         {
             BondingMode.CombineAll => "⚡ Donut downloads: all selected adapters",

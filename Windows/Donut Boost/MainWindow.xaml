@@ -37,18 +37,31 @@
         </Grid.RowDefinitions>
 
         <Grid x:Name="WallpaperViewport" Grid.RowSpan="3" ClipToBounds="True" IsHitTestVisible="False">
-            <Ellipse Width="940" Height="690" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <Ellipse.CacheMode><BitmapCache/></Ellipse.CacheMode>
-                <Ellipse.RenderTransform><TranslateTransform x:Name="WallpaperTravel"/></Ellipse.RenderTransform>
-                <Ellipse.Fill>
-                    <RadialGradientBrush RadiusX="0.5" RadiusY="0.5">
+            <Grid.Resources>
+                    <RadialGradientBrush x:Key="WallpaperGlowBrush" RadiusX="0.5" RadiusY="0.5">
                         <GradientStop Color="#92552508"/>
                         <GradientStop Color="#69582B0B" Offset="0.28"/>
                         <GradientStop Color="#30582B0B" Offset="0.63"/>
                         <GradientStop Color="#00582B0B" Offset="1"/>
                     </RadialGradientBrush>
-                </Ellipse.Fill>
-            </Ellipse>
+            </Grid.Resources>
+            <Grid>
+                <Grid.RenderTransform><TranslateTransform x:Name="WallpaperTravel"/></Grid.RenderTransform>
+                <Ellipse x:Name="WallpaperGlow" Width="940" Height="690" HorizontalAlignment="Center" VerticalAlignment="Center"
+                         Fill="{StaticResource WallpaperGlowBrush}">
+                    <Ellipse.CacheMode><BitmapCache/></Ellipse.CacheMode>
+                </Ellipse>
+                <Ellipse x:Name="WallpaperUpperGlow" Width="740" Height="550" HorizontalAlignment="Center" VerticalAlignment="Center"
+                         Fill="{StaticResource WallpaperGlowBrush}" Opacity="0">
+                    <Ellipse.CacheMode><BitmapCache/></Ellipse.CacheMode>
+                    <Ellipse.RenderTransform><TranslateTransform x:Name="WallpaperUpperTravel"/></Ellipse.RenderTransform>
+                </Ellipse>
+                <Ellipse x:Name="WallpaperLowerGlow" Width="700" Height="510" HorizontalAlignment="Center" VerticalAlignment="Center"
+                         Fill="{StaticResource WallpaperGlowBrush}" Opacity="0">
+                    <Ellipse.CacheMode><BitmapCache/></Ellipse.CacheMode>
+                    <Ellipse.RenderTransform><TranslateTransform x:Name="WallpaperLowerTravel"/></Ellipse.RenderTransform>
+                </Ellipse>
+            </Grid>
         </Grid>
 
         <!-- Title bar -->
@@ -537,9 +550,9 @@
                             <StackPanel>
                                 <DockPanel>
                                     <TextBlock x:Name="PreviewDownloadLimitText" DockPanel.Dock="Right" Text="Unlimited" Foreground="#FFB63E" FontWeight="SemiBold"/>
-                                    <TextBlock Text="Download speed limit" FontSize="15" Foreground="#F4EFE6" FontWeight="Bold"/>
+                                    <TextBlock Text="Wi-Fi speed limit" FontSize="15" Foreground="#F4EFE6" FontWeight="Bold"/>
                                 </DockPanel>
-                                <Slider x:Name="PreviewDownloadLimit" Minimum="-1" Maximum="3" Value="3" SmallChange="0.1" LargeChange="0.25" IsMoveToPointEnabled="True" ValueChanged="PreviewDownloadLimit_Changed" PreviewMouseDown="StopDownloadSliderAnimation" PreviewKeyDown="StopDownloadSliderAnimation" Margin="2,9,2,5" Height="22" AutomationProperties.Name="Combined speed limit for Donut downloads">
+                                <Slider x:Name="PreviewDownloadLimit" Minimum="-1" Maximum="3" Value="3" SmallChange="0.1" LargeChange="0.25" IsMoveToPointEnabled="True" ValueChanged="PreviewDownloadLimit_Changed" PreviewMouseDown="StopDownloadSliderAnimation" PreviewKeyDown="StopDownloadSliderAnimation" Margin="2,9,2,5" Height="22" AutomationProperties.Name="Wi-Fi speed limit for Donut downloads" ToolTip="Caps Wi-Fi speed for direct downloads and bonded torrents inside Donut Boost.">
                                     <Slider.Template>
                                         <ControlTemplate TargetType="Slider">
                                             <Grid>
@@ -588,7 +601,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Connections" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                    <TextBlock x:Name="AdapterCountTextBlock" Grid.Column="1" Text="0 Detected" FontSize="11" FontWeight="Bold" Foreground="#78E2DB"/>
+                                    <TextBlock x:Name="AdapterCountTextBlock" Grid.Column="1" Text="0 Detected" FontSize="11" FontWeight="Bold" Foreground="#78E2DB" Margin="0,0,14,0"/>
                                 </Grid>
 
                                 <!-- Adapters List -->
