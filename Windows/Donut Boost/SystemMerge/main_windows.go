@@ -124,6 +124,7 @@ func run() (runErr error) {
 	capturing := true
 	failedSamples := 0
 	var retryMergeAfter time.Time
+	var restoreError error
 	for {
 		result, err := windows.WaitForMultipleObjects(handles, false, 1000)
 		if err != nil {
@@ -153,13 +154,20 @@ func run() (runErr error) {
 			retryMergeAfter = now.Add(15 * time.Second)
 		} else if !capturing && healthy && !now.Before(retryMergeAfter) {
 			if err := tunnel.On(); err != nil {
-				return fmt.Errorf("could not restore merge routes: %w", err)
+				tunnel.Off()
+				restoreError = err
+				retryMergeAfter = now.Add(15 * time.Second)
+			} else {
+				capturing = true
+				restoreError = nil
 			}
-			capturing = true
 		}
 		message := summarizeLinks(slots, skipped)
 		if !capturing {
 			message = "Using normal Windows routing while merge waits for a stable link. " + message
+			if restoreError != nil {
+				message += fmt.Sprintf(" Last merge attempt: %v", restoreError)
+			}
 		}
 		report(message)
 		last = now
@@ -172,7 +180,7 @@ type adapterScan struct {
 }
 
 func scanAdapters(done <-chan struct{}, updates chan<- adapterScan) {
-	ticker := time.NewTicker(3 * time.Second)
+	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	for {
 		select {

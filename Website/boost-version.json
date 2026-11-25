@@ -2,7 +2,7 @@
   "latestVersion": "1.0.12",
   "minRequiredVersion": "1.0.0",
   "releaseDate": "2026-11-25",
-  "releaseNotes": "Smoother Wi-Fi and mobile speed rings and graphs, a phone icon for tethering, and faster recovery when a bonded download connection stalls. Restart Donut Boost to finish applying the update.",
+  "releaseNotes": "Redesigned Wi-Fi and mobile speed limit dialogs with smoother gauges, automatic reopening after updates, and improved recovery for System Merge and bonded downloads.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }

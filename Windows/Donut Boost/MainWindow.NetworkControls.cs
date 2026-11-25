@@ -109,6 +109,24 @@ public partial class MainWindow
     private void EditAdapterLimits_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { DataContext: NetworkAdapterInfo adapter }) return;
+        if (adapter.IsWifi || adapter.IsMobilePhone)
+        {
+            bool isMobile = adapter.IsMobilePhone;
+            double currentLimit = isMobile ? adapter.DownloadLimitMbps : _downloader.Throttler.CurrentLimitMbps;
+            if (!isMobile && adapter.DownloadLimitMbps > 0)
+                currentLimit = currentLimit == 0 ? adapter.DownloadLimitMbps : Math.Min(currentLimit, adapter.DownloadLimitMbps);
+            var speedDialog = new WifiLimitDialog(currentLimit, isMobile) { Owner = this };
+            if (speedDialog.ShowDialog() == true)
+            {
+                double adapterLimit = isMobile ? speedDialog.LimitMbps : 0;
+                adapter.SetDownloadLimitMbps(adapterLimit);
+                if (adapterLimit == 0) _savedAdapterLimits.Remove(adapter.Id);
+                else _savedAdapterLimits[adapter.Id] = adapterLimit;
+                if (!isMobile) SetWifiLimit(speedDialog.LimitMbps);
+                SaveSpeedLimits();
+            }
+            if (!speedDialog.EditDataBudgets) return;
+        }
 
         var panel = new StackPanel { Margin = new Thickness(20) };
         var dialog = new Window
@@ -131,15 +149,16 @@ public partial class MainWindow
             Text = "Applies to Donut downloads. Use 0 for unlimited. Daily budgets reset at local midnight.",
             TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8)
         });
-        var speed = AddField("Download speed (Mbps)", adapter.DownloadLimitMbps.ToString("0.##"));
+        var speed = adapter.IsWifi || adapter.IsMobilePhone ? null : AddField("Download speed (Mbps)", adapter.DownloadLimitMbps.ToString("0.##"));
         var transfer = AddField("Data per transfer (MB)", adapter.DownloadDataLimitMb.ToString());
         var daily = AddField("Data per day (MB)", adapter.DailyDownloadLimitMb.ToString());
         var save = new Button { Content = "Save limits", IsDefault = true, Style = (Style)FindResource("SecondaryButtonStyle") };
         panel.Children.Add(save);
         save.Click += (_, _) =>
         {
-            if (!double.TryParse(speed.Text.Trim(), NumberStyles.AllowDecimalPoint, CultureInfo.CurrentCulture, out double mbps) ||
-                !IsValidNetworkSpeedLimit(mbps))
+            double mbps = adapter.DownloadLimitMbps;
+            if (speed != null && (!double.TryParse(speed.Text.Trim(), NumberStyles.AllowDecimalPoint, CultureInfo.CurrentCulture, out mbps) ||
+                !IsValidNetworkSpeedLimit(mbps)))
             {
                 MessageBox.Show(dialog, "Enter 0 or a speed from 0.1 to 100,000 Mbps.", dialog.Title);
                 speed.Focus();
@@ -158,7 +177,7 @@ public partial class MainWindow
             SaveSpeedLimits();
             dialog.DialogResult = true;
         };
-        dialog.Loaded += (_, _) => speed.Focus();
+        dialog.Loaded += (_, _) => (speed ?? transfer).Focus();
         dialog.ShowDialog();
 
         bool ReadBudget(TextBox input, out long limit)

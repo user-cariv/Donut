@@ -78,7 +78,7 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Explorer\CLSID\{{
 ; Run the app with the signed-in user's normal privileges after setup.
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch Donut Boost"; Flags: shellexec runasoriginaluser nowait postinstall skipifsilent
 ; In-app updates are silent; reopen the updated app for the user after setup completes.
-Filename: "{app}\{#MyAppExeName}"; Flags: shellexec runasoriginaluser nowait; Check: WizardSilent
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--after-update"; WorkingDir: "{app}"; Flags: shellexec runasoriginaluser nowait; Check: WizardSilent
 
 [UninstallDelete]
 ; Inno removes installed files and its own executable from the install folder.

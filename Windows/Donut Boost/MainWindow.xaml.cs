@@ -36,7 +36,7 @@ public partial class MainWindow : Window
     private static readonly string SpeedLimitsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DonutBoost", "speed-limits.json");
     private sealed record SpeedLimits(Dictionary<string, double> Adapters, Dictionary<string, long>? DataLimits,
-        Dictionary<string, long>? DailyLimits);
+        Dictionary<string, long>? DailyLimits, double WifiMbps = 0);
 
     public MainWindow()
     {
@@ -462,6 +462,8 @@ public partial class MainWindow : Window
             if (!File.Exists(SpeedLimitsPath)) return;
             var settings = JsonSerializer.Deserialize<SpeedLimits>(File.ReadAllText(SpeedLimitsPath));
             if (settings is null) return;
+            if (IsValidNetworkSpeedLimit(settings.WifiMbps))
+                SetWifiLimit(settings.WifiMbps);
             if (settings.Adapters is not null)
                 foreach (var (adapter, limit) in settings.Adapters.Where(entry => IsValidNetworkSpeedLimit(entry.Value)))
                     _savedAdapterLimits[adapter] = limit;
@@ -485,7 +487,7 @@ public partial class MainWindow : Window
             Directory.CreateDirectory(Path.GetDirectoryName(SpeedLimitsPath)!);
             string pending = SpeedLimitsPath + ".tmp";
             File.WriteAllText(pending, JsonSerializer.Serialize(new SpeedLimits(
-                _savedAdapterLimits, _savedAdapterDataLimits, _dailyAdapterLimits)));
+                _savedAdapterLimits, _savedAdapterDataLimits, _dailyAdapterLimits, _downloader.Throttler.CurrentLimitMbps)));
             File.Move(pending, SpeedLimitsPath, overwrite: true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -1118,9 +1120,8 @@ public partial class MainWindow : Window
 
             if (!_windowClosed)
             {
-                UpdateProgressPercentText.Text = "Update installed. Open Donut Boost from Start if it hasn’t reopened.";
-                UpdateNowButtonText.Text = "Installed";
-                _availableUpdate = null;
+                UpdateProgressPercentText.Text = "Update installed. Restarting Donut Boost…";
+                Close();
             }
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }

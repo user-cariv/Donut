@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using DonutBoost.Models;
 using GaugePath = System.Windows.Shapes.Path;
 
@@ -34,19 +35,55 @@ public partial class MainWindow
         }
     }
 
+    private bool _syncingWifiLimit;
+
+    private void StopWifiSliderAnimation(object sender, RoutedEventArgs e)
+    {
+        if (!_syncingWifiLimit) return;
+        PreviewWifiLimit.BeginAnimation(System.Windows.Controls.Primitives.RangeBase.ValueProperty, null);
+        _syncingWifiLimit = false;
+    }
+
     private void PreviewWifiLimit_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (_downloader is null || PreviewWifiLimitText is null) return;
-        double rate = PreviewWifiLimitRate(e.NewValue);
+        if (_syncingWifiLimit || _downloader is null || PreviewWifiLimitText is null) return;
+        SetWifiLimit(PreviewWifiLimitRate(e.NewValue), syncSlider: false);
+    }
+
+    private void SetWifiLimit(double rate, bool syncSlider = true)
+    {
         if (_downloader.Throttler.CurrentLimitMbps != rate)
             _downloader.Throttler.SetLimitMbps(rate);
-        PreviewWifiLimitText.Text = rate == 0 ? "Unlimited" : $"{rate:F0} Mbps";
+        if (syncSlider)
+        {
+            double target = rate == 0 ? 3 :
+                rate <= 100 ? (rate - 50) / 50 : Math.Min(2, 1 + (rate - 100) / 100);
+            double current = PreviewWifiLimit.Value;
+            _syncingWifiLimit = true;
+            var valueProperty = System.Windows.Controls.Primitives.RangeBase.ValueProperty;
+            PreviewWifiLimit.Value = target;
+            if (IsLoaded && SystemParameters.ClientAreaAnimation && current != target)
+            {
+                var animation = PreviewEase(target, 420);
+                animation.From = current;
+                animation.FillBehavior = FillBehavior.Stop;
+                animation.Completed += (_, _) => _syncingWifiLimit = false;
+                PreviewWifiLimit.BeginAnimation(valueProperty, animation);
+            }
+            else
+            {
+                PreviewWifiLimit.BeginAnimation(valueProperty, null);
+                _syncingWifiLimit = false;
+            }
+        }
+        PreviewWifiLimitText.Text = rate == 0 ? "Unlimited" : $"{rate:0.##} Mbps";
         UpdateFooterSpeedLimitText();
     }
 
     internal static double PreviewWifiLimitRate(double position)
     {
         if (position >= 2.96) return 0;
+        if (position < 0) return Math.Max(0.1, Math.Round(50 + position * 50));
         if (position >= 2) return 200;
         if (position >= 1) return 100 + 20 * Math.Round((position - 1) * 5, MidpointRounding.AwayFromZero);
         return 50 + 10 * Math.Round(position * 5, MidpointRounding.AwayFromZero);

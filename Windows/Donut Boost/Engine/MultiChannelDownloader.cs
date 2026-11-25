@@ -805,7 +805,7 @@ public class MultiChannelDownloader
                                     else
                                         chunk.ConsecutiveFailures = 0;
 
-                                    if (IsPermanentHttpFailure(ex) || chunk.ConsecutiveFailures >= 8)
+                                    if (chunk.ConsecutiveFailures >= 8)
                                     {
                                         session.ErrorMessage = IsPermanentHttpFailure(ex)
                                             ? "The download server rejected a byte-range request. Check that the link is valid and accessible."
@@ -892,6 +892,8 @@ public class MultiChannelDownloader
 
         try
         {
+            // Catch connections that arrived while the ranges were being prepared.
+            onAdaptersChanged();
             while (!token.IsCancellationRequested && !chunks.All(c => c.IsCompleted))
             {
                 Task[] currentTasks;

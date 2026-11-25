@@ -25,8 +25,19 @@ public partial class App : Application
         {
             _singleInstanceMutex = new Mutex(false, "DonutBoost_SingleInstance_AppMutex");
             string? link = FindDownloadLink(e.Args);
+            bool ownsInstance = TryAcquireInstance();
+            if (!ownsInstance && e.Args.Contains("--after-update", StringComparer.OrdinalIgnoreCase))
+            {
+                // Wait for the previous instance to release its mutex during shutdown.
+                var wait = Stopwatch.StartNew();
+                while (!ownsInstance && wait.Elapsed < TimeSpan.FromSeconds(30))
+                {
+                    await Task.Delay(200);
+                    ownsInstance = TryAcquireInstance();
+                }
+            }
 
-            if (!TryAcquireInstance())
+            if (!ownsInstance)
             {
                 if ((link != null || !ActivateVisibleInstance()) && await TryForwardHandoffAsync(link ?? ShowWindowCommand))
                 {
