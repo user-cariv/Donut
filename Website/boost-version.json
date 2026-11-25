@@ -1,8 +1,8 @@
 {
   "latestVersion": "1.0.12",
   "minRequiredVersion": "1.0.0",
-  "releaseDate": "2026-11-24",
-  "releaseNotes": "A redesigned Windows app with glass surfaces, live graphs, Wi-Fi-first connection cards, USB phone names when available, and a dedicated System Log. Restart Donut Boost to finish applying the update.",
+  "releaseDate": "2026-11-25",
+  "releaseNotes": "Fixed a crash when connecting a phone for USB tethering. Restart Donut Boost to finish applying the update.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }

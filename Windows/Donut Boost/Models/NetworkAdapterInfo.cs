@@ -2,6 +2,8 @@ using System.ComponentModel;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Windows.Media;
 
 namespace DonutBoost.Models;
 
@@ -90,12 +92,20 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
     }
 
     private const int PreviewSampleCount = 20;
+    private static readonly PointCollection EmptyPreviewSparkline = CreateEmptyPreviewSparkline();
     private readonly Queue<double> _previewHistory = new();
     private readonly double[] _previewStart = new double[PreviewSampleCount];
     private readonly double[] _previewTarget = new double[PreviewSampleCount];
     private long _previewSampleTime;
-    public System.Windows.Media.PointCollection PreviewSparkline { get; } = new();
+    public PointCollection PreviewSparkline { get; private set; } = EmptyPreviewSparkline;
     public string PreviewSparklineBrush => IsWifi ? "#FFAB30" : "#A593FF";
+
+    private static PointCollection CreateEmptyPreviewSparkline()
+    {
+        var points = new PointCollection();
+        points.Freeze();
+        return points;
+    }
 
     internal void AddPreviewSample(double bytesPerSecond)
     {
@@ -105,8 +115,10 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
 
         if (PreviewSparkline.Count == 0)
         {
+            var baseline = new PointCollection(PreviewSampleCount);
             for (int index = 0; index < PreviewSampleCount; index++)
-                PreviewSparkline.Add(new System.Windows.Point(index * 65.0 / (PreviewSampleCount - 1), 15));
+                baseline.Add(new Point(index * 65.0 / (PreviewSampleCount - 1), 15));
+            PublishPreviewSparkline(baseline);
         }
 
         for (int index = 0; index < PreviewSampleCount; index++)
@@ -130,14 +142,27 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
         double progress = immediate ? 1 : Math.Min(1,
             System.Diagnostics.Stopwatch.GetElapsedTime(_previewSampleTime).TotalMilliseconds / 550);
         double eased = progress * progress * (3 - 2 * progress);
+        PointCollection? updated = null;
         for (int index = 0; index < PreviewSparkline.Count; index++)
         {
             var point = PreviewSparkline[index];
             double y = _previewStart[index] + (_previewTarget[index] - _previewStart[index]) * eased;
             if (Math.Abs(point.Y - y) > 0.002 || (progress >= 1 && point.Y != y))
-                PreviewSparkline[index] = new System.Windows.Point(point.X, y);
+            {
+                updated ??= PreviewSparkline.Clone();
+                updated[index] = new Point(point.X, y);
+            }
         }
+        if (updated != null) PublishPreviewSparkline(updated);
         if (progress >= 1) _previewSampleTime = 0;
+    }
+
+    private void PublishPreviewSparkline(PointCollection points)
+    {
+        // Adapter discovery can create models off the WPF dispatcher.
+        points.Freeze();
+        PreviewSparkline = points;
+        OnPropertyChanged(nameof(PreviewSparkline));
     }
     private double _currentSpeedBps;
     public double CurrentSpeedBps
