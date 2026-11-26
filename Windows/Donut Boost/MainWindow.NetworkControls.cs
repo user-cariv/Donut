@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -79,6 +80,8 @@ public partial class MainWindow
             };
             launch.ArgumentList.Add(Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
             launch.ArgumentList.Add(session);
+            if (_systemMergeCaps.Count != 0)
+                launch.ArgumentList.Add(Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(_systemMergeCaps)));
             using var worker = Process.Start(launch) ?? throw new InvalidOperationException("The System merge engine could not start.");
             reportTimer.Start();
             Task exited = worker.WaitForExitAsync();
@@ -133,22 +136,32 @@ public partial class MainWindow
 
         panel.Children.Add(new TextBlock
         {
-            Text = "Applies to Donut downloads. Use 0 for unlimited. Daily budgets reset at local midnight.",
+            Text = "Data budgets apply to Donut downloads. Daily budgets reset at local midnight. The speed cap applies when System merge next starts. Enter 0 for unlimited.",
             TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8)
         });
         var transfer = AddField("Data per transfer (MB)", adapter.DownloadDataLimitMb.ToString());
         var daily = AddField("Data per day (MB)", adapter.DailyDownloadLimitMb.ToString());
+        var mergeCap = AddField("System merge speed cap (Mbps)", _systemMergeCaps.GetValueOrDefault(adapter.Name).ToString(CultureInfo.CurrentCulture));
         var save = new Button { Content = "Save limits", IsDefault = true, Style = (Style)FindResource("SecondaryButtonStyle") };
         panel.Children.Add(save);
         save.Click += (_, _) =>
         {
             if (!ReadBudget(transfer, out long transferMb) || !ReadBudget(daily, out long dailyMb)) return;
+            if (!double.TryParse(mergeCap.Text.Trim(), NumberStyles.AllowDecimalPoint, CultureInfo.CurrentCulture, out double cap) ||
+                !IsValidNetworkSpeedLimit(cap))
+            {
+                MessageBox.Show(dialog, "Enter 0 for unlimited or a speed from 0.1 to 100,000 Mbps.", dialog.Title);
+                mergeCap.Focus();
+                return;
+            }
             adapter.SetDownloadDataLimitMb(transferMb);
             adapter.SetDailyDownloadLimitMb(dailyMb);
             if (transferMb == 0) _savedAdapterDataLimits.Remove(adapter.Id);
             else _savedAdapterDataLimits[adapter.Id] = transferMb;
             if (dailyMb == 0) _dailyAdapterLimits.Remove(adapter.Id);
             else _dailyAdapterLimits[adapter.Id] = dailyMb;
+            if (cap == 0) _systemMergeCaps.Remove(adapter.Name);
+            else _systemMergeCaps[adapter.Name] = cap;
             SaveSpeedLimits();
             dialog.DialogResult = true;
         };

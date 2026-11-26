@@ -44,13 +44,19 @@ Traditional applications route all traffic through a single default gateway. **D
 - **System Proxy Safety:** Automatic registry proxy cleanup on application close, exit, or crash to ensure Windows network settings are never left modified.
 - **Native Windows WPF:** Built on .NET 8 for fast, smooth performance and low CPU/RAM usage.
 
+For system-wide traffic, use an adapter's **System merge speed cap** to limit how much of that link merging can use. The cap is applied per direction when System merge next starts, and the scheduler accounts for it immediately when assigning new connections.
+
 ## Torrent downloads
 
-Paste a BitTorrent magnet link into the download field, or use **Torrent** to choose a `.torrent` file. An HTTP(S) link ending in `.torrent` also works. **Combine connections for torrent peers** assigns outgoing TCP peers to enabled adapters and closes their connections when an adapter is switched off. Tracker and DHT discovery may use the Windows route. Clear the option before starting for the original Windows routing, incoming peers, and HTTP web seeds. Donut Boost shows verified progress and stops the torrent when it completes.
+Paste a BitTorrent magnet link into the download field, or use **Torrent / NZB** to choose a `.torrent` file. An HTTP(S) link ending in `.torrent` also works. **Combine connections for torrent peers** assigns outgoing TCP peers to enabled adapters and closes their connections when an adapter is switched off. Tracker and DHT discovery may use the Windows route. Clear the option before starting for the original Windows routing, incoming peers, and HTTP web seeds. Donut Boost shows verified progress and stops the torrent when it completes.
+
+## Usenet downloads
+
+Choose a local `.nzb` file using **Torrent / NZB**, enter your provider's TLS hostname, port and credentials, then select **Download**. Donut opens parallel NNTP connections across your enabled adapters, checks yEnc article CRCs and file coverage, and publishes the files into a new folder after verification. Provider credentials stay in the running app. The downloader retrieves yEnc attachments and leaves archive extraction and PAR recovery to separate tools.
 
 ## Download queue
 
-Use **Add to queue** for a direct link, magnet link, or torrent file. Leave the time blank to start when the current download finishes, or enter a local time in `HH:mm` format. Scheduled downloads start while the app is open. The queue and its history are saved locally.
+Use **Add to queue** for a direct link, magnet link, torrent file, or NZB. Leave the time blank to start when the current download finishes, or enter a local time in `HH:mm` format. Scheduled downloads start while the app is open. The queue and its history are saved locally. After restarting Donut Boost, configure your provider again to start any queued NZBs.
 
 After a restart, use **Retry selected** on a queued transfer or submit the same direct link with the same destination folder. If the server supports byte ranges and provides an unchanged strong ETag, Donut Boost resumes from its saved checkpoint in the partial file. It may download some later chunks again. Retrying a torrent rechecks its partial data.
 

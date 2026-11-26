@@ -203,6 +203,20 @@ public class NetworkAdapterInfo : INotifyPropertyChanged
 
     public double SpeedMbps => (CurrentSpeedBps * 8) / 1_000_000.0;
 
+    internal double PreviewSpeedBps { get; private set; }
+    public string PreviewDisplaySpeed { get; private set; } = "0.0 Mbps";
+
+    internal void SetPreviewSpeed(double bytesPerSecond)
+    {
+        if (PreviewSpeedBps == bytesPerSecond) return;
+        PreviewSpeedBps = bytesPerSecond;
+        double mbps = bytesPerSecond * 8 / 1_000_000.0;
+        string display = mbps >= 1000 ? $"{mbps / 1000:F2} Gbps" : $"{mbps:F1} Mbps";
+        if (PreviewDisplaySpeed == display) return;
+        PreviewDisplaySpeed = display;
+        OnPropertyChanged(nameof(PreviewDisplaySpeed));
+    }
+
     public string DisplaySpeed
     {
         get

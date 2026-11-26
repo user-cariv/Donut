@@ -351,8 +351,8 @@
                                 </Button>
 
 
-                                <Button x:Name="TorrentDownloadButton" Grid.Column="2" MinHeight="36" Padding="12,5" Click="SelectTorrentButton_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="8,0,0,0" ToolTip="Choose a .torrent file">
-                                    <TextBlock Text="Torrent"/>
+                                <Button x:Name="TorrentDownloadButton" Grid.Column="2" MinHeight="36" Padding="12,5" Click="SelectTorrentButton_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="8,0,0,0" ToolTip="Choose a torrent or Usenet NZB file">
+                                    <TextBlock Text="Torrent / NZB"/>
                                 </Button>
 
                                 <Button x:Name="StartBoostButton" Grid.Column="3" MinWidth="155" MinHeight="38" FontSize="15" Padding="14,5" Click="StartBoostButton_Click" Style="{StaticResource BoostButtonStyle}" Margin="8,0,0,0">
@@ -365,6 +365,29 @@
                         </Border>
                         <ScrollViewer x:Name="PreviewDownloadView" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel>
+                        <Expander Header="Download queue" Margin="0,6,0,8" Foreground="{StaticResource TextPrimaryBrush}">
+                            <StackPanel Margin="0,6,0,0">
+                                <WrapPanel>
+                                    <TextBox x:Name="QueueScheduleText" Width="70" MaxLength="5" ToolTip="Optional local start time in HH:mm"
+                                             AutomationProperties.Name="Optional start time in HH:mm" Margin="0,0,8,0"/>
+                                    <Button Content="Add to queue" Click="AddManualDownloadToQueue_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0"/>
+                                    <Button Content="Retry selected" Click="RetryQueuedDownload_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0"/>
+                                    <Button Content="Remove selected" Click="RemoveQueuedDownload_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                                </WrapPanel>
+                                <TextBlock x:Name="QueueFeedback" TextWrapping="Wrap" Margin="0,4,0,0"
+                                           Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <ListView x:Name="DownloadQueueList" MaxHeight="147" Margin="0,5,0,0"
+                                          Background="{StaticResource SurfaceSubtleBrush}" Foreground="{StaticResource TextPrimaryBrush}">
+                                    <ListView.View>
+                                        <GridView>
+                                            <GridViewColumn Header="Download" DisplayMemberBinding="{Binding Name}" Width="220"/>
+                                            <GridViewColumn Header="Status" DisplayMemberBinding="{Binding StatusText}" Width="175"/>
+                                            <GridViewColumn Header="Details" DisplayMemberBinding="{Binding Detail}" Width="290"/>
+                                        </GridView>
+                                    </ListView.View>
+                                </ListView>
+                            </StackPanel>
+                        </Expander>
                         <DockPanel Margin="0,5,0,0">
                             <Button DockPanel.Dock="Right" VerticalAlignment="Center" Click="OpenBrowserExtensionButton_Click" Margin="10,0,0,0" Padding="12,4" Background="#211A12" BorderBrush="#826028" Foreground="#FFC466" Style="{StaticResource SecondaryButtonStyle}" Content="●  Browser extension"/>
                         <Border x:Name="ActiveTaskCard" Padding="1,4,1,2">
@@ -664,7 +687,8 @@
                                                                         </Style.Triggers>
                                                                     </Style>
                                                                 </StackPanel.Style>
-                                                                <TextBlock Text="{Binding DisplaySpeed}" FontWeight="Bold" FontSize="17" Foreground="#F4EFE6" HorizontalAlignment="Right"/>
+                                                                <TextBlock Text="{Binding PreviewDisplaySpeed}" FontWeight="Bold" FontSize="17" Foreground="#F4EFE6" HorizontalAlignment="Right"
+                                                                           ToolTip="Live inbound traffic on this connection"/>
                                                                 <Polyline Points="{Binding PreviewSparkline}" Stroke="{Binding PreviewSparklineBrush}" StrokeThickness="1.4" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="74" Height="17" HorizontalAlignment="Right" Margin="0,3,0,0"/>
                                                             </StackPanel>
                                                             <Button Content="Data limits" Click="EditAdapterDataLimits_Click" HorizontalAlignment="Left" Padding="8,3" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="10">

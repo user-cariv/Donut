@@ -6,6 +6,7 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using DonutBoost.Models;
+using Microsoft.Win32.SafeHandles;
 using MonoTorrent;
 using MonoTorrent.Client;
 
@@ -30,6 +31,7 @@ public class MultiChannelDownloader
     public bool IsPaused => _isPaused;
     public bool BondTorrentPeers { get; set; } = true;
     public BandwidthThrottler Throttler => _throttler;
+    internal UsenetServer? UsenetSettings { get; set; }
 
     public event Action<DownloadSession>? ProgressUpdated;
     public event Action<DownloadSession>? StatusChanged;
@@ -176,6 +178,40 @@ public class MultiChannelDownloader
                 return;
             }
 
+            if (UsenetDownload.IsInput(url))
+            {
+                var server = UsenetSettings ?? throw new InvalidOperationException("Configure your Usenet provider from the NZB picker.");
+                session.FileName = Path.GetFileName(url);
+                session.Status = DownloadStatus.Downloading;
+                StatusChanged?.Invoke(session);
+                var elapsed = Stopwatch.StartNew();
+                var usenet = UsenetDownload.RunAsync(url, outputFolder, server,
+                    _bondingManager.GetActiveEnabledAdapters, _throttler, () => _isPaused, (bytes, adapter) =>
+                    {
+                        adapter.AddDownloadedBytes(bytes);
+                        session.AddDownloadedBytes(bytes);
+                    }, token);
+                long previousBytes = 0;
+                TimeSpan previousTime = TimeSpan.Zero;
+                while (await Task.WhenAny(usenet, Task.Delay(500)) != usenet)
+                {
+                    long bytes = session.DownloadedBytes;
+                    var now = elapsed.Elapsed;
+                    session.UpdateSpeed(_isPaused ? 0 : (bytes - previousBytes) / (now - previousTime).TotalSeconds);
+                    ProgressUpdated?.Invoke(session);
+                    previousBytes = bytes;
+                    previousTime = now;
+                }
+                session.DestinationPath = await usenet;
+                session.TotalBytes = session.DownloadedBytes;
+                session.UpdateSpeed(session.DownloadedBytes / Math.Max(0.001, elapsed.Elapsed.TotalSeconds));
+                session.Status = DownloadStatus.Completed;
+                ProgressUpdated?.Invoke(session);
+                StatusChanged?.Invoke(session);
+                LogReceived?.Invoke($"Usenet download completed. Files saved to {session.DestinationPath}");
+                return;
+            }
+
             // 1. Check enabled adapters
             var allAdapters = _bondingManager.Adapters.Where(a => a.IsOnline && a.HasDownloadAddress).ToList();
             var enabledAdapters = allAdapters.Where(a => a.IsEnabled).ToList();
@@ -262,7 +298,8 @@ public class MultiChannelDownloader
                 if (resuming)
                 {
                     partialPath = Path.Combine(outputFolder, checkpoint!.PartialName);
-                    _fileStream = new FileStream(partialPath, FileMode.Open, FileAccess.Write, FileShare.Read);
+                    _fileStream = new FileStream(partialPath, FileMode.Open, FileAccess.Write, FileShare.Read,
+                        64 * 1024, useAsync: true);
                     session.DownloadedBytes = checkpoint.ContiguousBytes;
                     session.DestinationPath = partialPath;
                     LogReceived?.Invoke($"Resuming from {session.FormattedDownloadedSize} saved on this device.");
@@ -648,8 +685,9 @@ public class MultiChannelDownloader
         List<NetworkAdapterInfo> probedAdapters, string? entityTag, Action saveCheckpoint,
         Func<NetworkAdapterInfo, HttpClient> getClient, bool requireFileResponse, CancellationToken token)
     {
+        SafeFileHandle output = _fileStream!.SafeFileHandle;
         // Compute chunk size: between 2 MB and 16 MB depending on total size
-        long chunkSize = Math.Clamp(session.TotalBytes / (adapters.Count * 12), 2 * 1024 * 1024, 16 * 1024 * 1024);
+        long chunkSize = Math.Clamp(session.TotalBytes / (adapters.Count * 24L), 1024 * 1024, 8 * 1024 * 1024);
         int chunkIndex = 0;
         long currentOffset = session.DownloadedBytes;
 
@@ -669,8 +707,12 @@ public class MultiChannelDownloader
         }
 
         session.Chunks = chunks;
-        var pendingQueue = new Queue<DownloadChunk>(chunks);
+        var pendingQueue = new LinkedList<DownloadChunk>(chunks);
         var queueLock = new object();
+        var workerClock = Stopwatch.StartNew();
+        var activeRanges = new Dictionary<DownloadChunk, TailRangeTransfer>();
+        var handoffs = new Dictionary<DownloadChunk, (string AdapterId, TimeSpan Expires)>();
+        var handedOff = new HashSet<DownloadChunk>();
 
         LogReceived?.Invoke($"⚡ Bonding pipeline active: {chunks.Count} chunks of {DownloadSession.FormatBytes(chunkSize)} bonded across {adapters.Count} connection(s).");
 
@@ -716,7 +758,7 @@ public class MultiChannelDownloader
             }
         }, token);
 
-        // Worker tasks per network adapter (12 workers for Mobile 5G, 8 for Wi-Fi for maximum 300+ Mbps throughput)
+        // Workers share a queue so the links that finish sooner can claim more ranges.
         var workerTasks = new List<Task>();
         var workerAdapters = new List<NetworkAdapterInfo>();
         var trackedAdapterIds = new HashSet<string>(probedAdapters.Select(a => a.Id));
@@ -726,9 +768,11 @@ public class MultiChannelDownloader
         {
             var client = getClient(adp);
             lock (workerLock) workerAdapters.Add(adp);
-            int workersCount = adp.IsMobilePhone ? 12 : 8;
-            for (int w = 0; w < workersCount; w++)
+            var parallelism = new DownloadParallelism();
+            var recovery = new DownloadLinkRecovery();
+            for (int w = 0; w < DownloadParallelism.MaximumWorkers; w++)
             {
+                int workerIndex = w;
                 lock (workerLock)
                 {
                     workerTasks.Add(Task.Run(async () =>
@@ -756,12 +800,41 @@ public class MultiChannelDownloader
                             }
 
                             DownloadChunk? chunk = null;
+                            TailRangeTransfer? attempt = null;
+                            bool recoveryProbe = false;
                             lock (queueLock)
                             {
-                                if (pendingQueue.Count > 0)
+                                if (pendingQueue.Count >= DownloadParallelism.MaximumWorkers)
+                                    parallelism.Sample(adp.TotalBytesDownloaded, workerClock.Elapsed);
+                                if (workerIndex < parallelism.Workers)
                                 {
-                                    chunk = pendingQueue.Dequeue();
-                                    chunk.AssignedAdapterId = adp.Id;
+                                    var now = workerClock.Elapsed;
+                                    var available = pendingQueue.First;
+                                    while (available != null && handoffs.TryGetValue(available.Value, out var handoff) &&
+                                           handoff.AdapterId != adp.Id && now < handoff.Expires)
+                                        available = available.Next;
+
+                                    if (available != null && recovery.TryStart(now, out recoveryProbe))
+                                    {
+                                        chunk = available.Value;
+                                        pendingQueue.Remove(available);
+                                        handoffs.Remove(chunk);
+                                        chunk.AssignedAdapterId = adp.Id;
+                                        attempt = new TailRangeTransfer(adp, token);
+                                        activeRanges.Add(chunk, attempt);
+                                    }
+                                    else if (pendingQueue.Count == 0 && adp.TotalBytesDownloaded > 0 &&
+                                             !activeRanges.Values.Any(range => range.AdapterId == adp.Id) &&
+                                             !activeRanges.Values.Any(range => range.HandoffTo == adp.Id))
+                                    {
+                                        foreach (var (candidate, source) in activeRanges)
+                                        {
+                                            if (source.AdapterId == adp.Id || source.HandoffTo != null ||
+                                                !source.IsWaitingForNetwork || !handedOff.Add(candidate)) continue;
+                                            source.HandOff(adp.Id);
+                                            break;
+                                        }
+                                    }
                                 }
                             }
 
@@ -777,11 +850,13 @@ public class MultiChannelDownloader
                             bool attemptThrew = false;
                             int retryDelayMs = 0;
                             long bytesBeforeAttempt = chunk.BytesDownloaded;
-                            using var adapterTransfer = new AdapterTransferCancellation(adp, token);
+                            using var adapterTransfer = attempt!;
                             try
                             {
+                                bool hasProvenAlternate = _bondingManager.GetActiveEnabledAdapters().Any(other =>
+                                    other.Id != adp.Id && other.TotalBytesDownloaded > 0 && !other.TransferDataLimit.IsReached);
                                 interrupted = await DownloadChunkWithClientAsync(client, session.Url, chunk, adp, session, entityTag,
-                                    requireFileResponse, adapterTransfer.Token);
+                                    requireFileResponse, hasProvenAlternate, adapterTransfer, output);
                                 success = chunk.IsCompleted;
                             }
                             catch (Exception) when (adapterTransfer.Token.IsCancellationRequested)
@@ -836,13 +911,26 @@ public class MultiChannelDownloader
 
                             // Seamless Handover: If chunk is not completed (e.g. paused, errored, or connection turned OFF mid-download),
                             // return it to pendingQueue immediately so an active connection picks it up right where it left off!
-                            if (!chunk.IsCompleted && !token.IsCancellationRequested && session.Status != DownloadStatus.Failed)
+                            lock (queueLock)
                             {
-                                lock (queueLock)
+                                activeRanges.Remove(chunk);
+                                bool madeProgress = success || chunk.BytesDownloaded > bytesBeforeAttempt;
+                                recovery.Finish(workerClock.Elapsed, recoveryProbe, madeProgress,
+                                    stalled: retryDelayMs > 0 && !_isPaused && adp.IsEnabled && adp.IsOnline);
+                                if (!chunk.IsCompleted && !token.IsCancellationRequested && session.Status != DownloadStatus.Failed)
                                 {
-                                    pendingQueue.Enqueue(chunk);
+                                    if (adapterTransfer.HandoffTo is { } destination)
+                                    {
+                                        handoffs.Add(chunk, (destination, workerClock.Elapsed + TimeSpan.FromSeconds(1)));
+                                        pendingQueue.AddFirst(chunk);
+                                    }
+                                    else if (retryDelayMs > 0) pendingQueue.AddFirst(chunk);
+                                    else pendingQueue.AddLast(chunk);
                                 }
                             }
+
+                            if (adapterTransfer.HandoffTo != null && !chunk.IsCompleted)
+                                LogReceived?.Invoke($"Handed off stalled chunk {chunk.Index} from {adp.Name} at {chunk.BytesDownloaded:N0} bytes.");
 
                             // Let a healthy worker resume the saved range while this worker backs off.
                             if (retryDelayMs > 0)
@@ -928,8 +1016,10 @@ public class MultiChannelDownloader
     }
 
     private async Task<bool> DownloadChunkWithClientAsync(HttpClient client, string url, DownloadChunk chunk, NetworkAdapterInfo adapter,
-        DownloadSession session, string? entityTag, bool requireFileResponse, CancellationToken token)
+        DownloadSession session, string? entityTag, bool requireFileResponse, bool hasProvenAlternate, TailRangeTransfer attempt,
+        SafeFileHandle output)
     {
+        var token = attempt.Token;
         // Support resuming chunk from exact downloaded offset
         long startFrom = chunk.StartOffset + chunk.BytesDownloaded;
         if (startFrom > chunk.EndOffset)
@@ -943,7 +1033,15 @@ public class MultiChannelDownloader
         if (entityTag is not null)
             request.Headers.IfRange = new RangeConditionHeaderValue(EntityTagHeaderValue.Parse(entityTag));
 
-        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
+        using var readTimeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        var stallTimeout = TimeSpan.FromSeconds(hasProvenAlternate ? 6 : 12);
+        readTimeout.CancelAfter(stallTimeout);
+        attempt.BeginRead();
+        HttpResponseMessage headers;
+        try { headers = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, readTimeout.Token); }
+        finally { attempt.EndRead(); }
+        using var response = headers;
+        readTimeout.CancelAfter(Timeout.InfiniteTimeSpan);
         response.EnsureSuccessStatusCode();
 
         if (response.StatusCode != System.Net.HttpStatusCode.PartialContent)
@@ -966,7 +1064,6 @@ public class MultiChannelDownloader
         byte[] buffer = new byte[256 * 1024]; // 256 KB high-throughput buffer for 300+ Mbps 5G & gigabit streams
         long writeOffset = startFrom;
         long responseEnd = contentRange.To.Value;
-        using var readTimeout = CancellationTokenSource.CreateLinkedTokenSource(token);
 
         while (writeOffset <= responseEnd)
         {
@@ -974,22 +1071,19 @@ public class MultiChannelDownloader
                 return true;
 
             int length = (int)Math.Min(buffer.Length, responseEnd - writeOffset + 1);
-            readTimeout.CancelAfter(TimeSpan.FromSeconds(20));
-            int bytesRead = await adapter.TransferDataLimit.ReadAsync(buffer.AsMemory(0, length), contentStream.ReadAsync, readTimeout.Token);
+            readTimeout.CancelAfter(stallTimeout);
+            attempt.BeginRead();
+            int bytesRead;
+            try { bytesRead = await adapter.TransferDataLimit.ReadAsync(buffer.AsMemory(0, length), contentStream.ReadAsync, readTimeout.Token); }
+            finally { attempt.EndRead(); }
             readTimeout.CancelAfter(Timeout.InfiniteTimeSpan);
             if (bytesRead < 0) return true;
             if (bytesRead == 0) break;
 
+            await RandomAccess.WriteAsync(output, buffer.AsMemory(0, bytesRead), writeOffset, token);
+            // A checkpoint may only include bytes whose write has completed.
             lock (_fileLock)
-            {
-                token.ThrowIfCancellationRequested();
-                if (_fileStream != null)
-                {
-                    _fileStream.Seek(writeOffset, SeekOrigin.Begin);
-                    _fileStream.Write(buffer, 0, bytesRead);
-                    chunk.BytesDownloaded += bytesRead;
-                }
-            }
+                chunk.BytesDownloaded += bytesRead;
 
             writeOffset += bytesRead;
 
@@ -1188,6 +1282,48 @@ public class MultiChannelDownloader
 
     private static bool AllAdapterDataLimitsReached(IReadOnlyCollection<NetworkAdapterInfo> adapters) =>
         adapters.Count > 0 && adapters.All(adapter => adapter.TransferDataLimit.IsReached);
+
+    private sealed class TailRangeTransfer : IDisposable
+    {
+        private readonly CancellationTokenSource _handoff;
+        private readonly AdapterTransferCancellation _transfer;
+        private long _readStarted;
+
+        public TailRangeTransfer(NetworkAdapterInfo adapter, CancellationToken token)
+        {
+            AdapterId = adapter.Id;
+            _handoff = CancellationTokenSource.CreateLinkedTokenSource(token);
+            _transfer = new AdapterTransferCancellation(adapter, _handoff.Token);
+        }
+
+        public string AdapterId { get; }
+        public string? HandoffTo { get; private set; }
+        public CancellationToken Token => _transfer.Token;
+
+        public bool IsWaitingForNetwork
+        {
+            get
+            {
+                long started = Interlocked.Read(ref _readStarted);
+                return started != 0 && Stopwatch.GetElapsedTime(started) >= TimeSpan.FromSeconds(2);
+            }
+        }
+
+        public void BeginRead() => Interlocked.Exchange(ref _readStarted, Stopwatch.GetTimestamp());
+        public void EndRead() => Interlocked.Exchange(ref _readStarted, 0);
+
+        public void HandOff(string adapterId)
+        {
+            HandoffTo = adapterId;
+            _ = _handoff.CancelAsync();
+        }
+
+        public void Dispose()
+        {
+            _transfer.Dispose();
+            _handoff.Dispose();
+        }
+    }
 
     private sealed class AdapterTransferCancellation : IDisposable
     {

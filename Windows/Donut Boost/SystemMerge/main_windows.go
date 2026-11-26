@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/netip"
@@ -29,7 +31,7 @@ func main() {
 }
 
 func runSystemMerge() (runErr error) {
-	if len(os.Args) != 3 || !windows.GetCurrentProcessToken().IsElevated() {
+	if (len(os.Args) != 3 && len(os.Args) != 4) || !windows.GetCurrentProcessToken().IsElevated() {
 		return fmt.Errorf("start System merge from Donut Boost")
 	}
 	pid, err := strconv.ParseUint(os.Args[1], 10, 32)
@@ -70,6 +72,13 @@ func runSystemMerge() (runErr error) {
 			report(runErr.Error())
 		}
 	}()
+	var limits map[string]float64
+	if len(os.Args) == 4 {
+		limits, err = parseSpeedCaps(os.Args[3])
+		if err != nil {
+			return err
+		}
+	}
 
 	mutex, err := windows.CreateMutex(nil, false, windows.StringToUTF16Ptr("Global\\DonutBoostSystemMerge"))
 	if mutex != 0 {
@@ -102,6 +111,7 @@ func runSystemMerge() (runErr error) {
 		}
 	}
 	scheduler := engine.NewScheduler(adapters)
+	scheduler.SetLimits(limits)
 	scheduler.SetAuto(true)
 	balancer := engine.NewBalancer(scheduler)
 	balancer.SetV6Mode(engine.V6Auto)
@@ -160,6 +170,20 @@ func runSystemMerge() (runErr error) {
 		report(message)
 		last = now
 	}
+}
+
+func parseSpeedCaps(value string) (map[string]float64, error) {
+	var limits map[string]float64
+	encoded, err := base64.StdEncoding.DecodeString(value)
+	if err != nil || len(encoded) > 8192 || json.Unmarshal(encoded, &limits) != nil {
+		return nil, fmt.Errorf("invalid System merge speed caps")
+	}
+	for name, cap := range limits {
+		if name == "" || cap < 0.1 || cap > 100000 {
+			return nil, fmt.Errorf("invalid System merge speed cap")
+		}
+	}
+	return limits, nil
 }
 
 type adapterScan struct {

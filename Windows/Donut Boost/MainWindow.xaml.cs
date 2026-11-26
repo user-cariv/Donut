@@ -33,10 +33,11 @@ public partial class MainWindow : Window
     private readonly Dictionary<Guid, (string CookieHeader, DateTimeOffset Expiry)> _browserSessions = new();
     private readonly Dictionary<string, long> _savedAdapterDataLimits = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, long> _dailyAdapterLimits = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, double> _systemMergeCaps = new(StringComparer.Ordinal);
     private static readonly string SpeedLimitsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DonutBoost", "speed-limits.json");
     private sealed record SpeedLimits(Dictionary<string, long>? DataLimits, Dictionary<string, long>? DailyLimits,
-        [property: JsonPropertyName("WifiMbps")] double DownloadMbps = 0);
+        [property: JsonPropertyName("WifiMbps")] double DownloadMbps = 0, Dictionary<string, double>? SystemMergeCaps = null);
 
     public MainWindow()
     {
@@ -74,6 +75,7 @@ public partial class MainWindow : Window
         _downloader.LogReceived += OnLogReceived;
         try { _downloadQueue.Load(); }
         catch (Exception ex) { OnLogReceived($"Could not load the download queue: {ex.Message}"); }
+        DownloadQueueList.ItemsSource = _downloadQueue.Entries;
         _downloadQueueTimer.Tick += DownloadQueueTimer_Tick;
 
 
@@ -470,6 +472,9 @@ public partial class MainWindow : Window
             if (settings.DailyLimits is not null)
                 foreach (var (adapter, limit) in settings.DailyLimits.Where(entry => entry.Value is > 0 and <= 10_000_000))
                     _dailyAdapterLimits[adapter] = limit;
+            if (settings.SystemMergeCaps is not null)
+                foreach (var (adapter, cap) in settings.SystemMergeCaps.Where(entry => IsValidNetworkSpeedLimit(entry.Value) && entry.Value > 0))
+                    _systemMergeCaps[adapter] = cap;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -484,7 +489,7 @@ public partial class MainWindow : Window
             Directory.CreateDirectory(Path.GetDirectoryName(SpeedLimitsPath)!);
             string pending = SpeedLimitsPath + ".tmp";
             File.WriteAllText(pending, JsonSerializer.Serialize(new SpeedLimits(
-                _savedAdapterDataLimits, _dailyAdapterLimits, _downloader.Throttler.CurrentLimitMbps)));
+                _savedAdapterDataLimits, _dailyAdapterLimits, _downloader.Throttler.CurrentLimitMbps, _systemMergeCaps)));
             File.Move(pending, SpeedLimitsPath, overwrite: true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -708,7 +713,7 @@ public partial class MainWindow : Window
         string url = UrlTextBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(url))
         {
-            MessageBox.Show("Enter a direct HTTP(S) download URL, a magnet link, or choose a .torrent file.", "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show("Enter a direct HTTP(S) URL or magnet link, or choose a torrent or NZB file.", "Donut Boost", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -720,6 +725,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (UsenetDownload.IsInput(url) && _downloader.UsenetSettings is null && !ConfigureUsenetServer()) return;
         try { await RunDownloadAsync(url, _outputFolder); }
         catch (Exception ex) { OnLogReceived($"Download error: {ex.Message}"); }
     }
@@ -794,7 +800,8 @@ public partial class MainWindow : Window
             !_licenseManager.CurrentLicense.IsActive || _bondingManager.GetActiveEnabledAdapters().Count == 0) return;
 
         var entry = _downloadQueue.Entries.FirstOrDefault(item => item.Status == QueueEntryStatus.Queued &&
-            (item.ScheduledAt == null || item.ScheduledAt <= now));
+            (item.ScheduledAt == null || item.ScheduledAt <= now) &&
+            (!UsenetDownload.IsInput(item.Input) || _downloader.UsenetSettings != null));
         if (entry == null) return;
 
         string? browserCookieHeader = null;
@@ -896,12 +903,12 @@ public partial class MainWindow : Window
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "Choose a BitTorrent metadata file",
-            Filter = "Torrent files (*.torrent)|*.torrent",
+            Title = "Choose a torrent or Usenet NZB file",
+            Filter = "Download files (*.torrent;*.nzb)|*.torrent;*.nzb|Torrent files (*.torrent)|*.torrent|Usenet NZB files (*.nzb)|*.nzb",
             CheckFileExists = true,
             Multiselect = false
         };
-        if (dialog.ShowDialog() == true)
+        if (dialog.ShowDialog() == true && (!UsenetDownload.IsInput(dialog.FileName) || ConfigureUsenetServer()))
             UrlTextBox.Text = dialog.FileName;
     }
 
@@ -994,8 +1001,6 @@ public partial class MainWindow : Window
             double combinedReceiveBps = sample.Sum(item => item.BytesPerSecond);
             double mbps = combinedReceiveBps * 8 / 1_000_000.0;
             string speedText = mbps >= 1000 ? $"{(mbps / 1000):F2} Gbps" : $"{mbps:F1} Mbps";
-            _liveGaugeMbps = mbps;
-            if (!_showingSpeedTest) SetSpeedGaugeValue(mbps);
 
             bool isDirectDownloadActive = _downloader.CurrentSession != null &&
                 (_downloader.CurrentSession.Status == DownloadStatus.Downloading ||

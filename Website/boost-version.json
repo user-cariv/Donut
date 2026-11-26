@@ -1,8 +1,8 @@
 {
-  "latestVersion": "1.0.12",
+  "latestVersion": "1.0.13",
   "minRequiredVersion": "1.0.0",
-  "releaseDate": "2026-11-25",
-  "releaseNotes": "Wi-Fi and mobile speed graphs now scroll smoothly between readings. Both speed-limit dialogs have matching Cancel and Save buttons and no data budget controls.",
+  "releaseDate": "2026-11-26",
+  "releaseNotes": "System Merge now accounts for link load and per-adapter speed caps. Direct downloads adapt their parallel streams, recover from link stalls, and write ranges concurrently. The download queue supports scheduling and retries, and the app now downloads verified yEnc attachments from Usenet NZBs over TLS.",
   "downloadUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe",
   "fallbackUrl": "https://user-cariv.github.io/Donut/Install%20Donut%20Boost.exe"
 }

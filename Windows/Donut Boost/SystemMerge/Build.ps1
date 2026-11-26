@@ -1,12 +1,19 @@
-param([Parameter(Mandatory)][string]$OutputDirectory)
+param(
+    [Parameter(Mandatory)][string]$OutputDirectory,
+    [string]$EngineArchive,
+    [string]$DriverArchive
+)
 $ErrorActionPreference = 'Stop'
 $destination = [IO.Path]::GetFullPath($OutputDirectory)
 $work = Join-Path ([IO.Path]::GetTempPath()) ('donut-merge-' + [guid]::NewGuid())
 New-Item -ItemType Directory -Force $work, $destination | Out-Null
 
-$archive = Join-Path $work 'source.zip'
-curl.exe -fsSL --max-time 60 'https://codeload.github.com/net-merge/net-merge/zip/refs/tags/v0.3.7' -o $archive
-if ($LASTEXITCODE -ne 0) { throw 'System Merge source download failed.' }
+$archive = if ($EngineArchive) { [IO.Path]::GetFullPath($EngineArchive) } else { Join-Path $work 'source.zip' }
+if (!$EngineArchive) {
+    curl.exe -4 -fsSL --retry 2 --retry-all-errors --max-time 60 'https://codeload.github.com/net-merge/net-merge/zip/refs/tags/v0.3.7' -o $archive
+    if ($LASTEXITCODE -ne 0) { throw 'System Merge source download failed.' }
+}
+$driverZip = if ($DriverArchive) { [IO.Path]::GetFullPath($DriverArchive) } else { Join-Path $work 'wintun.zip' }
 if ((Get-FileHash $archive).Hash -ne 'D837B54075CEEA5565996EFF0CBE6CE5072A11299F0E105851DD881C05CB3DBA') {
     throw 'System Merge upstream source checksum mismatch.'
 }
@@ -15,6 +22,16 @@ $source = Join-Path $work 'net-merge-0.3.7'
 $command = Join-Path $source 'cmd/donut-system-merge'
 New-Item -ItemType Directory $command | Out-Null
 Copy-Item (Join-Path $PSScriptRoot '*.go') $command
+
+# Retain the pinned scheduler's health and fallback logic while accounting for link load.
+$engineDirectory = Join-Path $source 'internal/engine'
+Copy-Item (Join-Path $PSScriptRoot 'Scheduler/*.go') $engineDirectory
+$schedulerPath = Join-Path $engineDirectory 'sched.go'
+$scheduler = [IO.File]::ReadAllText($schedulerPath)
+$originalScore = 'if score := float64(load+1) / sl.weight[f]; score < bestScore {'
+if (!$scheduler.Contains($originalScore)) { throw 'Pinned scheduler scoring code changed.' }
+[IO.File]::WriteAllText($schedulerPath, $scheduler.Replace($originalScore,
+    'if score := donutFlowScore(sl, f, load, s.auto); score < bestScore {'))
 
 # Reuse the pinned engine's automatic pause/resume policy without starting its tray app.
 foreach ($name in 'autopause.go', 'autopause_test.go') {
@@ -59,12 +76,14 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'System Merge engine build failed.' }
     & (Join-Path $destination 'DonutBoost.SystemMerge.exe') --check
     if ($LASTEXITCODE -ne 0) { throw 'System Merge executable check failed.' }
-    $driverArchive = Join-Path $work 'wintun.zip'
-    curl.exe -fsSL --max-time 60 'https://www.wintun.net/builds/wintun-0.14.1.zip' -o $driverArchive
-    if ($LASTEXITCODE -ne 0 -or (Get-FileHash $driverArchive).Hash -ne '07c256185d6ee3652e09fa55c0b673e2624b565e02c4b9091c79ca7d2f24ef51') {
+    if (!$DriverArchive) {
+        curl.exe -fsSL --retry 2 --max-time 60 'https://www.wintun.net/builds/wintun-0.14.1.zip' -o $driverZip
+        if ($LASTEXITCODE -ne 0) { throw 'Wintun download failed.' }
+    }
+    if ((Get-FileHash $driverZip).Hash -ne '07c256185d6ee3652e09fa55c0b673e2624b565e02c4b9091c79ca7d2f24ef51') {
         throw 'Wintun download failed verification.'
     }
-    Expand-Archive $driverArchive $work
+    Expand-Archive -LiteralPath $driverZip -DestinationPath $work
     $dll = Join-Path $work 'wintun/bin/amd64/wintun.dll'
     $signature = Get-AuthenticodeSignature $dll
     if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'WireGuard LLC') {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"strings"
 	"testing"
 	"unsafe"
@@ -9,6 +10,19 @@ import (
 	"net-merge/internal/engine"
 	"net-merge/internal/nics"
 )
+
+func TestParseSpeedCaps(t *testing.T) {
+	encode := func(value string) string { return base64.StdEncoding.EncodeToString([]byte(value)) }
+	caps, err := parseSpeedCaps(encode(`{"Ethernet 2":5.5,"Wi-Fi":100}`))
+	if err != nil || caps["Ethernet 2"] != 5.5 || caps["Wi-Fi"] != 100 {
+		t.Fatalf("valid caps were not accepted: %v, %v", caps, err)
+	}
+	for _, invalid := range []string{`{"Wi-Fi":0}`, `{"Wi-Fi":100001}`, `{"":5}`, `["Wi-Fi"]`} {
+		if _, err := parseSpeedCaps(encode(invalid)); err == nil {
+			t.Fatalf("accepted invalid speed caps %s", invalid)
+		}
+	}
+}
 
 func TestHealthyLinkCount(t *testing.T) {
 	for _, tc := range []struct {

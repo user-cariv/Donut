@@ -109,8 +109,10 @@ public partial class MainWindow
         _lastGaugeFrame = frame;
         if (elapsed <= TimeSpan.Zero) return;
 
-        double settleTime = _showingSpeedTest ? 620 : 240;
-        double weight = 1 - Math.Exp(-elapsed.TotalMilliseconds / settleTime);
+        AdvanceLiveTraffic(1 - Math.Exp(-elapsed.TotalMilliseconds / 240));
+        if (!_showingSpeedTest) return;
+
+        double weight = 1 - Math.Exp(-elapsed.TotalMilliseconds / 620);
         if (_shownWifi != _targetWifi || _shownMobile != _targetMobile)
             RenderPreviewGauge(ApproachGaugeTarget(_shownWifi, _targetWifi, weight),
                 ApproachGaugeTarget(_shownMobile, _targetMobile, weight));
@@ -139,18 +141,39 @@ public partial class MainWindow
     private void UpdatePreviewGauge(IReadOnlyList<(NetworkAdapterInfo Adapter, double BytesPerSecond)> sample)
     {
         foreach (var item in sample) item.Adapter.AddPreviewSample(item.BytesPerSecond);
-        if (_showingSpeedTest && _speedTestCancellation is null) return;
+        if (!_previewRendering) AdvanceLiveTraffic(1);
+        if (!_showingSpeedTest || _speedTestCancellation is null) return;
 
         double wifi = sample.Where(item => item.Adapter.IsWifi).Sum(item => item.BytesPerSecond);
         double mobile = sample.Where(item => item.Adapter.IsMobilePhone && !item.Adapter.IsWifi).Sum(item => item.BytesPerSecond);
         double total = sample.Sum(item => item.BytesPerSecond);
-        double gaugeScale = _showingSpeedTest
-            ? Math.Max(62_500_000, total * 1.15)
-            : Math.Max(12_500_000, total);
+        double gaugeScale = Math.Max(62_500_000, total * 1.15);
         _targetWifi = wifi / gaugeScale;
         _targetMobile = mobile / gaugeScale;
         if (!_previewRendering || !SystemParameters.ClientAreaAnimation)
             RenderPreviewGauge(_targetWifi, _targetMobile);
+    }
+
+    private void AdvanceLiveTraffic(double weight)
+    {
+        double total = 0;
+        double wifi = 0;
+        double mobile = 0;
+        foreach (var adapter in _previewAdapters)
+        {
+            double speed = ApproachGaugeTarget(adapter.PreviewSpeedBps, adapter.CurrentSpeedBps, weight);
+            adapter.SetPreviewSpeed(speed);
+            total += speed;
+            if (adapter.IsWifi) wifi += speed;
+            else if (adapter.IsMobilePhone) mobile += speed;
+        }
+
+        _liveGaugeMbps = total * 8 / 1_000_000.0;
+        if (_showingSpeedTest) return;
+
+        SetSpeedGaugeValue(_liveGaugeMbps);
+        double scale = Math.Max(12_500_000, total);
+        RenderPreviewGauge(wifi / scale, mobile / scale);
     }
 
     private static void SetArc(GaugePath path, double radius, double fraction)
